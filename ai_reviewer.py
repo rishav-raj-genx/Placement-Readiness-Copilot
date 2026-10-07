@@ -18,7 +18,12 @@ class ReviewResult(BaseModel):
     specific_fixes: list[str]
 
 
-def evaluate_text(text: str) -> ReviewResult:
+class GithubReview(BaseModel):
+    score: int = Field(ge=0, le=100)
+    specific_fixes: list[str]
+
+
+def _get_chat_model():
     use_local_mode = os.getenv("USE_LOCAL_MODE", "").strip().lower() in {
         "1",
         "true",
@@ -27,10 +32,11 @@ def evaluate_text(text: str) -> ReviewResult:
     }
 
     if use_local_mode:
-        model = ChatOllama(model="llama3")
-    else:
-        model = ChatGroq(model="llama-3.1-8b-instant")
+        return ChatOllama(model="llama3")
+    return ChatGroq(model="llama-3.1-8b-instant")
 
+
+def evaluate_text(text: str) -> ReviewResult:
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -45,5 +51,25 @@ markdown, or fields outside the required schema.""",
             ("human", "{resume_text}"),
         ]
     )
-    reviewer = prompt | model.with_structured_output(ReviewResult)
+    reviewer = prompt | _get_chat_model().with_structured_output(ReviewResult)
     return reviewer.invoke({"resume_text": text})
+
+
+def evaluate_github(github_data: dict) -> GithubReview:
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a placement officer reviewing a candidate's GitHub
+profile against software-engineering placement benchmarks. Assess the quality,
+consistency, technical relevance, documentation, and evidence of impact in the
+provided GitHub profile and repositories. Return a score from 0 to 100 and
+specific, practical fixes for improving the repositories.
+You must return only the requested structured response. Do not add commentary,
+markdown, or fields outside the required schema.""",
+            ),
+            ("human", "{github_data}"),
+        ]
+    )
+    reviewer = prompt | _get_chat_model().with_structured_output(GithubReview)
+    return reviewer.invoke({"github_data": str(github_data)})
