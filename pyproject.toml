@@ -1,0 +1,28 @@
+[project]
+name = "profile-review-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Rishav Raj", email = "rishavraj.rr1234@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142.2",
+    "langchain>=1.4.3",
+    "langchain-community>=0.4.2",
+    "langchain-groq>=1.1.3",
+    "pydantic>=2.13.5",
+    "pygithub>=2.10.0",
+    "pymupdf>=1.28.2",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+profile-review-service = "profile_review_service:main"
+
+[build-system]
+requires = ["uv_build>=0.12.4,<0.13.0"]
+build-backend = "uv_build"
