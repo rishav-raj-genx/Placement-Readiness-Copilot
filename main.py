@@ -3,7 +3,14 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from github import GithubException
 from pydantic import BaseModel, Field
 
-from ai_reviewer import GithubReview, ReviewResult, evaluate_github, evaluate_text
+from ai_reviewer import (
+    GithubReview,
+    LinkedInReviewResult,
+    ReviewResult,
+    evaluate_github,
+    evaluate_linkedin_text,
+    evaluate_text,
+)
 from github_service import fetch_github_data
 
 
@@ -13,6 +20,7 @@ app = FastAPI()
 class AnalyzeProfileResponse(BaseModel):
     resume_review: ReviewResult
     github_review: GithubReview
+    linkedin_review: LinkedInReviewResult | None
     total_readiness_score: float = Field(ge=0, le=100)
 
 
@@ -50,6 +58,7 @@ async def review_resume(file: UploadFile = File(...)) -> ReviewResult:
 async def analyze_profile(
     github_username: str = Form(...),
     resume: UploadFile = File(...),
+    linkedin_pdf: UploadFile | None = File(None),
 ) -> AnalyzeProfileResponse:
     resume_text = await extract_pdf_text(resume)
     resume_review = evaluate_text(resume_text)
@@ -63,9 +72,19 @@ async def analyze_profile(
         ) from exc
 
     github_review = evaluate_github(github_data)
-    total_readiness_score = round((resume_review.score + github_review.score) / 2, 2)
+    linkedin_review = None
+    if linkedin_pdf is not None:
+        linkedin_text = await extract_pdf_text(linkedin_pdf)
+        linkedin_review = evaluate_linkedin_text(linkedin_text)
+
+    scores = [resume_review.score, github_review.score]
+    if linkedin_review is not None:
+        scores.append(linkedin_review.score)
+    total_readiness_score = round(sum(scores) / len(scores), 2)
+
     return AnalyzeProfileResponse(
         resume_review=resume_review,
         github_review=github_review,
+        linkedin_review=linkedin_review,
         total_readiness_score=total_readiness_score,
     )
