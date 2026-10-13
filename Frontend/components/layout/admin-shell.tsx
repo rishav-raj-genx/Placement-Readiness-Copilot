@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useAuthStore } from '@/stores/auth-store';
 import { DemoBanner } from '@/components/shared/demo-banner';
+import { toast } from 'sonner';
 
 const adminNavItems = [
   { href: '/admin/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
@@ -38,7 +39,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     await signOut();
-    router.push('/');
+    toast.success('Signed out successfully');
+    router.push('/signin');
   };
 
   const AccountFooter = ({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) => (

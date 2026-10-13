@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Brain, ArrowRight, GraduationCap, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Brain, ArrowRight, GraduationCap, ShieldCheck, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -98,6 +98,16 @@ function SignInContent() {
 
         {/* Card */}
         <div className="signin-animate rounded-2xl border border-border bg-card p-7 shadow-sm space-y-6">
+          {redirectTo && (
+            <div className="flex items-center gap-2.5 rounded-xl border border-brand/30 bg-brand/10 px-3.5 py-2.5 text-xs text-brand font-medium">
+              <Lock className="h-4 w-4 shrink-0 text-brand" />
+              <span>
+                <strong>Protected Route:</strong> Sign in required to access{' '}
+                <code className="rounded bg-brand/15 px-1 py-0.5 text-foreground font-mono">{redirectTo}</code>
+              </span>
+            </div>
+          )}
+
           <h2 className="text-lg font-semibold">Welcome back</h2>
 
           <form onSubmit={handleSignIn} className="space-y-4">
