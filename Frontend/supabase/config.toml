@@ -1,0 +1,3 @@
+[functions.interview-session]
+verify_jwt = true
+entrypoint = "./functions/interview-session/index.ts"

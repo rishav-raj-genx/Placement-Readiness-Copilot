@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 25% 99%;
+    --foreground: 20 14% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 12%;
+    --primary: 20 14% 12%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 10% 96%;
+    --secondary-foreground: 20 14% 12%;
+    --muted: 30 10% 95%;
+    --muted-foreground: 20 10% 45%;
+    --accent: 30 10% 95%;
+    --accent-foreground: 20 14% 12%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 10% 90%;
+    --input: 30 10% 90%;
+    --ring: 20 14% 12%;
+    --brand: 20 85% 55%;
+    --brand-foreground: 0 0% 100%;
+    --success: 142 60% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --chart-1: 20 85% 55%;
+    --chart-2: 142 60% 45%;
+    --chart-3: 197 37% 40%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 72% 51%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  @media (pointer: fine) {
+    html.custom-cursor-active,
+    html.custom-cursor-active * {
+      cursor: none !important;
+    }
+  }
+
+  .orange-cursor {
+    position: fixed;
+    z-index: 9999;
+    top: 0;
+    left: 0;
+    width: 24px;
+    height: 24px;
+    border: 1px solid hsl(var(--brand) / 0.8);
+    border-radius: 9999px;
+    background: hsl(var(--brand) / 0.2);
+    box-shadow: 0 0 18px hsl(var(--brand) / 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: width 180ms ease, height 180ms ease, background-color 180ms ease, opacity 180ms ease;
+  }
+
+  .orange-cursor.is-hovering {
+    width: 36px;
+    height: 36px;
+    background: hsl(var(--brand) / 0.32);
+    box-shadow: 0 0 24px hsl(var(--brand) / 0.3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orange-cursor {
+      transition: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .orange-cursor {
+      display: none;
+    }
+  }
+}
