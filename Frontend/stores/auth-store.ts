@@ -5,6 +5,7 @@ import type { UserProfile, UserRole } from '@/types';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '@/lib/storage';
 import { demoStudent, demoAdmin } from '@/lib/fixtures/users';
 import { supabase } from '@/lib/supabase-client';
+import { setAuthCookies, setDemoCookies, clearAllAuthCookies } from '@/lib/auth-cookies';
 
 const DEMO_FLAG_KEY = 'auth-is-demo';
 
@@ -61,6 +62,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
+      if (data.session) {
+        setAuthCookies(data.session, profile.role);
+      }
+
       set({ user: profile, isLoading: false, isDemoMode: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign in failed';
@@ -72,10 +77,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const user = role === 'admin' ? demoAdmin : demoStudent;
     saveToStorage('auth-user', user);
     saveToStorage(DEMO_FLAG_KEY, true);
-    // Write a lightweight cookie that middleware can read (localStorage is not visible to Edge functions)
-    if (typeof document !== 'undefined') {
-      document.cookie = `demo-session=${role}; path=/; SameSite=Lax`;
-    }
+    setDemoCookies(role);
     set({ user, isDemoMode: true });
   },
 
@@ -98,6 +100,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const profile = await fetchProfile(data.user.id);
       if (!profile) throw new Error('Failed to load profile after signup');
 
+      if (data.session) {
+        setAuthCookies(data.session, profile.role);
+      }
+
       set({ user: profile, isLoading: false, isDemoMode: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed';
@@ -106,35 +112,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    removeFromStorage('auth-user');
+    removeFromStorage(DEMO_FLAG_KEY);
+    clearAllAuthCookies();
+
     const isDemo = get().isDemoMode;
-    if (isDemo) {
-      removeFromStorage('auth-user');
-      removeFromStorage(DEMO_FLAG_KEY);
-      // Clear the demo cookie so middleware stops letting demo users through
-      if (typeof document !== 'undefined') {
-        document.cookie = 'demo-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      }
-      set({ user: null, isDemoMode: false });
-      return;
+    if (!isDemo) {
+      await supabase.auth.signOut().catch(() => {});
     }
-    await supabase.auth.signOut();
-    set({ user: null });
+    set({ user: null, isDemoMode: false });
   },
 
   hydrate: () => {
     const isDemo = loadFromStorage<boolean>(DEMO_FLAG_KEY, false);
     if (isDemo) {
       const user = loadFromStorage<UserProfile | null>('auth-user', null);
+      if (user) {
+        setDemoCookies(user.role);
+      }
       set({ user, isHydrated: true, isDemoMode: true });
       return;
     }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
-        set({ isHydrated: true });
+        clearAllAuthCookies();
+        set({ user: null, isHydrated: true });
         return;
       }
       const profile = await fetchProfile(session.user.id);
+      if (profile) {
+        setAuthCookies(session, profile.role);
+      }
       set({ user: profile, isHydrated: true });
     }).catch(() => {
       set({ isHydrated: true });
@@ -145,6 +154,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
+        clearAllAuthCookies();
         set({ user: null });
         return;
       }
@@ -152,7 +162,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (!session) return;
         (async () => {
           const profile = await fetchProfile(session.user.id);
-          if (profile) set({ user: profile });
+          if (profile) {
+            setAuthCookies(session, profile.role);
+            set({ user: profile });
+          }
         })();
       }
     });
@@ -160,3 +173,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+

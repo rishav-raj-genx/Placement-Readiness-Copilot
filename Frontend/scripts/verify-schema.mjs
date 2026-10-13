@@ -183,7 +183,7 @@ async function main() {
     console.log(`${G}${B}✔  All schema objects verified — database is ready!${R}\n`);
     console.log(`   Rituraj can now point his scripts at:`);
     console.log(`   ${D}SUPABASE_URL${R}  = ${supabaseUrl}`);
-    console.log(`   ${D}SUPABASE_KEY${R}  = ${serviceRoleKey.slice(0, 20)}...  (service role key)\n`);
+    console.log(`   ${D}SUPABASE_KEY${R}  = [CONFIGURED (hidden)]  (service role key)\n`);
   } else {
     console.log(`${RED}${B}✘  Missing objects: ${missing.join(', ')}${R}`);
     console.log(`\n   Run ${Y}src/db/schema.sql${R} in the Supabase SQL Editor:`);

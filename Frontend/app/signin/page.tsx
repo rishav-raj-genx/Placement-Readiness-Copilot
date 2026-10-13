@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Brain, ArrowRight, GraduationCap, ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,11 @@ import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import gsap from 'gsap';
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirectTo');
+
   const { signIn, signInDemo, isLoading, error, clearError } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +26,6 @@ export default function SignInPage() {
   // Mount animation
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Set initial hidden state via GSAP (not Tailwind opacity-0)
       gsap.set('.signin-animate', { opacity: 0, y: 24 });
       gsap.to('.signin-animate', {
         y: 0,
@@ -37,6 +39,16 @@ export default function SignInPage() {
     return () => ctx.revert();
   }, []);
 
+  const getDestination = (role: 'student' | 'admin') => {
+    if (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
+      if (redirectTo.startsWith('/admin') && role !== 'admin') {
+        return '/dashboard';
+      }
+      return redirectTo;
+    }
+    return role === 'admin' ? '/admin/dashboard' : '/dashboard';
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
@@ -48,7 +60,7 @@ export default function SignInPage() {
     const state = useAuthStore.getState();
     if (state.user) {
       toast.success('Signed in successfully', { duration: 5000 });
-      router.push(state.user.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+      router.push(getDestination(state.user.role));
     } else if (state.error) {
       toast.error(state.error);
     }
@@ -57,7 +69,7 @@ export default function SignInPage() {
   const handleDemoSignIn = (role: 'student' | 'admin') => {
     signInDemo(role);
     toast.success(`Signed in as ${role}`, { duration: 5000 });
-    router.push(role === 'admin' ? '/admin/dashboard' : '/dashboard');
+    router.push(getDestination(role));
   };
 
   return (
@@ -189,7 +201,10 @@ export default function SignInPage() {
         {/* Footer link */}
         <p className="signin-animate text-center text-sm text-muted-foreground">
           No account?{' '}
-          <Link href="/signup" className="font-medium text-brand hover:underline underline-offset-4">
+          <Link
+            href={redirectTo ? `/signup?redirectTo=${encodeURIComponent(redirectTo)}` : '/signup'}
+            className="font-medium text-brand hover:underline underline-offset-4"
+          >
             Create one free
           </Link>
         </p>
@@ -199,5 +214,13 @@ export default function SignInPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <SignInContent />
+    </Suspense>
   );
 }

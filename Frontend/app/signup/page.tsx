@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Brain, ArrowRight, Loader2, Check, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,11 @@ const perks = [
   'Application tracker & job board',
 ];
 
-export default function SignUpPage() {
+function SignUpContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirectTo');
+
   const { signUp, isLoading, error, clearError } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,7 +33,6 @@ export default function SignUpPage() {
   // Mount animation
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Set initial hidden state via GSAP (not Tailwind opacity-0)
       gsap.set('.signup-animate', { opacity: 0, y: 24 });
       gsap.to('.signup-animate', {
         y: 0,
@@ -59,7 +61,11 @@ export default function SignUpPage() {
     const state = useAuthStore.getState();
     if (state.user) {
       toast.success('Account created successfully');
-      router.push('/dashboard');
+      const target =
+        redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//') && !redirectTo.startsWith('/admin')
+          ? redirectTo
+          : '/dashboard';
+      router.push(target);
     } else if (state.error) {
       toast.error(state.error);
     }
@@ -191,7 +197,10 @@ export default function SignUpPage() {
         {/* Footer links */}
         <p className="signup-animate text-center text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/signin" className="font-medium text-brand hover:underline underline-offset-4">
+          <Link
+            href={redirectTo ? `/signin?redirectTo=${encodeURIComponent(redirectTo)}` : '/signin'}
+            className="font-medium text-brand hover:underline underline-offset-4"
+          >
             Sign in
           </Link>
         </p>
@@ -201,5 +210,13 @@ export default function SignUpPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <SignUpContent />
+    </Suspense>
   );
 }

@@ -60,7 +60,10 @@ export function AuthModal() {
       const message = mode === 'signup' ? 'Account created successfully' : 'Signed in successfully';
       toast.success(message, { duration: 5000 });
       close();
-      const target = state.user.role === 'admin' ? '/admin/dashboard' : (redirectUrl || '/dashboard');
+      const target =
+        redirectUrl && redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')
+          ? (redirectUrl.startsWith('/admin') && state.user.role !== 'admin' ? '/dashboard' : redirectUrl)
+          : (state.user.role === 'admin' ? '/admin/dashboard' : '/dashboard');
       router.push(target);
     } else if (state.error) {
       toast.error(state.error);
@@ -72,7 +75,10 @@ export function AuthModal() {
     signInDemo(role);
     toast.success(`Signed in as ${role}`, { duration: 5000 });
     close();
-    const target = role === 'admin' ? '/admin/dashboard' : (redirectUrl || '/dashboard');
+    const target =
+      redirectUrl && redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')
+        ? (redirectUrl.startsWith('/admin') && role !== 'admin' ? '/dashboard' : redirectUrl)
+        : (role === 'admin' ? '/admin/dashboard' : '/dashboard');
     router.push(target);
   };
 

@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Next.js Middleware — Server-Side Route Protection (Edge Runtime)
+ * Next.js Middleware — Server-Side Edge Route Protection
  *
- * Runs on the edge BEFORE any page renders. Uses lightweight cookie checks
- * only — no Supabase SDK imports (they use Node.js APIs not available in Edge).
+ * Runs on the Edge BEFORE any page renders.
+ * Uses lightweight cookie verification to ensure zero leakage of protected
+ * routes or server secrets.
  *
- * Rules:
- *  - /admin/*    → must be authenticated (role verified in AuthGuard / API route)
- *  - /(student)/* → must be authenticated
- *  - /signin, /signup → redirect to /dashboard if already logged in
- *  - /api/livekit/* → must be authenticated (JWT check done inside the route)
- *  - Everything else → pass through
+ * Route Protection Rules:
+ *  1. Unauthenticated users:
+ *     - Accessing protected paths (/dashboard, /interview/*, /applications, /jobs, /resources, /admin/*)
+ *       -> Redirects to /signin?redirectTo=<full_path_with_query>
+ *  2. Role-based protection:
+ *     - Accessing /admin/* as a non-admin (e.g. role 'student')
+ *       -> Redirects to /dashboard
+ *  3. Authenticated users:
+ *     - Accessing /signin or /signup or /
+ *       -> Redirects to their role-appropriate dashboard (/admin/dashboard or /dashboard)
+ *  4. Public assets and API routes:
+ *     - Passes through (API routes verify JWT inside their route handlers).
  */
 
 const PROTECTED_STUDENT_PATHS = [
@@ -31,51 +38,66 @@ export const config = {
 };
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   const isStudentPath = PROTECTED_STUDENT_PATHS.some((p) => pathname.startsWith(p));
   const isAdminPath = PROTECTED_ADMIN_PATHS.some((p) => pathname.startsWith(p));
   const isAuthPage = pathname === '/signin' || pathname === '/signup';
   const isLandingPage = pathname === '/';
 
+  // If this path is not protected and not an auth/landing page, let it pass immediately
   if (!isStudentPath && !isAdminPath && !isAuthPage && !isLandingPage) {
     return NextResponse.next();
   }
 
-  // ── Read Supabase session from cookie ──────────────────────────────────────
+  // ── 1. Read Demo session ───────────────────────────────────────────────────
+  const demoCookie = request.cookies.get('demo-session')?.value;
+  const isDemoAuthenticated = demoCookie === 'student' || demoCookie === 'admin';
+
+  // ── 2. Read Supabase session from cookies ──────────────────────────────────
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const projectRef = supabaseUrl?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
-  const cookieName = projectRef ? `sb-${projectRef}-auth-token` : null;
-  const rawCookie = cookieName ? request.cookies.get(cookieName)?.value : null;
+  const projectCookie = projectRef ? request.cookies.get(`sb-${projectRef}-auth-token`)?.value : null;
+  const customAuthCookie = request.cookies.get('sb-auth-token')?.value;
 
-  let isAuthenticated = false;
-  if (rawCookie) {
+  const rawAuthCookie = customAuthCookie || projectCookie;
+  let isSupabaseAuthenticated = false;
+
+  if (rawAuthCookie) {
     try {
-      const parsed = JSON.parse(decodeURIComponent(rawCookie));
+      const parsed = JSON.parse(decodeURIComponent(rawAuthCookie));
       const session = Array.isArray(parsed) ? parsed[0] : parsed;
-      isAuthenticated = !!session?.access_token;
+      isSupabaseAuthenticated = !!(session?.access_token || session?.user_id);
     } catch {
-      isAuthenticated = false;
+      isSupabaseAuthenticated = false;
     }
   }
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  const demoSession = request.cookies.get('demo-session')?.value;
-  const isDemoAuthenticated = demoSession === 'student' || demoSession === 'admin';
+  const isAuthenticated = isDemoAuthenticated || isSupabaseAuthenticated;
 
-  // Redirect authenticated users away from auth pages AND the landing page
-  if ((isAuthPage || isLandingPage) && (isAuthenticated || isDemoAuthenticated)) {
-    const dest = demoSession === 'admin' ? '/admin/dashboard' : '/dashboard';
+  // ── 3. Determine User Role ─────────────────────────────────────────────────
+  const roleCookie = request.cookies.get('sb-user-role')?.value;
+  let userRole: 'student' | 'admin' = 'student';
+  if (demoCookie === 'admin' || roleCookie === 'admin') {
+    userRole = 'admin';
+  }
+
+  // ── 4. Redirect logged-in users away from auth pages and landing page ──────
+  if (isAuthenticated && (isAuthPage || isLandingPage)) {
+    const dest = userRole === 'admin' ? '/admin/dashboard' : '/dashboard';
     return NextResponse.redirect(new URL(dest, request.url));
   }
 
-  if ((isStudentPath || isAdminPath) && !isAuthenticated && !isDemoAuthenticated) {
+  // ── 5. Redirect unauthenticated users away from protected routes ───────────
+  if (!isAuthenticated && (isStudentPath || isAdminPath)) {
+    const fullPath = search ? `${pathname}${search}` : pathname;
     const signInUrl = new URL('/signin', request.url);
-    signInUrl.searchParams.set('redirectTo', pathname);
+    signInUrl.searchParams.set('redirectTo', fullPath);
     return NextResponse.redirect(signInUrl);
   }
 
-  if (isAdminPath && isDemoAuthenticated && demoSession !== 'admin') {
+  // ── 6. Enforce Role Protection: Non-admin users cannot access /admin ──────
+  if (isAdminPath && userRole !== 'admin') {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
