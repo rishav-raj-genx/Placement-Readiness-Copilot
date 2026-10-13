@@ -1,0 +1,48 @@
+name: Playwright Live Link Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_url:
+        description: 'Student project URL to verify'
+        required: true
+        default: 'https://example.com'
+      student_id:
+        description: 'Student ID'
+        required: false
+        default: 'student_gh_actions'
+
+jobs:
+  verify-live-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
+
+      - name: Execute Live Link Check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          HEADLESS_BROWSER: 'true'
+        run: |
+          python run.py check-link "${{ github.event.inputs.project_url }}" --student-id "${{ github.event.inputs.student_id }}"
+
+      - name: Upload Screenshot Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: project-mobile-screenshots
+          path: data/screenshots/*.png
+          if-no-files-found: ignore

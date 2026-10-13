@@ -1,0 +1,99 @@
+{
+  "student_id": "student_rituraj_402",
+  "student_name": "Rituraj Sinha",
+  "target_role": "Full Stack Developer Intern",
+  "target_skills": ["React", "Node.js", "TypeScript", "Python", "PostgreSQL", "FastAPI"],
+  "locations": ["Bangalore", "Remote", "India"],
+  "resume": {
+    "score": 72.0,
+    "has_metrics": false,
+    "page_count": 1,
+    "has_action_verbs": true,
+    "has_clean_formatting": true,
+    "missing_elements": ["impact metrics in experience bullets"]
+  },
+  "projects": [
+    {
+      "name": "AI Placement Copilot",
+      "live_url": "https://example.com",
+      "repo_url": "https://github.com/placement-copilot/copilot",
+      "live_link_score": 85.0,
+      "code_quality_score": 78.0,
+      "documentation_score": 80.0,
+      "has_readme": true,
+      "is_live": true
+    },
+    {
+      "name": "E-Commerce Microservices",
+      "live_url": "https://httpbin.org/status/200",
+      "repo_url": "https://github.com/placement-copilot/ecommerce",
+      "live_link_score": 60.0,
+      "code_quality_score": 70.0,
+      "documentation_score": 65.0,
+      "has_readme": true,
+      "is_live": true
+    }
+  ],
+  "interview_session_result": {
+    "contract_version": "v0",
+    "interview_score": 78.5,
+    "transcript": [
+      {
+        "speaker": "ai",
+        "timestamp_sec": 5,
+        "text": "Could you walk me through your project architecture?"
+      },
+      {
+        "speaker": "student",
+        "timestamp_sec": 14,
+        "text": "I used Next.js for the client, with Supabase PostgreSQL and background workers for scraping."
+      }
+    ],
+    "summary": "Demonstrated strong knowledge of full stack architecture and background workers.",
+    "dimensions": {
+      "technical_depth": {
+        "score": 80.0,
+        "feedback": "Strong understanding of distributed queues",
+        "strengths": ["Architecture diagrams", "API design"],
+        "improvement_areas": ["Caching layers"]
+      },
+      "communication": {
+        "score": 75.0,
+        "feedback": "Clear answers, confident delivery",
+        "strengths": ["Concise explanations"],
+        "improvement_areas": ["Pacing"]
+      },
+      "behavioral": {
+        "score": 80.0,
+        "feedback": "Great collaboration mindset",
+        "strengths": ["Ownership"],
+        "improvement_areas": []
+      }
+    }
+  },
+  "github": {
+    "score": 65.0,
+    "pinned_repos_count": 2,
+    "recent_commit_streak_days": 12,
+    "has_profile_readme": true
+  },
+  "coding_practice": {
+    "score": 70.0,
+    "problems_solved": 140,
+    "mediums_solved": 65,
+    "hards_solved": 8,
+    "contest_rating": 1580
+  },
+  "linkedin": {
+    "score": 60.0,
+    "has_headline": true,
+    "has_about_summary": false,
+    "experience_matches_resume": true
+  },
+  "co_curricular": {
+    "score": 75.0,
+    "hackathons_count": 2,
+    "certifications_count": 1,
+    "club_leadership": true
+  }
+}

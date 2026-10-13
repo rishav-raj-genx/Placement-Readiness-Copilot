@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+data/local_cache.db
+data/screenshots/*.png
+!data/screenshots/.gitkeep

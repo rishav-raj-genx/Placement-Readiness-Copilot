@@ -1,0 +1,42 @@
+name: Daily Job Discovery & Aggregation Cron
+
+on:
+  schedule:
+    # Runs everyday at 06:00 UTC (11:30 AM IST)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      skills:
+        description: 'Target candidate skills'
+        required: false
+        default: 'React, Node.js, Python, TypeScript, Java'
+      target_role:
+        description: 'Target Role'
+        required: false
+        default: 'Software Engineer Intern'
+
+jobs:
+  discover-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Compliant Job Aggregator & Sync to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MAX_JOBS_PER_SOURCE: 30
+        run: |
+          python run.py discover-jobs --skills "${{ github.event.inputs.skills || 'React, Node.js, Python, TypeScript' }}" --role "${{ github.event.inputs.target_role || 'Software Engineer Intern' }}" --limit 40
