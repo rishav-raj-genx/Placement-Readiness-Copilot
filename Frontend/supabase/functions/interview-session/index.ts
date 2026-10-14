@@ -202,6 +202,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         id: interviewId,
         user_id: jwtUserId,
+        student_id: jwtUserId,
         livekit_room_name: roomName,
         target_role: body.targetRole,
         job_id: body.jobId || null,
