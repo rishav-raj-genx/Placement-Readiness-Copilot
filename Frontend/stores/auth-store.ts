@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import type { UserProfile, UserRole } from '@/types';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '@/lib/storage';
 import { demoStudent, demoAdmin } from '@/lib/fixtures/users';
-import { supabase } from '@/lib/supabase-client';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 import { setAuthCookies, setDemoCookies, clearAllAuthCookies } from '@/lib/auth-cookies';
 
 const DEMO_FLAG_KEY = 'auth-is-demo';
@@ -53,6 +53,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signIn: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
+      if (!isSupabaseConfigured) {
+        throw new Error(
+          'Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.'
+        );
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
@@ -84,6 +90,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email: string, password: string, displayName: string) => {
     set({ isLoading: true, error: null });
     try {
+      if (!isSupabaseConfigured) {
+        throw new Error(
+          'Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.'
+        );
+      }
+
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
       if (!data.user) throw new Error('Sign up failed — no user returned');
@@ -134,6 +146,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
+    if (!isSupabaseConfigured) {
+      set({ isHydrated: true });
+      return;
+    }
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         clearAllAuthCookies();
@@ -173,4 +190,3 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
-
