@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
     const token = new AccessToken(apiKey, apiSecret, {
       identity: user.id,
       name: user.email ?? user.id,
-      // Token expires in 2 hours (covers the full 15-20 min interview + buffer)
-      ttl: 60 * 120,
+      // Match the platform's 30-minute interview maximum.
+      ttl: 60 * 30,
     });
 
     token.addGrant({

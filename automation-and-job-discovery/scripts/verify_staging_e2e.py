@@ -40,31 +40,17 @@ def run_staging_verification(student_id: str = "staging_student_test"):
     )
 
     if not res.data:
-        print(f"⚠️ No session found for '{student_id}'. Inserting a live staging test session to verify...")
-        test_session = {
-            "id": f"intv_staging_{int(os.times().elapsed)}",
-            "student_id": student_id,
-            "status": "completed",
-            "result": {
-                "contract_version": "v0",
-                "interview_score": 78.5,
-                "transcript": [
-                    {"speaker": "ai", "timestamp_sec": 5, "text": "Describe your deployment pipeline."},
-                    {"speaker": "student", "timestamp_sec": 12, "text": "I used GitHub Actions with Supabase."}
-                ],
-                "summary": "Clear articulation of CI/CD concepts.",
-                "dimensions": {
-                    "technical_depth": {"score": 80, "feedback": "Good pipeline awareness"},
-                    "communication": {"score": 75, "feedback": "Solid tone"},
-                    "behavioral": {"score": 80, "feedback": "Demonstrated ownership"}
-                }
-            }
-        }
-        client.table("interview_sessions").upsert(test_session).execute()
-        res = client.table("interview_sessions").select("*").eq("student_id", student_id).order("created_at", desc=True).limit(1).execute()
+        print(f"❌ No completed interview session found for '{student_id}'. Run a real staging interview first.")
+        return False
 
     session_row = res.data[0]
     print(f"✔ Found session id: {session_row['id']} (status: {session_row.get('status')})")
+    if session_row.get("status") != "completed":
+        print(f"❌ Session is not completed: {session_row.get('status')}")
+        return False
+    if not session_row.get("completed_at"):
+        print("❌ Session completed_at is missing.")
+        return False
 
     # 2. Verify payload and contract_version
     result_json = session_row.get("result")
@@ -87,6 +73,13 @@ def run_staging_verification(student_id: str = "staging_student_test"):
         return False
     score_float = float(score_raw)
     print(f"✔ Preserved decimal interview score: {score_float}")
+
+    dimensions = result_json.get("dimensions")
+    required_dimensions = {"technical_depth", "communication", "behavioral"}
+    if not isinstance(dimensions, dict) or not required_dimensions.issubset(dimensions):
+        print("❌ Required interview dimensions are missing. REJECTED.")
+        return False
+    print("✔ All required interview dimensions are present.")
 
     # 4. Ingest into readiness engine
     print("4. Calculating readiness score with 20% mock-interview weighting...")

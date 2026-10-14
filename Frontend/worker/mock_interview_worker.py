@@ -424,30 +424,39 @@ def build_canonical_v0_result(
 
     # Validate and normalize interview_score (0.0 to 100.0, decimal valid)
     score_val = data.get("interview_score")
-    if score_val is None:
-        score_val = data.get("finalScore", 70.0)
-    try:
-        score_val = round(float(score_val), 1)
-        score_val = max(0.0, min(100.0, score_val))
-    except (ValueError, TypeError):
-        score_val = 70.0
+    if isinstance(score_val, bool) or not isinstance(score_val, (int, float)):
+        raise ValueError("scoring response must contain a numeric interview_score")
+    score_val = round(float(score_val), 1)
+    if not 0.0 <= score_val <= 100.0:
+        raise ValueError("interview_score must be between 0 and 100")
 
     raw_dims = data.get("dimensions", {})
+    if not isinstance(raw_dims, dict):
+        raise ValueError("scoring response dimensions must be an object")
     dimensions: dict[str, dict[str, Any]] = {}
     for dim_key in ("technical_depth", "communication", "behavioral"):
-        raw_dim = raw_dims.get(dim_key, {})
-        try:
-            dim_score = round(float(raw_dim.get("score", score_val)), 1)
-            dim_score = max(0.0, min(100.0, dim_score))
-        except (ValueError, TypeError):
-            dim_score = score_val
+        raw_dim = raw_dims.get(dim_key)
+        if not isinstance(raw_dim, dict):
+            raise ValueError(f"scoring response is missing dimensions.{dim_key}")
+        dim_score = raw_dim.get("score")
+        if isinstance(dim_score, bool) or not isinstance(dim_score, (int, float)):
+            raise ValueError(f"dimensions.{dim_key}.score must be numeric")
+        dim_score = round(float(dim_score), 1)
+        if not 0.0 <= dim_score <= 100.0:
+            raise ValueError(f"dimensions.{dim_key}.score must be between 0 and 100")
 
         dimensions[dim_key] = {
             "score": dim_score,
-            "feedback": str(raw_dim.get("feedback", f"Performance evaluated for {dim_key.replace('_', ' ')}.")),
-            "strengths": list(raw_dim.get("strengths", [])),
-            "improvement_areas": list(raw_dim.get("improvement_areas", [])),
+            "feedback": raw_dim.get("feedback", ""),
+            "strengths": raw_dim.get("strengths", []),
+            "improvement_areas": raw_dim.get("improvement_areas", []),
         }
+        if not isinstance(dimensions[dim_key]["feedback"], str):
+            raise ValueError(f"dimensions.{dim_key}.feedback must be a string")
+        if not all(isinstance(item, str) for item in dimensions[dim_key]["strengths"]):
+            raise ValueError(f"dimensions.{dim_key}.strengths must contain strings")
+        if not all(isinstance(item, str) for item in dimensions[dim_key]["improvement_areas"]):
+            raise ValueError(f"dimensions.{dim_key}.improvement_areas must contain strings")
 
     return {
         "contract_version": "v0",
@@ -491,8 +500,10 @@ def validate_canonical_v0_result(payload: dict[str, Any]) -> tuple[bool, str]:
         dim = dims[dim_name]
         if not isinstance(dim, dict):
             return False, f"dimensions.{dim_name} must be a dict"
-        if not isinstance(dim.get("score"), (int, float)):
+        if isinstance(dim.get("score"), bool) or not isinstance(dim.get("score"), (int, float)):
             return False, f"dimensions.{dim_name}.score must be numeric"
+        if not 0 <= dim["score"] <= 100:
+            return False, f"dimensions.{dim_name}.score must be between 0 and 100"
         if not isinstance(dim.get("feedback"), str):
             return False, f"dimensions.{dim_name}.feedback must be a string"
         if not isinstance(dim.get("strengths"), list):

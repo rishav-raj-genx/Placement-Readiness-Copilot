@@ -133,6 +133,18 @@ class TestCanonicalV0Contract(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("interview_score must be between 0 and 100", msg)
 
+    def test_missing_score_is_rejected(self):
+        raw = dict(self.sample_raw_llm)
+        raw.pop("interview_score")
+        with self.assertRaises(ValueError):
+            build_canonical_v0_result(raw, self.sample_transcript)
+
+    def test_missing_dimension_is_rejected_before_persistence(self):
+        raw = json.loads(json.dumps(self.sample_raw_llm))
+        del raw["dimensions"]["behavioral"]
+        with self.assertRaises(ValueError):
+            build_canonical_v0_result(raw, self.sample_transcript)
+
     def test_missing_dimension_rejected(self):
         canonical = build_canonical_v0_result(self.sample_raw_llm, self.sample_transcript)
         del canonical["dimensions"]["behavioral"]

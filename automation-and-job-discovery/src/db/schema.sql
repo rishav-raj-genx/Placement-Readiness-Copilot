@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS interview_sessions (
     status TEXT NOT NULL DEFAULT 'completed',
     result JSONB NOT NULL,
     contract_version TEXT GENERATED ALWAYS AS (result->>'contract_version') STORED,
-    interview_score NUMERIC(5, 2) GENERATED ALWAYS AS (COALESCE((result->>'interview_score')::numeric, 0.0)) STORED,
+    interview_score NUMERIC(5, 2) GENERATED ALWAYS AS (NULLIF(result->>'interview_score', '')::numeric) STORED,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS mock_interview_results (
     feedback_notes TEXT,
     transcript JSONB NOT NULL DEFAULT '[]'::jsonb,
     mode TEXT DEFAULT 'hosted_api' CHECK (mode IN ('hosted_api', 'ollama_local')),
-    duration_minutes INTEGER DEFAULT 15,
+    duration_minutes INTEGER DEFAULT 30,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

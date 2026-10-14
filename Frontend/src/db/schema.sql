@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS interview_sessions (
     status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'active', 'completed', 'abandoned', 'error')),
     result JSONB,
     contract_version TEXT GENERATED ALWAYS AS (result->>'contract_version') STORED,
-    interview_score NUMERIC(5, 2) GENERATED ALWAYS AS (COALESCE((result->>'interview_score')::numeric, (result->>'finalScore')::numeric)) STORED,
+    interview_score NUMERIC(5, 2) GENERATED ALWAYS AS (NULLIF(result->>'interview_score', '')::numeric) STORED,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
