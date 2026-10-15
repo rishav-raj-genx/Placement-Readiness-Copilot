@@ -1,0 +1,14 @@
+{
+  "name": "Asha Rao",
+  "target_role": "Backend Engineer",
+  "summary": "Software engineer focused on APIs and reliable services.",
+  "skills": ["Python", "PostgreSQL", "Docker"],
+  "projects": [
+    {
+      "name": "Order platform",
+      "description": "Built an idempotent order API."
+    }
+  ],
+  "experience": ["Backend Engineer at Example Co."],
+  "education": ["B.Tech in Computer Science"]
+}
