@@ -6,6 +6,36 @@
 -- ====================================================================
 
 -- --------------------------------------------------------------------
+-- 0. User Profiles Table (Student & Admin Roles)
+-- --------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'admin')),
+    github_username TEXT,
+    linkedin_url TEXT,
+    resume_pdf_path TEXT,
+    linkedin_pdf_path TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "select_own_profile" ON profiles;
+CREATE POLICY "select_own_profile" ON profiles FOR SELECT USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "insert_own_profile" ON profiles;
+CREATE POLICY "insert_own_profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "update_own_profile" ON profiles;
+CREATE POLICY "update_own_profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Service role full access profiles" ON profiles;
+CREATE POLICY "Service role full access profiles" ON profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- --------------------------------------------------------------------
 -- 1. Canonical Interview Sessions Table (Module 3 - Voice & AI Viva)
 -- --------------------------------------------------------------------
 -- Note: id is TEXT to support both auto-generated UUIDs and 'intv_<timestamp>'

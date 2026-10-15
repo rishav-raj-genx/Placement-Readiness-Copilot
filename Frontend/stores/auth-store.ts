@@ -23,22 +23,43 @@ interface AuthState {
   clearError: () => void;
 }
 
-async function fetchProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, email, display_name, role, created_at')
-    .eq('id', userId)
-    .maybeSingle();
+async function fetchProfile(userId: string, userFallback?: any): Promise<UserProfile | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, display_name, role, created_at')
+      .eq('id', userId)
+      .maybeSingle();
 
-  if (error || !data) return null;
+    if (!error && data) {
+      return {
+        id: data.id,
+        email: data.email,
+        displayName: data.display_name,
+        role: data.role as UserRole,
+        createdAt: data.created_at,
+      };
+    }
+  } catch {
+    // Ignore schema cache or network error on profiles table
+  }
 
-  return {
-    id: data.id,
-    email: data.email,
-    displayName: data.display_name,
-    role: data.role as UserRole,
-    createdAt: data.created_at,
-  };
+  // Graceful fallback to verified user metadata from Supabase Auth
+  if (userFallback) {
+    return {
+      id: userFallback.id,
+      email: userFallback.email || '',
+      displayName:
+        userFallback.user_metadata?.display_name ||
+        userFallback.user_metadata?.full_name ||
+        userFallback.email?.split('@')[0] ||
+        'Student',
+      role: (userFallback.user_metadata?.role as UserRole) || 'student',
+      createdAt: userFallback.created_at || new Date().toISOString(),
+    };
+  }
+
+  return null;
 }
 
 let authListenerRegistered = false;
@@ -62,11 +83,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const profile = await fetchProfile(data.user.id);
-      if (!profile) {
-        set({ isLoading: false, error: 'Profile not found. Please try signing up again.' });
-        return;
-      }
+      const profile = (await fetchProfile(data.user.id, data.user)) || {
+        id: data.user.id,
+        email: data.user.email || email,
+        displayName: data.user.user_metadata?.display_name || email.split('@')[0],
+        role: (data.user.user_metadata?.role as UserRole) || 'student',
+        createdAt: data.user.created_at || new Date().toISOString(),
+      };
 
       if (data.session) {
         setAuthCookies(data.session, profile.role);
@@ -157,7 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: null, isHydrated: true });
         return;
       }
-      const profile = await fetchProfile(session.user.id);
+      const profile = await fetchProfile(session.user.id, session.user);
       if (profile) {
         setAuthCookies(session, profile.role);
       }
@@ -178,7 +201,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!session) return;
         (async () => {
-          const profile = await fetchProfile(session.user.id);
+          const profile = await fetchProfile(session.user.id, session.user);
           if (profile) {
             setAuthCookies(session, profile.role);
             set({ user: profile });
