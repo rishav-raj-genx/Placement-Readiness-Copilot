@@ -70,6 +70,7 @@ try:
     from livekit.agents.stt import STT
     from livekit.agents.tts import TTS
     from livekit.plugins import openai as lk_openai
+    from livekit.plugins import deepgram as lk_deepgram
 except ImportError:
     agents = None  # type: ignore
     rtc = None  # type: ignore
@@ -86,6 +87,7 @@ except ImportError:
     STT = None  # type: ignore
     TTS = None  # type: ignore
     lk_openai = None  # type: ignore
+    lk_deepgram = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Logging — sanitized (no PII, no tokens, no API keys)
@@ -273,6 +275,30 @@ async def send_data_message(room: rtc.Room, event: str, payload: dict[str, Any])
     logger.info("Sent data event: %s", event)
 
 
+def setup_transcription_listener(session: AgentSession, room: rtc.Room) -> None:
+    """Forward interim and final user transcription events to the browser."""
+
+    @session.on("user_input_transcribed")
+    def on_user_input_transcribed(event: Any) -> None:
+        transcript = (event.transcript or "").strip()
+        if not transcript:
+            return
+
+        asyncio.create_task(
+            send_data_message(
+                room,
+                "interview:transcript",
+                {
+                    "id": event.item_id or "student-live",
+                    "speaker": "student",
+                    "text": transcript,
+                    "final": event.is_final,
+                    "timestamp": time.time(),
+                },
+            )
+        )
+
+
 # ---------------------------------------------------------------------------
 # Interview logic
 # ---------------------------------------------------------------------------
@@ -402,7 +428,16 @@ def parse_scoring_response_raw(raw: str) -> dict[str, Any]:
     if text.endswith("```"):
         text = text[:-3]
     text = text.strip()
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Providers sometimes add a short explanation around an otherwise valid
+        # JSON response despite the prompt requesting JSON only.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            raise
+        return json.loads(text[start : end + 1])
 
 
 def build_canonical_v0_result(
@@ -594,7 +629,7 @@ async def persist_results_to_supabase(
 
     headers = {
         "apikey": service_key,
-        "Authorization": f"Bearer {service_key}",
+        "Authorization": "Bearer " + service_key,
         "Content-Type": "application/json",
         "Prefer": "return=minimal",
     }
@@ -624,11 +659,12 @@ async def persist_results_to_supabase(
 class MockInterviewAgent(Agent):
     """LiveKit agent that conducts a mock interview."""
 
-    def __init__(self, ctx: InterviewContext) -> None:
+    def __init__(self, ctx: InterviewContext, room: rtc.Room) -> None:
         super().__init__(
             instructions=build_system_prompt(ctx, 1, MAX_QUESTIONS),
         )
         self.ctx = ctx
+        self.room = room
         self.transcript: list[TranscriptEntry] = []
         self.question_count = 0
         self.finish_requested = False
@@ -636,6 +672,13 @@ class MockInterviewAgent(Agent):
         self._finish_event = asyncio.Event()
         self._finish_lock = asyncio.Lock()
         self._has_finished = False
+
+    async def _speak(self, text: str) -> None:
+        """Speak text without blocking the interview on a provider failure."""
+        try:
+            await self.session.say(text)
+        except Exception:
+            logger.exception("TTS failed while speaking interview text")
 
     async def on_enter(self) -> None:
         """Called when the agent enters the LiveKit room."""
@@ -656,7 +699,19 @@ class MockInterviewAgent(Agent):
             "interview:greeting",
             {"message": greeting},
         )
-        self.transcript.append(TranscriptEntry("interviewer", greeting, time.time() - self.start_time))
+        greeting_timestamp = time.time() - self.start_time
+        self.transcript.append(TranscriptEntry("interviewer", greeting, greeting_timestamp))
+        await send_data_message(
+            self.room,
+            "interview:transcript",
+            {
+                "speaker": "interviewer",
+                "text": greeting,
+                "final": True,
+                "timestamp": greeting_timestamp,
+            },
+        )
+        await self._speak(greeting)
 
         # 2. Generate and send the first question
         await self._ask_next_question()
@@ -664,16 +719,16 @@ class MockInterviewAgent(Agent):
     async def on_user_turn_completed(
         self,
         turn_ctx: ChatContext,
-        chat_ctx: ChatContext,
+        new_message: ChatMessage,
     ) -> None:
         """Called when the user finishes speaking (a turn completes)."""
         # Capture the student's speech into our transcript
-        for msg in turn_ctx.messages:
-            if msg.role == "user":
-                text = msg.content if isinstance(msg.content, str) else str(msg.content)
-                self.transcript.append(
-                    TranscriptEntry("student", text, time.time() - self.start_time)
-                )
+        text = new_message.content
+        if not isinstance(text, str):
+            text = str(text)
+        if text.strip():
+            timestamp = time.time() - self.start_time
+            self.transcript.append(TranscriptEntry("student", text, timestamp))
 
         self.question_count += 1
 
@@ -685,10 +740,23 @@ class MockInterviewAgent(Agent):
     async def _ask_next_question(self) -> None:
         """Generate the next interview question and send it."""
         q_num = self.question_count + 1
-        self.set_instructions(build_system_prompt(self.ctx, q_num, MAX_QUESTIONS))
+        await self.update_instructions(build_system_prompt(self.ctx, q_num, MAX_QUESTIONS))
 
         question_id = f"q_{q_num}_{uuid.uuid4().hex[:6]}"
-        question_text = await self._generate_question_text(q_num)
+        try:
+            question_text = await asyncio.wait_for(
+                self._generate_question_text(q_num),
+                timeout=15,
+            )
+        except Exception:
+            logger.exception("Question generation timed out or failed; using fallback")
+            fallbacks = [
+                f"Tell me about your experience with {self.ctx.focus_areas[0] if self.ctx.focus_areas else 'software engineering'}.",
+                "Describe a challenging project you worked on and your role in it.",
+                "How do you approach debugging a complex distributed system issue?",
+                "Walk me through your approach to designing a scalable system.",
+            ]
+            question_text = fallbacks[min(q_num - 1, len(fallbacks) - 1)]
 
         await send_data_message(
             self.room,
@@ -700,9 +768,19 @@ class MockInterviewAgent(Agent):
                 "totalQuestions": MAX_QUESTIONS,
             },
         )
-        self.transcript.append(
-            TranscriptEntry("interviewer", question_text, time.time() - self.start_time)
+        timestamp = time.time() - self.start_time
+        self.transcript.append(TranscriptEntry("interviewer", question_text, timestamp))
+        await send_data_message(
+            self.room,
+            "interview:transcript",
+            {
+                "speaker": "interviewer",
+                "text": question_text,
+                "final": True,
+                "timestamp": timestamp,
+            },
         )
+        await self._speak(question_text)
         logger.info("Asked question %d/%d: %s", q_num, MAX_QUESTIONS, question_text[:80])
 
     async def _generate_question_text(self, q_num: int) -> str:
@@ -741,7 +819,10 @@ Question:"""
             async for chunk in stream:
                 if chunk.delta:
                     text += chunk.delta.content if hasattr(chunk.delta, "content") else str(chunk.delta)
-            return text.strip()
+            generated = text.strip()
+            if generated:
+                return generated
+            raise ValueError("Groq returned an empty question")
         except Exception as e:
             logger.error("Question generation failed: %s — using fallback", e)
             fallbacks = [
@@ -764,7 +845,10 @@ Question:"""
 
             try:
                 # 1. Finalize transcript and generate results via Groq
-                raw_scoring = await self._generate_results_raw()
+                raw_scoring = await asyncio.wait_for(
+                    self._generate_results_raw(),
+                    timeout=45,
+                )
                 canonical_v0 = build_canonical_v0_result(raw_scoring, self.transcript)
 
                 # 2. Validate canonical v0 schema
@@ -887,7 +971,7 @@ def setup_data_listener(room: rtc.Room, agent: MockInterviewAgent) -> None:
 # ---------------------------------------------------------------------------
 
 
-def pre_job(job_ctx: JobContext) -> None:
+def pre_job(job_ctx: JobProcess) -> None:
     """Called before the agent enters the room — used for setup."""
     logger.info("Worker registered, waiting for job dispatch...")
 
@@ -901,7 +985,7 @@ async def entrypoint(ctx: JobContext) -> None:
     """LiveKit worker entrypoint — called when a room is assigned."""
     # 1. Read room metadata
     room = ctx.room
-    metadata_raw = room.metadata or ""
+    metadata_raw = room.metadata or getattr(ctx.job, "metadata", "") or ""
 
     logger.info("Job received: room=%s", room.name)
     interview_ctx = parse_room_metadata(metadata_raw)
@@ -914,13 +998,31 @@ async def entrypoint(ctx: JobContext) -> None:
         logger.info("No resume URL in metadata — proceeding without resume text")
 
     # 3. Create the agent
-    agent = MockInterviewAgent(interview_ctx)
+    agent = MockInterviewAgent(interview_ctx, room)
 
-    # 4. Connect to the room
-    await ctx.connect(
-        rooms=room.name,
-        agent=agent,
+    # 4. Connect and start the voice session using the LiveKit Agents 1.8 API.
+    await ctx.connect()
+    from livekit.plugins.groq import LLM as GroqLLM
+
+    if os.environ.get("DEEPGRAM_API_KEY"):
+        stt = lk_deepgram.STT(api_key=os.environ["DEEPGRAM_API_KEY"])
+        tts = lk_deepgram.TTS(api_key=os.environ["DEEPGRAM_API_KEY"])
+        logger.info("Using Deepgram for STT/TTS")
+    else:
+        stt = lk_openai.STT()
+        tts = lk_openai.TTS()
+        logger.info("Using OpenAI for STT/TTS")
+
+    session = AgentSession(
+        stt=stt,
+        llm=GroqLLM(
+            model="llama-3.3-70b-versatile",
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+        ),
+        tts=tts,
     )
+    setup_transcription_listener(session, room)
+    await session.start(agent=agent, room=room)
 
     # 5. Set up data message listener for interview:finish
     setup_data_listener(room, agent)
@@ -969,8 +1071,8 @@ def main() -> None:
         raise SystemExit(1)
 
     worker = WorkerOptions(
-        entrypoint_func=entrypoint,
-        pre_job_func=pre_job,
+        entrypoint_fnc=entrypoint,
+        prewarm_fnc=pre_job,
         agent_name=WORKER_IDENTITY,
         worker_type=WorkerType.ROOM,
         # The worker uses OpenAI for STT (Whisper) and TTS
