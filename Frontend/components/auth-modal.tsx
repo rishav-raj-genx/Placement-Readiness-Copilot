@@ -15,12 +15,12 @@ import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAuthModalStore } from '@/stores/auth-modal-store';
 import { toast } from 'sonner';
-import { Brain, ArrowRight, GraduationCap, ShieldCheck, Loader2, UserPlus, LogOut, Eye, EyeOff } from 'lucide-react';
+import { Brain, ArrowRight, Loader2, UserPlus, LogOut, Eye, EyeOff } from 'lucide-react';
 
 export function AuthModal() {
   const router = useRouter();
   const { isOpen, redirectUrl, close } = useAuthModalStore();
-  const { user, signIn, signUp, signInDemo, signOut, isLoading, error, clearError } = useAuthStore();
+  const { user, signIn, signUp, signOut, isLoading, error, clearError } = useAuthStore();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -68,18 +68,6 @@ export function AuthModal() {
     } else if (state.error) {
       toast.error(state.error);
     }
-  };
-
-  const handleDemoSignIn = (role: 'student' | 'admin') => {
-    clearError();
-    signInDemo(role);
-    toast.success(`Signed in as ${role}`, { duration: 5000 });
-    close();
-    const target =
-      redirectUrl && redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')
-        ? (redirectUrl.startsWith('/admin') && role !== 'admin' ? '/dashboard' : redirectUrl)
-        : (role === 'admin' ? '/admin/dashboard' : '/dashboard');
-    router.push(target);
   };
 
   const handleSignOutAndReset = async () => {
@@ -274,38 +262,6 @@ export function AuthModal() {
               </Button>
             </form>
 
-            {/* Divider */}
-            <div className="relative my-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">or quick access</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            {/* Quick Access Action Buttons */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleDemoSignIn('student')}
-                disabled={isLoading}
-                className="group h-9 border-border text-foreground hover:border-brand hover:bg-brand hover:text-white transition-all text-xs font-medium"
-              >
-                <GraduationCap className="mr-1.5 h-3.5 w-3.5 text-brand group-hover:text-white transition-colors" />
-                <span>Student</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleDemoSignIn('admin')}
-                disabled={isLoading}
-                className="group h-9 border-border text-foreground hover:border-brand hover:bg-brand hover:text-white transition-all text-xs font-medium"
-              >
-                <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-brand group-hover:text-white transition-colors" />
-                <span>Admin</span>
-              </Button>
-            </div>
           </>
         )}
       </DialogContent>

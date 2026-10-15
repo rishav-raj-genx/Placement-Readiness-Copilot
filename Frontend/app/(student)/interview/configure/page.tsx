@@ -168,8 +168,8 @@ function getInterviewTypeForTopics(topics: string[]): InterviewType {
 
 export default function ConfigureInterviewPage() {
   const router = useRouter();
-  const { user, isDemoMode } = useAuthStore();
-  const { createSession, canStartNew, getCompletedCount, getRemainingCount } = useInterviewStore();
+  const { user } = useAuthStore();
+  const { canStartNew, getCompletedCount, getRemainingCount } = useInterviewStore();
   const { startInterview: startLiveKitInterview, setCreating, setCreateError } = useLiveKitInterviewStore();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -225,9 +225,7 @@ export default function ConfigureInterviewPage() {
   const readinessComplete = Boolean(
     githubUsername.trim() &&
       linkedinUrl.trim() &&
-      (user && !isDemoMode
-        ? resumePdfPath && linkedinPdfPath
-        : (resumeFile || resumePdfName) && (linkedinPdfFile || linkedinPdfName))
+      resumePdfPath && linkedinPdfPath
   );
   const recommendedTopics = useMemo(
     () => getRecommendedTopics(effectiveRole, companyType),
@@ -269,7 +267,7 @@ export default function ConfigureInterviewPage() {
     setResumePdfName(savedReadiness.resumePdfName || '');
     setLinkedinPdfName(savedReadiness.linkedinPdfName || '');
 
-    if (!user || isDemoMode) return;
+    if (!user) return;
 
     let active = true;
     supabase
@@ -288,7 +286,7 @@ export default function ConfigureInterviewPage() {
     return () => {
       active = false;
     };
-  }, [user, isDemoMode]);
+  }, [user]);
 
   const canProceedToStep2 =
     targetRole.trim() !== '' && (targetRole !== 'Other' || customRole.trim() !== '');
@@ -318,7 +316,7 @@ export default function ConfigureInterviewPage() {
 
     setIsSavingReadiness(true);
     try {
-      if (user && !isDemoMode) {
+      if (user) {
         const uploadedPaths: { resume?: string; linkedin?: string } = {};
         for (const [file, name] of [[resumeFile, 'resume.pdf'], [linkedinPdfFile, 'linkedin.pdf']] as const) {
           if (!file) continue;
@@ -345,16 +343,7 @@ export default function ConfigureInterviewPage() {
 
         if (uploadedPaths.resume) setResumePdfPath(uploadedPaths.resume);
         if (uploadedPaths.linkedin) setLinkedinPdfPath(uploadedPaths.linkedin);
-      } else {
-        saveToStorage('interview-readiness', {
-          githubUsername: githubUsername.trim(),
-          linkedinUrl: linkedinUrl.trim(),
-          resumePdfName: resumeFile?.name || resumePdfName,
-          linkedinPdfName: linkedinPdfFile?.name || linkedinPdfName,
-        });
-        setResumePdfName(resumeFile?.name || resumePdfName);
-        setLinkedinPdfName(linkedinPdfFile?.name || linkedinPdfName);
-      }
+      } else throw new Error('You must be signed in to save interview readiness.');
       return true;
     } catch {
       toast.error('We could not save your interview documents. Please try again.');
@@ -383,20 +372,7 @@ export default function ConfigureInterviewPage() {
     if (!readinessSaved) return;
 
     const type = getInterviewTypeForTopics(topics);
-    const config: InterviewConfig = {
-      type,
-      targetRole: effectiveRole,
-      topics,
-      customInstructions: customInstructions.trim() || undefined,
-      difficulty,
-      experienceLevel,
-      durationMinutes: duration,
-      targetCompany: targetCompany.trim() || undefined,
-      companyType,
-    };
-
-    // Real authenticated users: start a LiveKit interview session
-    if (user && !isDemoMode) {
+    if (user) {
       setCreating(true);
       setCreateError(null);
       try {
@@ -433,10 +409,8 @@ export default function ConfigureInterviewPage() {
       return;
     }
 
-    // Demo mode: use the local browser-based interview
-    const sessionId = createSession(config, user?.id || 'demo-student');
-    toast.success('Interview configured. Starting now...');
-    router.push(`/interview/session/${sessionId}`);
+    toast.error('Your session has expired. Please sign in again.');
+    router.push('/signin?redirectTo=/interview/configure');
   };
 
   return (

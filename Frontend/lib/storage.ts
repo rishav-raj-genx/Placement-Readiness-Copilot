@@ -1,4 +1,4 @@
-const PREFIX = 'msot-demo-v1';
+const PREFIX = 'msot-v1';
 
 export function loadFromStorage<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;

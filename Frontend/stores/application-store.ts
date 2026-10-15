@@ -3,7 +3,6 @@
 import { create } from 'zustand';
 import type { JobApplication, ApplicationStatus } from '@/types';
 import { loadFromStorage, saveToStorage } from '@/lib/storage';
-import { fixtureApplications } from '@/lib/fixtures/applications';
 
 interface ApplicationState {
   applications: JobApplication[];
@@ -21,7 +20,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
   isHydrated: false,
 
   hydrate: () => {
-    const applications = loadFromStorage<JobApplication[]>('applications', fixtureApplications);
+    const applications = loadFromStorage<JobApplication[]>('applications', []);
     set({ applications, isHydrated: true });
   },
 

@@ -3,7 +3,6 @@
 import { create } from 'zustand';
 import type { ChatMessage, ChatAttachment } from '@/types';
 import { loadFromStorage, saveToStorage } from '@/lib/storage';
-import { fixtureChatMessages } from '@/lib/fixtures/chat-messages';
 
 interface ChatState {
   messages: ChatMessage[];
@@ -25,7 +24,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   attachments: [],
 
   hydrate: () => {
-    const messages = loadFromStorage<ChatMessage[]>('chat-messages', fixtureChatMessages);
+    const messages = loadFromStorage<ChatMessage[]>('chat-messages', []);
     set({ messages, isHydrated: true });
   },
 
@@ -42,20 +41,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const messages = [...get().messages, userMessage];
     saveToStorage('chat-messages', messages);
-    set({ messages, isSending: true, attachments: [] });
-
-    setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: 'msg-' + Date.now() + '-resp',
-        role: 'assistant',
-        content:
-          'I have noted your message. I am here to help you prepare interview questions, analyse your resume, and provide personalized readiness feedback.',
-        timestamp: new Date().toISOString(),
-      };
-      const updated = [...get().messages, assistantMessage];
-      saveToStorage('chat-messages', updated);
-      set({ messages: updated, isSending: false });
-    }, 800);
+    set({ messages, isSending: false, attachments: [] });
   },
 
   addAttachment: (file: File) => {

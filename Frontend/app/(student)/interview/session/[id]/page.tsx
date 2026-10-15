@@ -28,7 +28,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { DemoLabel } from '@/components/shared/demo-label';
 import { useLiveKitInterview } from '@/hooks/use-livekit-interview';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { useInterviewStore } from '@/stores/interview-store';
@@ -47,7 +46,7 @@ import { normalizeInterviewResult } from '@/lib/interview-result-adapter';
 export default function InterviewSessionPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
-  const { user, isDemoMode } = useAuthStore();
+  const { user } = useAuthStore();
   const liveKitStore = useLiveKitInterviewStore();
 
   const [connectionAttempted, setConnectionAttempted] = useState(false);
@@ -93,6 +92,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     onError: handleError,
   });
 
+  useEffect(() => {
+    if (!isLiveKitId) router.replace('/interview/configure');
+  }, [isLiveKitId, router]);
+
   const handleFinishInterview = useCallback(async () => {
     if (isFinishing) return;
     setIsFinishing(true);
@@ -133,7 +136,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   // Connect to LiveKit room using the session data stored by the configure page
   useEffect(() => {
     if (!isLiveKitId || connectionAttempted) return;
-    if (!user || isDemoMode) return;
+    if (!user) return;
 
     const stored = liveKitStore.currentInterview;
     if (!stored || !stored.serverUrl || !stored.token) {
@@ -158,16 +161,16 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         toast.error(message);
       }
     })();
-  }, [isLiveKitId, connectionAttempted, user, isDemoMode, livekit, liveKitStore]);
+  }, [isLiveKitId, connectionAttempted, user, livekit, liveKitStore]);
 
   // Auto-scroll transcript
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [livekit.transcripts]);
 
-  // Handle demo mode (non-LiveKit sessions)
+  // Only persisted LiveKit session IDs are valid.
   if (!isLiveKitId) {
-    return <DemoInterviewView id={id} />;
+    return null;
   }
 
   const currentInterview = liveKitStore.currentInterview;
@@ -262,7 +265,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         </div>
         <div className="flex items-center gap-2">
           <ConnectionStatusBadge status={status} />
-          <DemoLabel />
         </div>
       </div>
 
@@ -557,7 +559,6 @@ function DemoInterviewView({ id }: { id: string }) {
             </p>
           </div>
         </div>
-        <DemoLabel />
       </div>
 
       <div className="space-y-2">

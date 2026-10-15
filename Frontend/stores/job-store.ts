@@ -3,7 +3,6 @@
 import { create } from 'zustand';
 import type { JobPosting, JobStatus } from '@/types';
 import { loadFromStorage, saveToStorage } from '@/lib/storage';
-import { fixtureJobs } from '@/lib/fixtures/jobs';
 
 interface JobState {
   jobs: JobPosting[];
@@ -22,7 +21,7 @@ export const useJobStore = create<JobState>((set, get) => ({
   isHydrated: false,
 
   hydrate: () => {
-    const jobs = loadFromStorage<JobPosting[]>('jobs', fixtureJobs);
+    const jobs = loadFromStorage<JobPosting[]>('jobs', []);
     set({ jobs, isHydrated: true });
   },
 

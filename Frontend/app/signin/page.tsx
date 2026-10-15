@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Brain, ArrowRight, GraduationCap, ShieldCheck, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
+import { Brain, ArrowRight, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,7 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo');
 
-  const { signIn, signInDemo, isLoading, error, clearError } = useAuthStore();
+  const { signIn, isLoading, error, clearError } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -64,12 +64,6 @@ function SignInContent() {
     } else if (state.error) {
       toast.error(state.error);
     }
-  };
-
-  const handleDemoSignIn = (role: 'student' | 'admin') => {
-    signInDemo(role);
-    toast.success(`Signed in as ${role}`, { duration: 5000 });
-    router.push(getDestination(role));
   };
 
   return (
@@ -176,36 +170,6 @@ function SignInContent() {
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="relative flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or quick access</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          {/* Quick Access buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleDemoSignIn('student')}
-              disabled={isLoading}
-              className="group h-10 border-border text-foreground hover:border-brand hover:bg-brand hover:text-white transition-all"
-            >
-              <GraduationCap className="mr-1.5 h-4 w-4 text-brand group-hover:text-white transition-colors" />
-              <span className="text-sm font-medium">Student</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleDemoSignIn('admin')}
-              disabled={isLoading}
-              className="group h-10 border-border text-foreground hover:border-brand hover:bg-brand hover:text-white transition-all"
-            >
-              <ShieldCheck className="mr-1.5 h-4 w-4 text-brand group-hover:text-white transition-colors" />
-              <span className="text-sm font-medium">Admin</span>
-            </Button>
-          </div>
         </div>
 
         {/* Footer link */}

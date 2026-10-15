@@ -53,15 +53,15 @@ interface CombinedHistoryEntry {
 }
 
 export default function InterviewHistoryPage() {
-  const { sessions, isHydrated } = useInterviewStore();
-  const { user, isDemoMode } = useAuthStore();
+  const { isHydrated } = useInterviewStore();
+  const { user } = useAuthStore();
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [liveKitSessions, setLiveKitSessions] = useState<LiveKitHistoryEntry[]>([]);
   const [liveKitLoading, setLiveKitLoading] = useState(false);
 
   useEffect(() => {
-    if (!user || isDemoMode) return;
+    if (!user) return;
     setLiveKitLoading(true);
     supabase
       .from('interview_sessions')
@@ -73,24 +73,7 @@ export default function InterviewHistoryPage() {
         setLiveKitLoading(false);
         if (data) setLiveKitSessions(data as LiveKitHistoryEntry[]);
       });
-  }, [user, isDemoMode]);
-
-  // Combine demo sessions and LiveKit sessions
-  const demoEntries: CombinedHistoryEntry[] = sessions
-    .filter((s) => s.status === 'completed' || s.status === 'abandoned')
-    .map((s) => ({
-      id: s.id,
-      targetRole: s.config.targetRole,
-      type: s.config.type,
-      status: s.status,
-      completedAt: s.completedAt ?? null,
-      createdAt: s.createdAt,
-      difficulty: s.config.difficulty,
-      durationMinutes: s.config.durationMinutes,
-      overallScore: s.feedback?.overallScore,
-      topics: s.config.topics,
-      isLiveKit: false,
-    }));
+  }, [user]);
 
   const liveKitEntries: CombinedHistoryEntry[] = liveKitSessions
     .filter((s) => s.status === 'completed' || s.status === 'abandoned')
@@ -108,7 +91,7 @@ export default function InterviewHistoryPage() {
       isLiveKit: true,
     }));
 
-  const allEntries = [...liveKitEntries, ...demoEntries];
+  const allEntries = liveKitEntries;
 
   const filteredEntries = allEntries
     .filter((s) => typeFilter === 'all' || s.type === typeFilter)
