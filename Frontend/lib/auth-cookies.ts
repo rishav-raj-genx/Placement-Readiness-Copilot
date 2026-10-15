@@ -15,7 +15,8 @@ export function setAuthCookies(
     })
   );
 
-  document.cookie = `sb-auth-token=${tokenData}; path=/; max-age=${maxAge}; SameSite=Lax; Secure`;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `sb-auth-token=${tokenData}; path=/; max-age=${maxAge}; SameSite=Lax${secure}`;
 }
 
 /**
@@ -24,6 +25,7 @@ export function setAuthCookies(
 export function clearAllAuthCookies(): void {
   if (typeof document === 'undefined') return;
 
-  const expired = 'path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  const expired = `path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secure}`;
   document.cookie = `sb-auth-token=; ${expired}`;
 }

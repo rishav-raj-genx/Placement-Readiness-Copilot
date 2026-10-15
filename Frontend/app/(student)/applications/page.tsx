@@ -100,6 +100,10 @@ export default function ApplicationsPage() {
       toast.error('Company and job title are required');
       return;
     }
+    if (!user) {
+      toast.error('Your session has expired. Please sign in again.');
+      return;
+    }
     if (editingApp) {
       updateApplication(editingApp.id, {
         company: company.trim(),
@@ -111,7 +115,7 @@ export default function ApplicationsPage() {
       toast.success('Application updated');
     } else {
       addApplication({
-        userId: user?.id || 'demo-student',
+        userId: user.id,
         company: company.trim(),
         jobTitle: jobTitle.trim(),
         status: 'saved',

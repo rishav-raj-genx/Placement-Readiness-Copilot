@@ -36,6 +36,7 @@ import { DemoLabel } from '@/components/shared/demo-label';
 import { EmptyState } from '@/components/shared/empty-state';
 import { useJobStore } from '@/stores/job-store';
 import { useApplicationStore } from '@/stores/application-store';
+import { useAuthStore } from '@/stores/auth-store';
 import type { JobPosting } from '@/types';
 import { toast } from 'sonner';
 
@@ -49,6 +50,7 @@ const employmentTypeLabels: Record<string, string> = {
 export default function JobsPage() {
   const { jobs, isHydrated, hydrate } = useJobStore();
   const { addApplication } = useApplicationStore();
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedJob, setSelectedJob] = useState<JobPosting | null>(null);
@@ -84,8 +86,12 @@ export default function JobsPage() {
   };
 
   const confirmSave = () => {
+    if (!user) {
+      toast.error('Your session has expired. Please sign in again.');
+      return;
+    }
     addApplication({
-      userId: 'demo-student',
+      userId: user.id,
       company: saveCompany,
       jobTitle: saveTitle,
       status: 'saved',
