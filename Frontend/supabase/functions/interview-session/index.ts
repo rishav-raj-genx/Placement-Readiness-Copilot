@@ -47,6 +47,8 @@ interface RoomMetadata {
   job: JobInfo | null;
   focusAreas: string[];
   config: SessionRequest;
+}
+
 // Ambient declaration for IDE TypeScript language services
 // Supabase Edge Functions run natively on Deno runtime where 'Deno' is globally available.
 declare const Deno: {
@@ -244,7 +246,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // Generate LiveKit access token using the server SDK
-    const { AccessToken: LiveKitAccessToken, RoomServiceClient } = await import("npm:livekit-server-sdk@2.0.5");
+    const {
+      AccessToken: LiveKitAccessToken,
+      AgentDispatchClient,
+      RoomServiceClient,
+    } = await import("npm:livekit-server-sdk@2.19.1");
 
     // Create the room with metadata — fails closed on errors
     const roomService = new RoomServiceClient(livekitUrl, liveKitApiKey, liveKitApiSecret);
@@ -295,6 +301,28 @@ Deno.serve(async (req: Request) => {
     if (!roomCreated) {
       return new Response(
         JSON.stringify({ error: "Failed to establish LiveKit room", interviewId }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Explicitly dispatch the registered mock-interview worker to this room.
+    // Creating a room alone does not assign a room worker.
+    try {
+      const dispatchClient = new AgentDispatchClient(
+        livekitUrl,
+        liveKitApiKey,
+        liveKitApiSecret,
+      );
+      await dispatchClient.createDispatch(roomName, "mock-interview", {
+        metadata: metadataJson,
+      });
+    } catch (dispatchError) {
+      console.error("Failed to dispatch mock-interview worker:", dispatchError);
+      return new Response(
+        JSON.stringify({
+          error: "LiveKit worker dispatch failed",
+          interviewId,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
