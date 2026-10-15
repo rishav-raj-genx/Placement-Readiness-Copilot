@@ -47,7 +47,14 @@ interface RoomMetadata {
   job: JobInfo | null;
   focusAreas: string[];
   config: SessionRequest;
-}
+// Ambient declaration for IDE TypeScript language services
+// Supabase Edge Functions run natively on Deno runtime where 'Deno' is globally available.
+declare const Deno: {
+  serve: (handler: (req: Request) => Promise<Response> | Response) => void;
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
