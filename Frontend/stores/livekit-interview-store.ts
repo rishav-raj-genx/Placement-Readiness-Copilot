@@ -121,9 +121,16 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
   addTranscript: (entry: LiveKitTranscriptEntry) => {
     const current = get().currentInterview;
     if (!current) return;
+    const existingIndex = current.transcripts.findIndex((item) => item.id === entry.id);
+    const transcripts = [...current.transcripts];
+    if (existingIndex === -1) {
+      transcripts.push(entry);
+    } else {
+      transcripts[existingIndex] = entry;
+    }
     const updated = {
       ...current,
-      transcripts: [...current.transcripts, entry],
+      transcripts,
     };
     saveToStorage('livekit-current-interview', updated);
     set({ currentInterview: updated });

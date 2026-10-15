@@ -62,9 +62,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   }, [liveKitStore]);
   const handleTranscript = useCallback((p: LiveKitTranscriptPayload) => {
     liveKitStore.addTranscript({
-      id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: p.id || `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       speaker: p.speaker,
       text: p.text,
+      final: p.final,
       timestamp: p.timestamp,
     });
   }, [liveKitStore]);

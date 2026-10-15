@@ -200,9 +200,10 @@ export interface LiveKitQuestionPayload {
 }
 
 export interface LiveKitTranscriptPayload {
+  id?: string;
   speaker: 'student' | 'interviewer';
   text: string;
-  final: boolean;
+  final?: boolean;
   timestamp: number;
 }
 
@@ -255,5 +256,6 @@ export interface LiveKitTranscriptEntry {
   id: string;
   speaker: 'student' | 'interviewer';
   text: string;
+  final?: boolean;
   timestamp: number;
 }

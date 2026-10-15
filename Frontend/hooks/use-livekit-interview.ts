@@ -76,7 +76,14 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   }, [options]);
 
   const addTranscript = useCallback((entry: LiveKitTranscriptEntry) => {
-    setTranscripts((prev) => [...prev, entry]);
+    setTranscripts((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === entry.id);
+      if (existingIndex === -1) return [...prev, entry];
+
+      const updated = [...prev];
+      updated[existingIndex] = entry;
+      return updated;
+    });
   }, []);
 
   const handleDataReceived = useCallback(
@@ -100,9 +107,10 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
         case 'interview:transcript': {
           const p = parsed.payload as LiveKitTranscriptPayload;
           addTranscript({
-            id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            id: p.id || `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             speaker: p.speaker,
             text: p.text,
+            final: p.final,
             timestamp: p.timestamp,
           });
           optionsRef.current.onTranscript?.(p);
