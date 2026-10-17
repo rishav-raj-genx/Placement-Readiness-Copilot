@@ -52,7 +52,7 @@ The platform handoff specifies:
   record.
 - The worker reads `room.metadata`, including the nested `student`, `resume`,
   `job`, `focusAreas`, and `config` fields.
-- The maximum interview duration is 30 minutes.
+- The interview targets 18 minutes and must end within 20 minutes.
 - Canonical event fields are `message` for greetings, `questionId`/`text`/
   `questionNumber` for questions, `final` plus `interviewer`/`student` for
   transcript turns, and `reason: "student_requested"` for finish messages.

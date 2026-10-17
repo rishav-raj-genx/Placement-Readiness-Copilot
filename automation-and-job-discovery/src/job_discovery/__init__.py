@@ -9,5 +9,5 @@ __all__ = [
     "BooleanSearchParser",
     "GreenhouseFetcher",
     "LeverFetcher",
-    "RSSJobFetcher"
+    "RSSJobFetcher",
 ]

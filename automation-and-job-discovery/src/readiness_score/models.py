@@ -1,15 +1,18 @@
+from typing import Any, Dict, List, Literal, Optional
+
 from pydantic import BaseModel, Field, model_validator
-from typing import Dict, Any, List, Optional
 
 # Contract version for interview session payload
 CANONICAL_INTERVIEW_CONTRACT_VERSION = "v0"
 ALGORITHM_VERSION = "v1.0.0"
+
 
 class InterviewDimensions(BaseModel):
     score: float = Field(default=0.0, ge=0.0, le=100.0)
     feedback: Optional[str] = ""
     strengths: List[str] = Field(default_factory=list)
     improvement_areas: List[str] = Field(default_factory=list)
+
 
 class CanonicalInterviewResult(BaseModel):
     contract_version: str = CANONICAL_INTERVIEW_CONTRACT_VERSION
@@ -24,8 +27,11 @@ class CanonicalInterviewResult(BaseModel):
         if isinstance(data, dict):
             ver = data.get("contract_version")
             if ver != CANONICAL_INTERVIEW_CONTRACT_VERSION:
-                raise ValueError(f"Unsupported interview contract_version: '{ver}'. Expected '{CANONICAL_INTERVIEW_CONTRACT_VERSION}'")
+                raise ValueError(
+                    f"Unsupported interview contract_version: '{ver}'. Expected '{CANONICAL_INTERVIEW_CONTRACT_VERSION}'"
+                )
         return data
+
 
 class ResumeInput(BaseModel):
     score: float = Field(default=0.0, ge=0.0, le=100.0, description="Resume quality score (0-100)")
@@ -34,6 +40,7 @@ class ResumeInput(BaseModel):
     has_action_verbs: bool = True
     has_clean_formatting: bool = True
     missing_elements: List[str] = Field(default_factory=list)
+
 
 class ProjectItem(BaseModel):
     name: str = "Project"
@@ -45,30 +52,43 @@ class ProjectItem(BaseModel):
     has_readme: bool = True
     is_live: bool = False
 
+
 class GitHubActivityInput(BaseModel):
-    score: float = Field(default=0.0, ge=0.0, le=100.0, description="GitHub profile activity score (0-100)")
+    score: float = Field(
+        default=0.0, ge=0.0, le=100.0, description="GitHub profile activity score (0-100)"
+    )
     pinned_repos_count: int = 0
     recent_commit_streak_days: int = 0
     has_profile_readme: bool = False
 
+
 class CodingPracticeInput(BaseModel):
-    score: float = Field(default=0.0, ge=0.0, le=100.0, description="LeetCode / coding profile score (0-100)")
+    score: float = Field(
+        default=0.0, ge=0.0, le=100.0, description="LeetCode / coding profile score (0-100)"
+    )
     problems_solved: int = 0
     mediums_solved: int = 0
     hards_solved: int = 0
     contest_rating: Optional[int] = None
 
+
 class LinkedInInput(BaseModel):
-    score: float = Field(default=0.0, ge=0.0, le=100.0, description="LinkedIn profile score (0-100)")
+    score: float = Field(
+        default=0.0, ge=0.0, le=100.0, description="LinkedIn profile score (0-100)"
+    )
     has_headline: bool = False
     has_about_summary: bool = False
     experience_matches_resume: bool = True
 
+
 class CoCurricularInput(BaseModel):
-    score: float = Field(default=0.0, ge=0.0, le=100.0, description="Achievements, hackathons, clubs (0-100)")
+    score: float = Field(
+        default=0.0, ge=0.0, le=100.0, description="Achievements, hackathons, clubs (0-100)"
+    )
     hackathons_count: int = 0
     certifications_count: int = 0
     club_leadership: bool = False
+
 
 class StudentProfileEvaluation(BaseModel):
     student_id: str = "student_001"
@@ -89,7 +109,7 @@ class StudentProfileEvaluation(BaseModel):
         review_data: Dict[str, Any],
         student_id: str = "student_001",
         projects: Optional[List[ProjectItem]] = None,
-        interview_session_result: Optional[CanonicalInterviewResult] = None
+        interview_session_result: Optional[CanonicalInterviewResult] = None,
     ) -> "StudentProfileEvaluation":
         """
         Adapter that ingests Member 2 (Rishav)'s Profile Review API response:
@@ -103,15 +123,13 @@ class StudentProfileEvaluation(BaseModel):
                 has_clean_formatting=resume_data.get("is_ats_friendly", True),
                 has_action_verbs=resume_data.get("uses_action_verbs", True),
                 page_count=1 if resume_data.get("is_one_page", True) else 2,
-                missing_elements=resume_data.get("specific_fixes", [])
+                missing_elements=resume_data.get("specific_fixes", []),
             )
 
         github_data = review_data.get("github_review")
         github_input = None
         if github_data:
-            github_input = GitHubActivityInput(
-                score=float(github_data.get("score", 0.0))
-            )
+            github_input = GitHubActivityInput(score=float(github_data.get("score", 0.0)))
 
         linkedin_data = review_data.get("linkedin_review")
         linkedin_input = None
@@ -119,7 +137,7 @@ class StudentProfileEvaluation(BaseModel):
             linkedin_input = LinkedInInput(
                 score=float(linkedin_data.get("score", 0.0)),
                 has_headline=True,
-                has_about_summary=linkedin_data.get("has_complete_profile", True)
+                has_about_summary=linkedin_data.get("has_complete_profile", True),
             )
 
         return cls(
@@ -128,8 +146,9 @@ class StudentProfileEvaluation(BaseModel):
             github=github_input,
             linkedin=linkedin_input,
             projects=projects or [],
-            interview_session_result=interview_session_result
+            interview_session_result=interview_session_result,
         )
+
 
 class ActionItem(BaseModel):
     rank: int
@@ -137,6 +156,13 @@ class ActionItem(BaseModel):
     action: str
     potential_point_gain: float
     description: str
+
+
+class PersistenceStatus(BaseModel):
+    attempted: bool = False
+    success: bool = False
+    source: Literal["not_requested", "supabase", "local_sqlite"] = "not_requested"
+
 
 class ReadinessReport(BaseModel):
     student_id: str
@@ -148,3 +174,4 @@ class ReadinessReport(BaseModel):
     category_scores: Dict[str, Dict[str, Any]]
     top_actions: List[ActionItem]
     is_placement_ready: bool
+    persistence: PersistenceStatus = Field(default_factory=PersistenceStatus)

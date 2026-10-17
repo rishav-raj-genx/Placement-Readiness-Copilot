@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Dict, List, Optional
 
 from scoring.schemas import InterviewResult
 
+
 def greeting_event(
     text: str,
-    interview_id: Optional[str] = None,
-    target_role: Optional[str] = None,
-    company: Optional[str] = None,
-    threshold_score: Optional[int] = None,
-) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {"message": text}
+    interview_id: str | None = None,
+    target_role: str | None = None,
+    company: str | None = None,
+    threshold_score: int | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {"message": text}
     if interview_id is not None:
         payload["interviewId"] = interview_id
     if target_role is not None:
@@ -33,10 +33,10 @@ def greeting_event(
 def question_event(
     text: str,
     question_index: int,
-    total_questions: int = 4,
+    total_questions: int = 6,
     category: str = "Technical interview",
-    target_competencies: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    target_competencies: list[str] | None = None,
+) -> dict[str, object]:
     return {
         "event": "interview:question",
         "payload": {
@@ -52,21 +52,21 @@ def transcript_event(
     text: str,
     speaker: str,
     is_final: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, object]:
     if speaker not in {"interviewer", "student"}:
         raise ValueError("speaker must be interviewer or student")
     return {
         "event": "interview:transcript",
         "payload": {
-        "speaker": speaker,
-        "text": text,
-        "final": is_final,
-        "timestamp": _timestamp(),
+            "speaker": speaker,
+            "text": text,
+            "final": is_final,
+            "timestamp": _timestamp(),
         },
     }
 
 
-def error_event(code: str, message: str, recoverable: bool = True) -> Dict[str, Any]:
+def error_event(code: str, message: str, recoverable: bool = True) -> dict[str, object]:
     return {
         "event": "interview:error",
         "payload": {
@@ -78,7 +78,7 @@ def error_event(code: str, message: str, recoverable: bool = True) -> Dict[str, 
     }
 
 
-def results_event(result: InterviewResult) -> Dict[str, Any]:
+def results_event(result: InterviewResult) -> dict[str, object]:
     """Map the validated internal result to the frontend result event."""
 
     return {
@@ -110,14 +110,14 @@ def results_event(result: InterviewResult) -> Dict[str, Any]:
     }
 
 
-def finish_event() -> Dict[str, Any]:
+def finish_event() -> dict[str, object]:
     return {
         "event": "interview:finish",
         "payload": {"reason": "student_requested"},
     }
 
 
-def encode_event(event: Dict[str, Any]) -> bytes:
+def encode_event(event: dict[str, object]) -> bytes:
     """Encode only structured event data for LiveKit publishData."""
 
     return json.dumps(event, separators=(",", ":"), ensure_ascii=True).encode("utf-8")

@@ -163,6 +163,7 @@ the single source of truth.
       "additionalProperties": {
         "$ref": "#/$defs/DimensionScore"
       },
+      "minProperties": 3,
       "title": "Dimensions",
       "type": "object"
     },
@@ -170,6 +171,7 @@ the single source of truth.
       "items": {
         "type": "string"
       },
+      "minItems": 1,
       "title": "Improvement Areas",
       "type": "array"
     },
@@ -183,11 +185,12 @@ the single source of truth.
       "items": {
         "type": "string"
       },
+      "minItems": 1,
       "title": "Strengths",
       "type": "array"
     },
     "summary": {
-      "default": "",
+      "minLength": 1,
       "title": "Summary",
       "type": "string"
     },
@@ -195,12 +198,18 @@ the single source of truth.
       "items": {
         "$ref": "#/$defs/TranscriptTurn"
       },
+      "minItems": 1,
       "title": "Transcript",
       "type": "array"
     }
   },
   "required": [
-    "interview_score"
+    "interview_score",
+    "transcript",
+    "summary",
+    "strengths",
+    "improvement_areas",
+    "dimensions"
   ],
   "title": "InterviewResult",
   "type": "object"

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -6,7 +6,7 @@ from agent.auth import AuthenticationError, authenticate_student, parse_bearer_t
 
 
 def _token(subject="student-123", expired=False):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return jwt.encode(
         {
             "sub": subject,
@@ -20,9 +20,12 @@ def _token(subject="student-123", expired=False):
 
 
 def test_authentication_returns_subject():
-    assert authenticate_student(
-        _token(), "student-123", jwt_secret="test-secret-that-is-at-least-32-bytes"
-    ) == "student-123"
+    assert (
+        authenticate_student(
+            _token(), "student-123", jwt_secret="test-secret-that-is-at-least-32-bytes"
+        )
+        == "student-123"
+    )
 
 
 def test_bearer_header_is_parsed_without_altering_token():

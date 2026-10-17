@@ -1,5 +1,6 @@
 import re
-from typing import List, Union
+from typing import List
+
 
 class BooleanSearchParser:
     """
@@ -42,7 +43,7 @@ class BooleanSearchParser:
         def match_term(term: str) -> bool:
             term_clean = term.lower().strip()
             # Boundary search for clean keyword matching
-            pattern = r'(?:\b|_)' + re.escape(term_clean) + r'(?:\b|_)'
+            pattern = r"(?:\b|_)" + re.escape(term_clean) + r"(?:\b|_)"
             return bool(re.search(pattern, normalized_text))
 
         # Recursive-descent boolean evaluator
@@ -56,7 +57,11 @@ class BooleanSearchParser:
 
         def parse_term(index: int):
             left_val, index = parse_factor(index)
-            while index < len(tokens) and tokens[index] in ("AND",) or (index < len(tokens) and tokens[index] not in ("OR", ")")):
+            while (
+                index < len(tokens)
+                and tokens[index] in ("AND",)
+                or (index < len(tokens) and tokens[index] not in ("OR", ")"))
+            ):
                 if tokens[index] == "AND":
                     index += 1
                 right_val, index = parse_factor(index)
@@ -95,7 +100,9 @@ class BooleanSearchParser:
             return any(t in normalized_text for t in raw_terms)
 
     @staticmethod
-    def build_query_from_profile(skills: List[str], target_role: str, locations: List[str] = None) -> str:
+    def build_query_from_profile(
+        skills: List[str], target_role: str, locations: List[str] = None
+    ) -> str:
         """
         Builds a standard compliant boolean query from student profile.
         Example output:
@@ -109,7 +116,9 @@ class BooleanSearchParser:
 
         role_keywords = ["intern", "internship", "graduate", "junior", "associate"]
         if target_role:
-            role_terms = [target_role] + [f"{target_role} {k}" for k in ["Intern", "Internship", "Junior"]]
+            role_terms = [target_role] + [
+                f"{target_role} {k}" for k in ["Intern", "Internship", "Junior"]
+            ]
             role_clause = " OR ".join([f'"{r.strip()}"' for r in role_terms[:4]])
             parts.append(f"({role_clause})")
         else:

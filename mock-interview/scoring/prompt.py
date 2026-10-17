@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, List
 
 from scoring.schemas import InterviewContext, InterviewResult, TranscriptTurn
-
 
 SCORING_SYSTEM_PROMPT = """You score a mock job interview.
 Return only valid JSON matching this shape:
@@ -21,12 +19,12 @@ Return only valid JSON matching this shape:
     "behavioral": {"score": integer 0-100, "feedback": string, "strengths": [string], "improvement_areas": [string]}
   }
 }
-Do not invent facts not present in the resume or transcript."""
+Both top-level arrays, strengths and improvement_areas, must contain at least
+one evidence-based item. Include all three dimensions. Do not invent facts not
+present in the resume or transcript."""
 
 
-def build_scoring_prompt(
-    context: InterviewContext, transcript: List[TranscriptTurn]
-) -> str:
+def build_scoring_prompt(context: InterviewContext, transcript: list[TranscriptTurn]) -> str:
     """Build a bounded prompt from validated internal models."""
 
     resume = context.model_dump_json(exclude={"contract_version"})
@@ -41,7 +39,7 @@ def build_scoring_prompt(
     )
 
 
-def parse_scoring_result(payload: Any, transcript: List[TranscriptTurn]) -> InterviewResult:
+def parse_scoring_result(payload: object, transcript: list[TranscriptTurn]) -> InterviewResult:
     """Validate an LLM payload at the external-service boundary."""
 
     if isinstance(payload, str):
@@ -50,7 +48,7 @@ def parse_scoring_result(payload: Any, transcript: List[TranscriptTurn]) -> Inte
         except json.JSONDecodeError as exc:
             raise ValueError("scoring provider returned non-JSON output") from exc
     if not isinstance(payload, dict):
-        raise ValueError("scoring provider returned a JSON object")
+        raise TypeError("scoring provider returned a JSON object")
     payload = dict(payload)
     if "dimensions" not in payload and "dimension_scores" in payload:
         payload["dimensions"] = payload.pop("dimension_scores")

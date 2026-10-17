@@ -1,7 +1,7 @@
 import json
 
 from scoring.result_store import SupabaseInterviewSessionStore
-from scoring.schemas import InterviewResult
+from scoring.schemas import DimensionScore, InterviewResult, TranscriptTurn
 
 
 class FakeResponse:
@@ -27,7 +27,21 @@ def test_platform_store_patches_authoritative_interview_session(monkeypatch):
     SupabaseInterviewSessionStore(
         url="https://example.supabase.co",
         service_key="server-only",
-    ).save("intv-1", InterviewResult(interview_score=84))
+    ).save(
+        "intv-1",
+        InterviewResult(
+            interview_score=84,
+            transcript=[TranscriptTurn(speaker="student", text="A complete answer.")],
+            summary="Strong interview.",
+            strengths=["Clear communication"],
+            improvement_areas=["Add metrics"],
+            dimensions={
+                "communication": DimensionScore(score=86),
+                "technical_depth": DimensionScore(score=84),
+                "behavioral": DimensionScore(score=82),
+            },
+        ),
+    )
 
     assert captured["method"] == "PATCH"
     assert captured["url"].endswith("/rest/v1/interview_sessions?id=eq.intv-1")

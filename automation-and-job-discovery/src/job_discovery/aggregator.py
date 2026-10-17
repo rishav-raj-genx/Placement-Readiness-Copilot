@@ -1,14 +1,28 @@
-import re
 import logging
-from typing import List, Dict, Any, Optional
+import re
+import urllib.parse
+from typing import Any, Dict, List, Optional, Tuple
 
+from src import config
+from src.db.supabase_client import db_client
+from src.job_discovery.boolean_parser import BooleanSearchParser
+from src.job_discovery.e2e_fixtures import build_e2e_jobs
 from src.job_discovery.greenhouse import GreenhouseFetcher
 from src.job_discovery.lever import LeverFetcher
 from src.job_discovery.rss_fetcher import RSSJobFetcher
-from src.job_discovery.boolean_parser import BooleanSearchParser
-from src.db.supabase_client import db_client
 
 logger = logging.getLogger("job_aggregator")
+
+ALLOWED_JOB_SOURCES = frozenset(
+    {
+        "greenhouse_ats",
+        "lever_ats",
+        "weworkremotely_rss",
+        "jobicy_rss",
+    }
+)
+FORBIDDEN_JOB_HOSTS = frozenset({"linkedin.com", "www.linkedin.com"})
+
 
 class JobAggregator:
     """
@@ -28,7 +42,7 @@ class JobAggregator:
         boolean_query: Optional[str] = None,
         locations: Optional[List[str]] = None,
         max_results: int = 25,
-        save_to_db: bool = True
+        save_to_db: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Discovers, filters, scores, and ranks jobs for a student profile.
@@ -38,30 +52,37 @@ class JobAggregator:
             boolean_query = BooleanSearchParser.build_query_from_profile(
                 skills=student_skills,
                 target_role=target_role,
-                locations=locations or ["remote", "bangalore", "india", "worldwide"]
+                locations=locations or ["remote", "bangalore", "india", "worldwide"],
             )
 
         logger.info(f"Using Boolean Search Query: {boolean_query}")
 
-        # Gather from all three compliant streams
+        # Gather from compliant streams, or deterministic compliant fixtures in E2E mode.
         raw_pool: List[Dict[str, Any]] = []
-        try:
-            raw_pool.extend(self.greenhouse.fetch_all(max_per_board=10))
-        except Exception as e:
-            logger.warning(f"Greenhouse fetch encountered issues: {e}")
+        if config.AUTOMATION_E2E_MODE:
+            raw_pool.extend(build_e2e_jobs())
+        else:
+            try:
+                raw_pool.extend(self.greenhouse.fetch_all(max_per_board=10))
+            except Exception as e:
+                logger.warning(f"Greenhouse fetch encountered issues: {e}")
 
-        try:
-            raw_pool.extend(self.lever.fetch_all(max_per_company=10))
-        except Exception as e:
-            logger.warning(f"Lever fetch encountered issues: {e}")
+            try:
+                raw_pool.extend(self.lever.fetch_all(max_per_company=10))
+            except Exception as e:
+                logger.warning(f"Lever fetch encountered issues: {e}")
 
-        try:
-            raw_pool.extend(self.rss.fetch_all(max_per_feed=15))
-        except Exception as e:
-            logger.warning(f"RSS fetch encountered issues: {e}")
+            try:
+                raw_pool.extend(self.rss.fetch_all(max_per_feed=15))
+            except Exception as e:
+                logger.warning(f"RSS fetch encountered issues: {e}")
+
+        # Enforce source policy at the aggregation boundary. This prevents a
+        # misconfigured or replaced fetcher from introducing LinkedIn scraping.
+        compliant_pool = [job for job in raw_pool if self._is_permitted_job(job)]
 
         # 1. Deduplication
-        deduped = self._deduplicate_jobs(raw_pool)
+        deduped = self._deduplicate_jobs(compliant_pool)
 
         # 2. Boolean filter & scoring
         matched_jobs: List[Dict[str, Any]] = []
@@ -77,7 +98,7 @@ class JobAggregator:
             matched_skills_found = []
             for skill in clean_skills:
                 # Word boundary match for skills
-                pattern = r'(?:\b|_)' + re.escape(skill.lower()) + r'(?:\b|_)'
+                pattern = r"(?:\b|_)" + re.escape(skill.lower()) + r"(?:\b|_)"
                 if re.search(pattern, searchable_text.lower()):
                     matched_skills_found.append(skill)
 
@@ -87,7 +108,7 @@ class JobAggregator:
                 student_skills=clean_skills,
                 matched_skills=matched_skills_found,
                 target_role=target_role,
-                matches_boolean=matches_query
+                matches_boolean=matches_query,
             )
 
             # Keep if matches boolean query OR has high skill overlap
@@ -104,7 +125,7 @@ class JobAggregator:
                     "relevance_score": relevance,
                     "match_reason": match_reason,
                     "posted_at": job.get("posted_at"),
-                    "boolean_matched": matches_query
+                    "boolean_matched": matches_query,
                 }
                 matched_jobs.append(job_record)
 
@@ -118,6 +139,20 @@ class JobAggregator:
 
         return final_jobs
 
+    @staticmethod
+    def _is_permitted_job(job: Dict[str, Any]) -> bool:
+        source = str(job.get("source", ""))
+        if source not in ALLOWED_JOB_SOURCES:
+            logger.warning("Rejected job from unapproved source: %s", source or "missing")
+            return False
+
+        hostname = (urllib.parse.urlparse(str(job.get("url", ""))).hostname or "").lower()
+        if hostname in FORBIDDEN_JOB_HOSTS or hostname.endswith(".linkedin.com"):
+            logger.warning("Rejected LinkedIn job URL from source %s", source)
+            return False
+
+        return True
+
     def _deduplicate_jobs(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         seen_keys = set()
         unique_jobs = []
@@ -125,9 +160,9 @@ class JobAggregator:
         for job in jobs:
             # Normalize URL (strip tracking params and trailing slash)
             url_norm = job.get("url", "").split("?")[0].rstrip("/").lower()
-            title_norm = re.sub(r'[^a-z0-9]', '', job.get("title", "").lower())
-            company_norm = re.sub(r'[^a-z0-9]', '', job.get("company", "").lower())
-            
+            title_norm = re.sub(r"[^a-z0-9]", "", job.get("title", "").lower())
+            company_norm = re.sub(r"[^a-z0-9]", "", job.get("company", "").lower())
+
             combo_key = f"{company_norm}_{title_norm}"
             if url_norm and url_norm in seen_keys:
                 continue
@@ -146,8 +181,8 @@ class JobAggregator:
         student_skills: List[str],
         matched_skills: List[str],
         target_role: str,
-        matches_boolean: bool
-    ) -> (float, str):
+        matches_boolean: bool,
+    ) -> Tuple[float, str]:
         score = 0.0
         reasons = []
 
@@ -160,7 +195,9 @@ class JobAggregator:
             skill_pts = min(40.0, skill_ratio * 50.0)
             score += skill_pts
             if matched_skills:
-                reasons.append(f"Matches {len(matched_skills)} core skill(s): {', '.join(matched_skills[:4])}")
+                reasons.append(
+                    f"Matches {len(matched_skills)} core skill(s): {', '.join(matched_skills[:4])}"
+                )
 
         # Role match in title (up to 30 pts)
         target_terms = [t.lower() for t in target_role.split() if len(t) > 2]
@@ -172,7 +209,16 @@ class JobAggregator:
             score += 12.0
 
         # Internship / Student friendly keyword bonus (up to 15 pts)
-        student_keywords = ["intern", "internship", "graduate", "junior", "entry level", "university", "trainee", "fresher"]
+        student_keywords = [
+            "intern",
+            "internship",
+            "graduate",
+            "junior",
+            "entry level",
+            "university",
+            "trainee",
+            "fresher",
+        ]
         found_student_kw = [k for k in student_keywords if k in title_lower or k in desc_lower]
         if found_student_kw:
             score += 15.0

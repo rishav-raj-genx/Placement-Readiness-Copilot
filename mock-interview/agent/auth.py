@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from collections.abc import Mapping
 
 
 class AuthenticationError(ValueError):
     """Raised when a session token cannot be trusted."""
 
 
-def parse_bearer_token(authorization: Any) -> str:
+def parse_bearer_token(authorization: object) -> str:
     """Extract a bearer token from an HTTP Authorization header."""
 
     if not isinstance(authorization, str):
@@ -22,10 +22,10 @@ def parse_bearer_token(authorization: Any) -> str:
 
 
 def authenticate_student(
-    token: Any,
-    requested_student_id: Any = None,
+    token: object,
+    requested_student_id: object = None,
     *,
-    jwt_secret: Optional[str] = None,
+    jwt_secret: str | None = None,
 ) -> str:
     """Verify a Supabase JWT and return its subject.
 
@@ -41,7 +41,7 @@ def authenticate_student(
     try:
         import jwt
 
-        claims: Dict[str, Any] = jwt.decode(
+        decoded: object = jwt.decode(
             token,
             secret,
             algorithms=["HS256"],
@@ -50,6 +50,9 @@ def authenticate_student(
         )
     except Exception as exc:
         raise AuthenticationError("authentication token is invalid") from exc
+    if not isinstance(decoded, Mapping):
+        raise AuthenticationError("authentication token has invalid claims")
+    claims = decoded
     subject = claims.get("sub")
     if not isinstance(subject, str) or not subject:
         raise AuthenticationError("authentication token has no student identity")

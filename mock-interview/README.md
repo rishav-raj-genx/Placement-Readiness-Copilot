@@ -1,20 +1,18 @@
 # Mock Interview Voice Service
 
-This is a standalone websocket service for a 30-minute maximum mock interview.
-The transport is deliberately independent of the frontend so a LiveKit
-component can proxy or wrap it without coupling the interview state machine to
-React.
+This is a standalone websocket service for a 15-20 minute mock interview. The
+default plan targets 18 minutes with four technical questions and two HR
+questions. The transport is independent of the frontend so LiveKit can use the
+same interview and scoring boundaries.
 
 ## Run locally
 
 ```bash
 cd mock-interview
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync --dev
 export GROQ_API_KEY=...
 export DEEPGRAM_API_KEY=...
-uvicorn app:create_app --factory --reload
+uv run uvicorn app:create_app --factory --reload
 ```
 
 The service exposes `GET /health` and `WS /ws/interview`.
@@ -23,14 +21,15 @@ The service exposes `GET /health` and `WS /ws/interview`.
 
 The native LiveKit Agents worker is [`livekit_worker.py`](./livekit_worker.py).
 It uses the current `AgentServer`/`AgentSession` entrypoint pattern and reads
-the provisional resume payload from LiveKit room metadata. Run it with Python
-3.10+:
+resume data from LiveKit room metadata. The context adapter accepts structured
+resume objects and the profile review service's `text`/`page_count` extraction
+response. Run it with Python 3.11+:
 
 ```bash
 cp .env.example .env.local
 # Fill .env.local locally; never commit it.
-pip install -r livekit-requirements.txt
-lk agent dev
+uv sync --dev --extra voice
+uv run python livekit_worker.py dev
 ```
 
 Configured LiveKit project:
@@ -43,9 +42,16 @@ Configured LiveKit project:
 The SIP URI is reserved for a later phone-interview integration; the current
 browser flow uses WebRTC rooms.
 
-The worker uses LiveKit Inference with Deepgram STT, Groq LLM, and Deepgram
-Aura TTS. Set the corresponding LiveKit/provider credentials in the
-environment; never commit them to the repository.
+The worker uses LiveKit Inference with Deepgram Nova STT, Groq LLM, and
+Deepgram Aura TTS. Configure routes with `LIVEKIT_STT_MODEL`,
+`LIVEKIT_INTERVIEW_MODEL`, and `LIVEKIT_TTS_MODEL`. Set credentials in the
+environment; never commit them.
+
+On `interview:finish` or worker shutdown, the worker builds the full transcript
+and makes a separate Groq scoring call. The validated response must contain the
+score, summary, strengths, improvement areas, and communication,
+technical-depth, and behavioral dimensions. When room metadata includes an
+interview ID, this result is persisted to `interview_sessions.result`.
 
 ## Websocket protocol
 
@@ -127,3 +133,12 @@ LiveKit references:
 - https://docs.livekit.io/agents/start/voice-ai/
 - https://docs.livekit.io/agents/logic/sessions/
 - https://github.com/livekit/agents/blob/main/examples/voice_agents/basic_agent.py
+
+## Automated dry run
+
+This bypasses the microphone while exercising questions, answers, transcript
+collection, and the secondary scoring call:
+
+```bash
+uv run pytest tests/test_text_dry_run.py -q -s
+```

@@ -2,30 +2,37 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
-from typing import Any, Dict, Optional
+import os
+from collections.abc import Mapping
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from agent.auth import AuthenticationError, authenticate_student
-from agent.providers import DeepgramSTT, DeepgramTTS, GroqLLM, InterviewLLM, SpeechToText, TextToSpeech
-from agent.session import InterviewSession
 from agent.context_adapter import adapt_resume
+from agent.providers import (
+    DeepgramSTT,
+    DeepgramTTS,
+    GroqLLM,
+    InterviewLLM,
+    SpeechToText,
+    TextToSpeech,
+)
+from agent.session import InterviewSession
 from scoring.result_store import ResultStore, SupabaseResultStore
 
 
 def create_app(
-    llm: Optional[InterviewLLM] = None,
-    stt: Optional[SpeechToText] = None,
-    tts: Optional[TextToSpeech] = None,
-    result_store: Optional[ResultStore] = None,
+    llm: InterviewLLM | None = None,
+    stt: SpeechToText | None = None,
+    tts: TextToSpeech | None = None,
+    result_store: ResultStore | None = None,
     require_auth: bool = True,
-) -> Any:
+    runtime_mode: str = "live",
+) -> FastAPI:
     """Create the websocket app with injectable providers for tests."""
-
-    try:
-        from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-    except ImportError as exc:
-        raise RuntimeError("install requirements.txt to run the websocket service") from exc
 
     app = FastAPI(title="Mock Interview Voice Service")
     scoring_llm = llm or GroqLLM()
@@ -34,17 +41,29 @@ def create_app(
     persistence = result_store or SupabaseResultStore()
 
     @app.get("/health")
-    async def health() -> Dict[str, str]:
-        return {"status": "ok"}
+    async def health() -> dict[str, object]:
+        return {
+            "status": "ok",
+            "mode": runtime_mode,
+            "transport": "websocket",
+            "stt": "disabled" if runtime_mode == "e2e" else "deepgram",
+            "tts": "text-only" if runtime_mode == "e2e" else "deepgram",
+            "scoring": "deterministic" if runtime_mode == "e2e" else "groq",
+            "target_duration_minutes": InterviewSession.TARGET_DURATION_MINUTES,
+            "max_duration_minutes": InterviewSession.MAX_DURATION_MINUTES,
+        }
 
     @app.websocket("/ws/interview")
     async def interview_socket(websocket: WebSocket) -> None:
         await websocket.accept()
-        session: Optional[InterviewSession] = None
-        student_id: Optional[str] = None
+        session: InterviewSession | None = None
+        student_id: str | None = None
         try:
             while True:
-                message = await websocket.receive_json()
+                raw_message = await websocket.receive_json()
+                if not isinstance(raw_message, Mapping):
+                    raise TypeError("websocket message must be a JSON object")
+                message = raw_message
                 event = message.get("event")
                 if event == "start":
                     if require_auth:
@@ -54,8 +73,7 @@ def create_app(
                     session = InterviewSession(adapt_resume(message.get("resume")), scoring_llm)
                     greeting = session.greeting()
                     await _send_voice_event(websocket, "greeting", greeting, text_to_speech)
-                    question = session.next_question()
-                    await _send_voice_event(websocket, "question", question, text_to_speech)
+                    await _send_next_question(websocket, session, text_to_speech)
                 elif event == "answer":
                     if session is None:
                         raise ValueError("send a start event before answering")
@@ -63,23 +81,28 @@ def create_app(
                     if not isinstance(text, str):
                         raise ValueError("answer.text must be a string")
                     session.accept_answer(text)
-                    question = session.next_question()
-                    await _send_voice_event(websocket, "question", question, text_to_speech)
+                    await _send_next_question(websocket, session, text_to_speech)
                 elif event == "audio_answer":
                     if session is None:
                         raise ValueError("send a start event before answering")
                     audio = _decode_audio(message.get("audio_base64"))
-                    text = speech_to_text.transcribe(audio, message.get("content_type", "audio/webm"))
+                    content_type = message.get("content_type", "audio/webm")
+                    if not isinstance(content_type, str):
+                        raise TypeError("content_type must be a string")
+                    text = await asyncio.to_thread(
+                        speech_to_text.transcribe,
+                        audio,
+                        content_type,
+                    )
                     session.accept_answer(text)
                     await websocket.send_json({"event": "transcript", "text": text})
-                    question = session.next_question()
-                    await _send_voice_event(websocket, "question", question, text_to_speech)
+                    await _send_next_question(websocket, session, text_to_speech)
                 elif event == "finish":
                     if session is None:
                         raise ValueError("send a start event before finishing")
-                    result = session.finish()
+                    result = await asyncio.to_thread(session.finish)
                     if persistence is not None and student_id is not None:
-                        persistence.save(student_id, result)
+                        await asyncio.to_thread(persistence.save, student_id, result)
                     await websocket.send_json(
                         {"event": "result", "result": result.model_dump(mode="json")}
                     )
@@ -88,14 +111,52 @@ def create_app(
                     raise ValueError("event must be start, answer, audio_answer, or finish")
         except WebSocketDisconnect:
             return
-        except (AuthenticationError, ValueError, RuntimeError) as exc:
+        except (AuthenticationError, TypeError, ValueError, RuntimeError) as exc:
             await websocket.send_json({"event": "error", "message": str(exc)})
 
     return app
 
 
-async def _send_voice_event(websocket: Any, event: str, text: str, tts: TextToSpeech) -> None:
-    audio = tts.synthesize(text)
+def create_runtime_app() -> FastAPI:
+    """Create the live app, or deterministic providers when explicitly requested."""
+    if os.getenv("MOCK_INTERVIEW_E2E_MODE", "false").lower() not in {"1", "true", "yes"}:
+        return create_app()
+
+    from agent.e2e_providers import DeterministicInterviewLLM, NoopResultStore, TextOnlyTTS
+
+    return create_app(
+        llm=DeterministicInterviewLLM(),
+        tts=TextOnlyTTS(),
+        result_store=NoopResultStore(),
+        require_auth=False,
+        runtime_mode="e2e",
+    )
+
+
+async def _send_next_question(
+    websocket: WebSocket,
+    session: InterviewSession,
+    tts: TextToSpeech,
+) -> None:
+    if not session.has_more_questions:
+        await websocket.send_json(
+            {
+                "event": "ready_to_finish",
+                "question_count": session.question_number,
+            }
+        )
+        return
+    question = session.next_question()
+    await _send_voice_event(websocket, "question", question, tts)
+
+
+async def _send_voice_event(
+    websocket: WebSocket,
+    event: str,
+    text: str,
+    tts: TextToSpeech,
+) -> None:
+    audio = await asyncio.to_thread(tts.synthesize, text)
     await websocket.send_json(
         {
             "event": event,
@@ -105,9 +166,9 @@ async def _send_voice_event(websocket: Any, event: str, text: str, tts: TextToSp
     )
 
 
-def _decode_audio(value: Any) -> bytes:
+def _decode_audio(value: object) -> bytes:
     if not isinstance(value, str):
-        raise ValueError("audio_base64 must be a string")
+        raise TypeError("audio_base64 must be a string")
     try:
         return base64.b64decode(value, validate=True)
     except (ValueError, binascii.Error) as exc:

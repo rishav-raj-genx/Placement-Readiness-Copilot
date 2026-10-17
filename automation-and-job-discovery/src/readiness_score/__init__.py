@@ -1,18 +1,18 @@
-from .calculator import PlacementReadinessCalculator, WEIGHTS
+from .calculator import WEIGHTS, PlacementReadinessCalculator
 from .models import (
-    StudentProfileEvaluation,
-    ReadinessReport,
-    ActionItem,
-    ProjectItem,
-    ResumeInput,
-    CanonicalInterviewResult,
-    InterviewDimensions,
-    GitHubActivityInput,
-    CodingPracticeInput,
-    LinkedInInput,
-    CoCurricularInput,
     ALGORITHM_VERSION,
-    CANONICAL_INTERVIEW_CONTRACT_VERSION
+    CANONICAL_INTERVIEW_CONTRACT_VERSION,
+    ActionItem,
+    CanonicalInterviewResult,
+    CoCurricularInput,
+    CodingPracticeInput,
+    GitHubActivityInput,
+    InterviewDimensions,
+    LinkedInInput,
+    ProjectItem,
+    ReadinessReport,
+    ResumeInput,
+    StudentProfileEvaluation,
 )
 
 # Backward compatibility alias
@@ -34,5 +34,5 @@ __all__ = [
     "LinkedInInput",
     "CoCurricularInput",
     "ALGORITHM_VERSION",
-    "CANONICAL_INTERVIEW_CONTRACT_VERSION"
+    "CANONICAL_INTERVIEW_CONTRACT_VERSION",
 ]

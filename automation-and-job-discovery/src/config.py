@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env
@@ -8,7 +9,9 @@ load_dotenv(BASE_DIR / ".env")
 
 # Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+# SUPABASE_KEY is retained only as a backwards-compatible server-side alias.
+SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY or os.getenv("SUPABASE_KEY", "").strip()
 SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "project-screenshots").strip()
 
 # Browser & Link Checking
@@ -22,6 +25,11 @@ BROWSER_TIMEOUT_MS = int(os.getenv("BROWSER_TIMEOUT_MS", "25000"))
 
 # Job Discovery
 MAX_JOBS_PER_SOURCE = int(os.getenv("MAX_JOBS_PER_SOURCE", "30"))
+AUTOMATION_E2E_MODE = os.getenv("AUTOMATION_E2E_MODE", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 # Local Data Cache / Fallback directory
 DATA_DIR = BASE_DIR / "data"

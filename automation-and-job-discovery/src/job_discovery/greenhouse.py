@@ -1,6 +1,7 @@
-import requests
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import requests
 
 logger = logging.getLogger("greenhouse_fetcher")
 
@@ -14,8 +15,9 @@ POPULAR_GREENHOUSE_BOARDS = [
     "hashicorp",
     "elastic",
     "canonical",
-    "instacart"
+    "instacart",
 ]
+
 
 class GreenhouseFetcher:
     """
@@ -53,20 +55,23 @@ class GreenhouseFetcher:
 
                 # Basic strip tags for searchable text
                 import re
-                clean_text = re.sub(r'<[^>]+>', ' ', content_html)
+
+                clean_text = re.sub(r"<[^>]+>", " ", content_html)
                 clean_text = " ".join(clean_text.split())
 
-                jobs.append({
-                    "id": f"gh_{board_token}_{job_id}",
-                    "title": title,
-                    "company": board_token.capitalize(),
-                    "location": location,
-                    "url": job_url,
-                    "source": "greenhouse_ats",
-                    "description": clean_text[:2000],
-                    "is_remote": "remote" in location.lower() or "remote" in title.lower(),
-                    "posted_at": updated_at
-                })
+                jobs.append(
+                    {
+                        "id": f"gh_{board_token}_{job_id}",
+                        "title": title,
+                        "company": board_token.capitalize(),
+                        "location": location,
+                        "url": job_url,
+                        "source": "greenhouse_ats",
+                        "description": clean_text[:2000],
+                        "is_remote": "remote" in location.lower() or "remote" in title.lower(),
+                        "posted_at": updated_at,
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Error fetching Greenhouse board {board_token}: {e}")

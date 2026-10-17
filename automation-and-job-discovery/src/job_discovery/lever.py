@@ -1,16 +1,13 @@
-import requests
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import requests
 
 logger = logging.getLogger("lever_fetcher")
 
 # Popular tech companies using public Lever job boards
-POPULAR_LEVER_COMPANIES = [
-    "postman",
-    "coursera",
-    "palantir",
-    "leverdemo"
-]
+POPULAR_LEVER_COMPANIES = ["postman", "coursera", "palantir", "leverdemo"]
+
 
 class LeverFetcher:
     """
@@ -49,17 +46,20 @@ class LeverFetcher:
                 desc_plain = item.get("descriptionPlain", "")
                 created_at = item.get("createdAt")
 
-                jobs.append({
-                    "id": f"lever_{company}_{posting_id}",
-                    "title": text,
-                    "company": company.capitalize(),
-                    "location": location,
-                    "url": hosted_url,
-                    "source": "lever_ats",
-                    "description": desc_plain[:2000],
-                    "is_remote": "remote" in location.lower() or "remote" in workplace_type.lower(),
-                    "posted_at": created_at
-                })
+                jobs.append(
+                    {
+                        "id": f"lever_{company}_{posting_id}",
+                        "title": text,
+                        "company": company.capitalize(),
+                        "location": location,
+                        "url": hosted_url,
+                        "source": "lever_ats",
+                        "description": desc_plain[:2000],
+                        "is_remote": "remote" in location.lower()
+                        or "remote" in workplace_type.lower(),
+                        "posted_at": created_at,
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Error fetching Lever jobs for {company}: {e}")

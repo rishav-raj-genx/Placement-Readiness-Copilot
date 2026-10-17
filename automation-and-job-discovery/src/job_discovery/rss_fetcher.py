@@ -1,8 +1,9 @@
-import feedparser
-import logging
 import hashlib
+import logging
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import feedparser
 
 logger = logging.getLogger("rss_fetcher")
 
@@ -10,19 +11,20 @@ STANDARD_RSS_FEEDS = [
     {
         "name": "WeWorkRemotely Programming",
         "url": "https://weworkremotely.com/categories/remote-programming-jobs.rss",
-        "source": "weworkremotely_rss"
+        "source": "weworkremotely_rss",
     },
     {
         "name": "WeWorkRemotely Full-Stack",
         "url": "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss",
-        "source": "weworkremotely_rss"
+        "source": "weworkremotely_rss",
     },
     {
         "name": "Jobicy Global Tech",
         "url": "https://jobicy.com/?feed=job_feed",
-        "source": "jobicy_rss"
-    }
+        "source": "jobicy_rss",
+    },
 ]
+
 
 class RSSJobFetcher:
     """
@@ -60,23 +62,25 @@ class RSSJobFetcher:
                     title_clean = title
 
                 # Strip HTML from summary
-                clean_desc = re.sub(r'<[^>]+>', ' ', summary)
+                clean_desc = re.sub(r"<[^>]+>", " ", summary)
                 clean_desc = " ".join(clean_desc.split())
 
                 # Generate reproducible unique ID
                 unique_hash = hashlib.md5((link or title).encode("utf-8")).hexdigest()[:12]
 
-                jobs.append({
-                    "id": f"rss_{unique_hash}",
-                    "title": title_clean,
-                    "company": company,
-                    "location": "Remote / Worldwide",
-                    "url": link,
-                    "source": source_name,
-                    "description": clean_desc[:2000],
-                    "is_remote": True,
-                    "posted_at": published
-                })
+                jobs.append(
+                    {
+                        "id": f"rss_{unique_hash}",
+                        "title": title_clean,
+                        "company": company,
+                        "location": "Remote / Worldwide",
+                        "url": link,
+                        "source": source_name,
+                        "description": clean_desc[:2000],
+                        "is_remote": True,
+                        "posted_at": published,
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Error parsing RSS feed {feed_url}: {e}")

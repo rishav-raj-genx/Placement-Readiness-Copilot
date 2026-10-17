@@ -8,7 +8,7 @@ from agent.livekit_events import (
     results_event,
     transcript_event,
 )
-from scoring.schemas import InterviewResult
+from scoring.schemas import DimensionScore, InterviewResult, TranscriptTurn
 
 
 def test_events_match_frontend_namespaced_contract():
@@ -16,7 +16,18 @@ def test_events_match_frontend_namespaced_contract():
     question = question_event("Explain leader election.", 1, target_competencies=["Raft"])
     transcript = transcript_event("My answer", "student")
     results = results_event(
-        InterviewResult(interview_score=88, summary="Good", improvement_areas=["Add metrics"])
+        InterviewResult(
+            interview_score=88,
+            transcript=[TranscriptTurn(speaker="student", text="My answer")],
+            summary="Good interview.",
+            strengths=["Clear explanation"],
+            improvement_areas=["Add metrics"],
+            dimensions={
+                "communication": DimensionScore(score=90),
+                "technical_depth": DimensionScore(score=88),
+                "behavioral": DimensionScore(score=84),
+            },
+        )
     )
     finish = finish_event()
 

@@ -1,0 +1,9 @@
+packages: []
+
+allowBuilds:
+  unrs-resolver: true
+
+onlyBuiltDependencies:
+  - '@scarf/scarf'
+  - esbuild
+  - unrs-resolver

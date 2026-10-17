@@ -1,19 +1,21 @@
 import json
 import logging
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from src import config
 
 logger = logging.getLogger("supabase_client")
+
 
 class SupabaseHandler:
     """
     Handles pushing data to Member 1's Supabase database and Storage bucket.
     Includes automatic fallback to local SQLite when credentials are not configured yet.
     """
+
     def __init__(self):
         self.supabase = None
         self.is_live = False
@@ -23,15 +25,20 @@ class SupabaseHandler:
     def _init_client(self):
         if config.SUPABASE_URL and config.SUPABASE_KEY:
             try:
-                from supabase import create_client, Client
+                from supabase import Client, create_client
+
                 self.supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
                 self.is_live = True
                 logger.info(f"Connected successfully to Supabase at: {config.SUPABASE_URL}")
             except Exception as e:
-                logger.warning(f"Failed to initialize Supabase client: {e}. Falling back to local storage.")
+                logger.warning(
+                    f"Failed to initialize Supabase client: {e}. Falling back to local storage."
+                )
                 self.is_live = False
         else:
-            logger.info("Supabase credentials not configured. Running in Local Storage Fallback mode.")
+            logger.info(
+                "Supabase credentials not configured. Running in Local Storage Fallback mode."
+            )
             self.is_live = False
 
     def _init_local_fallback(self):
@@ -39,7 +46,7 @@ class SupabaseHandler:
         self.local_db_path = config.DATA_DIR / "local_cache.db"
         conn = sqlite3.connect(self.local_db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS project_live_checks (
             id TEXT PRIMARY KEY,
@@ -86,13 +93,23 @@ class SupabaseHandler:
             breakdown TEXT,
             top_actions TEXT,
             raw_inputs TEXT,
+            algorithm_version TEXT DEFAULT 'v1.0.0',
             updated_at TEXT
         )
         """)
+        readiness_columns = {
+            str(row[1]) for row in cursor.execute("PRAGMA table_info(readiness_scores)").fetchall()
+        }
+        if "algorithm_version" not in readiness_columns:
+            cursor.execute(
+                "ALTER TABLE readiness_scores ADD COLUMN algorithm_version TEXT DEFAULT 'v1.0.0'"
+            )
         conn.commit()
         conn.close()
 
-    def upload_screenshot(self, local_image_path: Path, remote_filename: Optional[str] = None) -> str:
+    def upload_screenshot(
+        self, local_image_path: Path, remote_filename: Optional[str] = None
+    ) -> str:
         """
         Uploads screenshot to Supabase Storage bucket 'project-screenshots'.
         If Supabase is not connected, returns the local file path as file:// URI.
@@ -109,22 +126,25 @@ class SupabaseHandler:
                     file_bytes = f.read()
 
                 # Upload to Supabase Storage
-                res = self.supabase.storage.from_(bucket).upload(
+                self.supabase.storage.from_(bucket).upload(
                     path=filename,
                     file=file_bytes,
-                    file_options={"content-type": "image/png", "upsert": "true"}
+                    file_options={"content-type": "image/png", "upsert": "true"},
                 )
                 public_url = self.supabase.storage.from_(bucket).get_public_url(filename)
                 logger.info(f"Uploaded screenshot to Supabase: {public_url}")
                 return public_url
             except Exception as e:
-                logger.warning(f"Could not upload screenshot to Supabase storage ({e}). Using local path.")
+                logger.warning(
+                    f"Could not upload screenshot to Supabase storage ({e}). Using local path."
+                )
 
         return str(local_image_path.resolve())
 
     def save_live_link_check(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Pushes project link check result to Supabase or local SQLite."""
         import uuid
+
         raw_id = data.get("id")
         # Ensure valid UUID
         try:
@@ -149,7 +169,7 @@ class SupabaseHandler:
             "network_errors": data.get("network_errors", []),
             "content_evaluation": data.get("content_evaluation", {}),
             "quality_score": data.get("quality_score", 0.0),
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
         if self.is_live and self.supabase:
@@ -162,16 +182,27 @@ class SupabaseHandler:
         # Local SQLite storage fallback
         conn = sqlite3.connect(self.local_db_path)
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             INSERT OR REPLACE INTO project_live_checks VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
-            payload["id"], payload["student_id"], payload["project_name"], payload["project_url"],
-            payload["status_code"], int(payload["is_live"]), payload["load_time_ms"],
-            int(payload["mobile_friendly"]), payload["screenshot_url"],
-            json.dumps(payload["console_errors"]), json.dumps(payload["network_errors"]),
-            json.dumps(payload["content_evaluation"]), payload["quality_score"],
-            payload["created_at"]
-        ))
+        """,
+            (
+                payload["id"],
+                payload["student_id"],
+                payload["project_name"],
+                payload["project_url"],
+                payload["status_code"],
+                int(payload["is_live"]),
+                payload["load_time_ms"],
+                int(payload["mobile_friendly"]),
+                payload["screenshot_url"],
+                json.dumps(payload["console_errors"]),
+                json.dumps(payload["network_errors"]),
+                json.dumps(payload["content_evaluation"]),
+                payload["quality_score"],
+                payload["created_at"],
+            ),
+        )
         conn.commit()
         conn.close()
 
@@ -184,21 +215,35 @@ class SupabaseHandler:
 
         # Filter strictly to schema columns
         allowed_columns = {
-            "id", "title", "company", "location", "url", "source",
-            "matched_skills", "relevance_score", "match_reason",
-            "is_remote", "job_type", "posted_at"
+            "id",
+            "title",
+            "company",
+            "location",
+            "url",
+            "source",
+            "matched_skills",
+            "relevance_score",
+            "match_reason",
+            "is_remote",
+            "job_type",
+            "posted_at",
         }
-        cleaned_jobs = [
-            {k: v for k, v in job.items() if k in allowed_columns}
-            for job in jobs
-        ]
+        cleaned_jobs = [{k: v for k, v in job.items() if k in allowed_columns} for job in jobs]
 
         saved_count = 0
         if self.is_live and self.supabase:
             try:
                 # Upsert into Supabase
-                res = self.supabase.table("discovered_jobs").upsert(cleaned_jobs, on_conflict="url").execute()
-                return {"success": True, "source": "supabase", "count": len(res.data) if res.data else len(cleaned_jobs)}
+                res = (
+                    self.supabase.table("discovered_jobs")
+                    .upsert(cleaned_jobs, on_conflict="url")
+                    .execute()
+                )
+                return {
+                    "success": True,
+                    "source": "supabase",
+                    "count": len(res.data) if res.data else len(cleaned_jobs),
+                }
             except Exception as e:
                 logger.error(f"Error upserting jobs into Supabase: {e}. Storing locally.")
 
@@ -207,23 +252,26 @@ class SupabaseHandler:
         cur = conn.cursor()
         for job in jobs:
             try:
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT OR REPLACE INTO discovered_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (
-                    job.get("id"),
-                    job.get("title"),
-                    job.get("company"),
-                    job.get("location"),
-                    job.get("url"),
-                    job.get("source"),
-                    json.dumps(job.get("matched_skills", [])),
-                    job.get("relevance_score", 0.0),
-                    job.get("match_reason", ""),
-                    int(job.get("is_remote", False)),
-                    job.get("job_type", "internship/entry-level"),
-                    job.get("posted_at", datetime.utcnow().isoformat()),
-                    datetime.utcnow().isoformat()
-                ))
+                """,
+                    (
+                        job.get("id"),
+                        job.get("title"),
+                        job.get("company"),
+                        job.get("location"),
+                        job.get("url"),
+                        job.get("source"),
+                        json.dumps(job.get("matched_skills", [])),
+                        job.get("relevance_score", 0.0),
+                        job.get("match_reason", ""),
+                        int(job.get("is_remote", False)),
+                        job.get("job_type", "internship/entry-level"),
+                        job.get("posted_at", datetime.now(timezone.utc).isoformat()),
+                        datetime.now(timezone.utc).isoformat(),
+                    ),
+                )
                 saved_count += 1
             except Exception as e:
                 logger.warning(f"Could not save job {job.get('id')}: {e}")
@@ -242,30 +290,42 @@ class SupabaseHandler:
             "breakdown": score_data.get("breakdown", {}),
             "top_actions": score_data.get("top_actions", []),
             "raw_inputs": score_data.get("raw_inputs", {}),
-            "updated_at": datetime.utcnow().isoformat()
+            "algorithm_version": score_data.get("algorithm_version", "v1.0.0"),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
         if self.is_live and self.supabase:
             try:
-                res = self.supabase.table("readiness_scores").upsert(payload, on_conflict="student_id").execute()
+                res = (
+                    self.supabase.table("readiness_scores")
+                    .upsert(payload, on_conflict="student_id")
+                    .execute()
+                )
                 return {"success": True, "source": "supabase", "data": res.data}
             except Exception as e:
                 logger.error(f"Error upserting readiness score to Supabase: {e}. Storing locally.")
 
         conn = sqlite3.connect(self.local_db_path)
         cur = conn.cursor()
-        cur.execute("""
-            INSERT OR REPLACE INTO readiness_scores VALUES (?,?,?,?,?,?,?,?)
-        """, (
-            f"score_{student_id}",
-            student_id,
-            payload["total_score"],
-            payload["readiness_level"],
-            json.dumps(payload["breakdown"]),
-            json.dumps(payload["top_actions"]),
-            json.dumps(payload["raw_inputs"]),
-            payload["updated_at"]
-        ))
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO readiness_scores (
+                id, student_id, total_score, readiness_level, breakdown,
+                top_actions, raw_inputs, algorithm_version, updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+        """,
+            (
+                f"score_{student_id}",
+                student_id,
+                payload["total_score"],
+                payload["readiness_level"],
+                json.dumps(payload["breakdown"]),
+                json.dumps(payload["top_actions"]),
+                json.dumps(payload["raw_inputs"]),
+                payload["algorithm_version"],
+                payload["updated_at"],
+            ),
+        )
         conn.commit()
         conn.close()
 
@@ -284,7 +344,9 @@ class SupabaseHandler:
         try:
             res = (
                 self.supabase.table("mock_interview_results")
-                .select("interview_score, technical_score, communication_score, behavioral_score, feedback_notes, strengths, weak_areas, attempt_number, created_at")
+                .select(
+                    "interview_score, technical_score, communication_score, behavioral_score, feedback_notes, strengths, weak_areas, attempt_number, created_at"
+                )
                 .eq("student_id", student_id)
                 .order("created_at", desc=True)
                 .limit(1)
@@ -301,7 +363,7 @@ class SupabaseHandler:
                     "feedback_notes": record.get("feedback_notes", ""),
                     "strengths": record.get("strengths", []),
                     "weak_areas": record.get("weak_areas", []),
-                    "attempt_number": record.get("attempt_number", 1)
+                    "attempt_number": record.get("attempt_number", 1),
                 }
         except Exception as e:
             logger.warning(f"Could not query mock_interview_results for {student_id}: {e}")
@@ -326,7 +388,7 @@ class SupabaseHandler:
                         "interview_score": float(score),
                         "feedback_notes": result_obj.get("feedback_notes", ""),
                         "strengths": result_obj.get("strengths", []),
-                        "weak_areas": result_obj.get("weak_areas", [])
+                        "weak_areas": result_obj.get("weak_areas", []),
                     }
         except Exception as e:
             logger.debug(f"Fallback check on interview_sessions returned: {e}")
@@ -336,4 +398,3 @@ class SupabaseHandler:
 
 # Singleton instance
 db_client = SupabaseHandler()
-

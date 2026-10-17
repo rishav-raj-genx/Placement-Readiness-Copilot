@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, Optional, Protocol
+from collections.abc import Mapping
+from typing import Protocol
 from urllib import request
 
 
@@ -17,7 +18,7 @@ class TextToSpeech(Protocol):
 
 
 class InterviewLLM(Protocol):
-    def complete(self, system_prompt: str, user_prompt: str) -> Any: ...
+    def complete(self, system_prompt: str, user_prompt: str) -> object: ...
 
 
 class HTTPProviderError(RuntimeError):
@@ -25,9 +26,9 @@ class HTTPProviderError(RuntimeError):
 
 
 class DeepgramSTT:
-    def __init__(self, api_key: Optional[str] = None, model: str = "nova-2"):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("DEEPGRAM_API_KEY")
-        self.model = model
+        self.model = model or os.getenv("DEEPGRAM_STT_MODEL", "nova-3")
 
     def transcribe(self, audio: bytes, content_type: str = "audio/webm") -> str:
         if not self.api_key:
@@ -43,9 +44,9 @@ class DeepgramSTT:
 
 
 class DeepgramTTS:
-    def __init__(self, api_key: Optional[str] = None, model: str = "aura-asteria-en"):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("DEEPGRAM_API_KEY")
-        self.model = model
+        self.model = model or os.getenv("DEEPGRAM_TTS_MODEL", "aura-2-thalia-en")
 
     def synthesize(self, text: str) -> bytes:
         if not self.api_key:
@@ -69,11 +70,11 @@ class DeepgramTTS:
 
 
 class GroqLLM:
-    def __init__(self, api_key: Optional[str] = None, model: str = "llama-3.1-8b-instant"):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
-        self.model = model
+        self.model = model or os.getenv("GROQ_SCORING_MODEL", "llama-3.1-8b-instant")
 
-    def complete(self, system_prompt: str, user_prompt: str) -> Any:
+    def complete(self, system_prompt: str, user_prompt: str) -> object:
         if not self.api_key:
             raise HTTPProviderError("GROQ_API_KEY is required for interview scoring")
         req = request.Request(
@@ -93,28 +94,49 @@ class GroqLLM:
             method="POST",
         )
         data = _json_request(req)
-        try:
-            return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise HTTPProviderError("Groq returned an invalid completion") from exc
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise HTTPProviderError("Groq returned an invalid completion")
+        first_choice = choices[0]
+        if not isinstance(first_choice, Mapping):
+            raise HTTPProviderError("Groq returned an invalid completion")
+        message = first_choice.get("message")
+        if not isinstance(message, Mapping):
+            raise HTTPProviderError("Groq returned an invalid completion")
+        content = message.get("content")
+        if not isinstance(content, str):
+            raise HTTPProviderError("Groq returned an invalid completion")
+        return content
 
 
-def _json_request(req: request.Request) -> Dict[str, Any]:
+def _json_request(req: request.Request) -> dict[str, object]:
     try:
         with request.urlopen(req, timeout=30) as response:
             data = json.loads(response.read())
     except Exception as exc:
         raise HTTPProviderError("provider request failed") from exc
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or not all(isinstance(key, str) for key in data):
         raise HTTPProviderError("provider returned a non-object response")
     return data
 
 
-def _deepgram_text(data: Dict[str, Any]) -> str:
-    try:
-        text = data["results"]["channels"][0]["alternatives"][0]["transcript"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise HTTPProviderError("Deepgram returned an invalid transcript") from exc
+def _deepgram_text(data: dict[str, object]) -> str:
+    results = data.get("results")
+    if not isinstance(results, Mapping):
+        raise HTTPProviderError("Deepgram returned an invalid transcript")
+    channels = results.get("channels")
+    if not isinstance(channels, list) or not channels:
+        raise HTTPProviderError("Deepgram returned an invalid transcript")
+    first_channel = channels[0]
+    if not isinstance(first_channel, Mapping):
+        raise HTTPProviderError("Deepgram returned an invalid transcript")
+    alternatives = first_channel.get("alternatives")
+    if not isinstance(alternatives, list) or not alternatives:
+        raise HTTPProviderError("Deepgram returned an invalid transcript")
+    first_alternative = alternatives[0]
+    if not isinstance(first_alternative, Mapping):
+        raise HTTPProviderError("Deepgram returned an invalid transcript")
+    text = first_alternative.get("transcript")
     if not isinstance(text, str):
         raise HTTPProviderError("Deepgram transcript was not text")
     return text.strip()

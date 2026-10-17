@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Protocol
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import Protocol
 from urllib import request
 
-from scoring.schemas import InterviewResult
+from scoring.schemas import DimensionScore, InterviewResult
 
 
 class ResultStore(Protocol):
@@ -32,8 +33,8 @@ class SupabaseResultStore:
 
     def __init__(
         self,
-        url: Optional[str] = None,
-        service_key: Optional[str] = None,
+        url: str | None = None,
+        service_key: str | None = None,
         table: str = "mock_interview_results",
     ):
         self.url = (url or os.getenv("SUPABASE_URL", "")).rstrip("/")
@@ -47,7 +48,7 @@ class SupabaseResultStore:
         *,
         attempt_number: int = 1,
         mode: str = "hosted_api",
-        duration_minutes: int = 30,
+        duration_minutes: int = 18,
     ) -> None:
         if not student_id:
             raise PersistenceError("student identity is required")
@@ -60,7 +61,7 @@ class SupabaseResultStore:
         if not self.url or not self.service_key:
             raise PersistenceError("Supabase persistence is not configured")
         dimensions = result.dimensions
-        payload: Dict[str, Any] = {
+        payload: dict[str, object] = {
             "student_id": student_id,
             "attempt_number": attempt_number,
             "interview_score": result.interview_score,
@@ -73,7 +74,7 @@ class SupabaseResultStore:
             "feedback_notes": result.summary,
             "mode": mode,
             "duration_minutes": duration_minutes,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         req = request.Request(
             f"{self.url}/rest/v1/{self.table}",
@@ -96,9 +97,10 @@ class SupabaseResultStore:
             raise PersistenceError("Supabase result persistence failed") from exc
 
 
-def _dimension_score(dimensions: Dict[str, Any], name: str) -> float:
+def _dimension_score(dimensions: Mapping[str, DimensionScore], name: str) -> float:
     dimension = dimensions.get(name)
-    return float(dimension.score) if dimension is not None else 0.0
+    score = getattr(dimension, "score", None)
+    return float(score) if isinstance(score, (int, float)) else 0.0
 
 
 class SupabaseInterviewSessionStore:
@@ -106,8 +108,8 @@ class SupabaseInterviewSessionStore:
 
     def __init__(
         self,
-        url: Optional[str] = None,
-        service_key: Optional[str] = None,
+        url: str | None = None,
+        service_key: str | None = None,
     ):
         self.url = (url or os.getenv("SUPABASE_URL", "")).rstrip("/")
         self.service_key = service_key or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -120,7 +122,7 @@ class SupabaseInterviewSessionStore:
         payload = {
             "result": result.model_dump(mode="json"),
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
         req = request.Request(
             f"{self.url}/rest/v1/interview_sessions?id=eq.{interview_id}",

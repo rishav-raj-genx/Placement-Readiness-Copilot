@@ -49,3 +49,21 @@ def test_divyansh_nested_room_metadata_shape_is_normalized():
     assert context.target_role == "Systems Engineer"
     assert context.summary == "Built consensus services."
     assert context.skills == ["Go", "Raft"]
+
+
+def test_profile_parser_text_shape_extracts_context_sections():
+    context = adapt_resume(
+        {
+            "text": (
+                "EXPERIENCE\nBuilt reliable APIs.\n"
+                "SKILLS\nPython PostgreSQL\n"
+                "PROJECTS\nPlacement Copilot - Built a resume review pipeline.\n"
+                "EDUCATION\nB.Tech Computer Science"
+            ),
+            "page_count": 1,
+        }
+    )
+
+    assert context.skills[:2] == ["Python", "PostgreSQL"]
+    assert context.projects == ["Placement Copilot - Built a resume review pipeline."]
+    assert context.experience == ["Built reliable APIs."]

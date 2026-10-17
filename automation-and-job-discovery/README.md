@@ -2,7 +2,7 @@
 > **Role:** Automation Engineer / Background Tasks & Aggregator  
 > **Challenge:** Problem 2 – Placement Readiness Challenge (MSOT Hackathon)
 
-This system provides an end-to-end background automation engine that verifies live project deployments using headless browser automation, discovers relevant tech roles across compliant ATS and RSS sources using boolean logic, calculates the official **Module 4 Placement Readiness Score**, and syncs all results directly to **Supabase** (with zero-config local storage fallback).
+This system provides an end-to-end background automation engine that verifies live project deployments using headless browser automation, discovers relevant tech roles across compliant ATS and RSS sources using boolean logic, calculates the official **Module 4 Placement Readiness Score**, and syncs results to **Supabase**. Local SQLite is available for development, while verification workflows can require Supabase and fail closed.
 
 ---
 
@@ -54,40 +54,52 @@ This system provides an end-to-end background automation engine that verifies li
 
 ## 🛠️ Quickstart
 
-### 1. Activate Environment
+### 1. Install dependencies
 ```bash
-source venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
+uv sync --dev
+uv run playwright install chromium
 ```
 
 ### 2. Run Complete Showcase Demo
 ```bash
-python run.py demo
+uv run python run.py demo
 ```
 
 ### 3. Run Individual Commands
 - **Check a live project link:**
   ```bash
-  python run.py check-link https://my-portfolio-demo.vercel.app --name "AI Portfolio"
+  uv run python run.py check-link https://my-portfolio-demo.vercel.app --name "AI Portfolio"
   ```
 - **Discover matching jobs:**
   ```bash
-  python run.py discover-jobs --skills "React, TypeScript, Python" --role "Software Engineer Intern" --limit 10
+  uv run python run.py discover-jobs --skills "React, TypeScript, Python" --role "Software Engineer Intern" --limit 10
   ```
 - **Compute placement readiness score:**
   ```bash
-  python run.py calculate-score --file data/sample_student_input.json
+  uv run python run.py calculate-score --file data/sample_student_input.json
   ```
 - **Start REST API / Webhook server:**
   ```bash
-  python run.py serve --port 8000
+  uv run python run.py serve --port 8000
   ```
 
 ### 4. Run Test Suite
 ```bash
-pytest
+uv run pytest
 ```
+
+### 5. Verify a real Supabase score write
+
+Set `SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY`, apply the
+frontend Supabase migrations, then run:
+
+```bash
+uv run python -m scripts.verify_readiness_supabase
+```
+
+The verifier calculates the seven-component fixture, requires a Supabase
+upsert, reads the row back, and prints the persisted JSON. Never expose the
+service-role key to browser code.
 
 ---
 

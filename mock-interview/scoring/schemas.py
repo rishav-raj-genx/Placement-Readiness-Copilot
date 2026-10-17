@@ -5,10 +5,9 @@ This module is the single source of truth for the draft v0 output contract.
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 CONTRACT_VERSION = "v0"
 
@@ -22,10 +21,10 @@ class InterviewContext(BaseModel):
     candidate_name: str = ""
     target_role: str = ""
     summary: str = ""
-    skills: List[str] = Field(default_factory=list)
-    projects: List[str] = Field(default_factory=list)
-    experience: List[str] = Field(default_factory=list)
-    education: List[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
+    experience: list[str] = Field(default_factory=list)
+    education: list[str] = Field(default_factory=list)
 
 
 class TranscriptTurn(BaseModel):
@@ -33,7 +32,7 @@ class TranscriptTurn(BaseModel):
 
     speaker: Literal["ai", "student"]
     text: str
-    timestamp_sec: Optional[float] = Field(default=None, ge=0)
+    timestamp_sec: float | None = Field(default=None, ge=0)
 
 
 class DimensionScore(BaseModel):
@@ -41,8 +40,8 @@ class DimensionScore(BaseModel):
 
     score: int = Field(ge=0, le=100)
     feedback: str = ""
-    strengths: List[str] = Field(default_factory=list)
-    improvement_areas: List[str] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    improvement_areas: list[str] = Field(default_factory=list)
 
 
 class InterviewResult(BaseModel):
@@ -52,11 +51,19 @@ class InterviewResult(BaseModel):
 
     contract_version: Literal["v0"] = CONTRACT_VERSION
     interview_score: float = Field(ge=0, le=100)
-    transcript: List[TranscriptTurn] = Field(default_factory=list)
-    summary: str = ""
-    strengths: List[str] = Field(default_factory=list)
-    improvement_areas: List[str] = Field(default_factory=list)
-    dimensions: Dict[str, DimensionScore] = Field(default_factory=dict)
+    transcript: list[TranscriptTurn] = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    strengths: list[str] = Field(min_length=1)
+    improvement_areas: list[str] = Field(min_length=1)
+    dimensions: dict[str, DimensionScore] = Field(min_length=3)
+
+    @model_validator(mode="after")
+    def require_scoring_dimensions(self) -> InterviewResult:
+        required = {"communication", "technical_depth", "behavioral"}
+        missing = sorted(required.difference(self.dimensions))
+        if missing:
+            raise ValueError(f"missing scoring dimensions: {', '.join(missing)}")
+        return self
 
 
 def contract_markdown() -> str:

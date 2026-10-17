@@ -1,12 +1,23 @@
-import time
 import re
+import time
 import urllib.parse
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
-from playwright.sync_api import sync_playwright, Page, Error as PlaywrightError
+from typing import Any, Dict, List, Optional, Tuple
+
+from playwright.sync_api import (
+    Error as PlaywrightError,
+)
+from playwright.sync_api import (
+    Page,
+    sync_playwright,
+)
+from playwright.sync_api import (
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from src import config
 from src.db.supabase_client import db_client
+
 
 class LiveLinkChecker:
     """
@@ -15,15 +26,17 @@ class LiveLinkChecker:
     and validates if the web application renders cleanly without white-screens.
     """
 
-    def __init__(self, headless: bool = config.HEADLESS_BROWSER, timeout_ms: int = config.BROWSER_TIMEOUT_MS):
+    def __init__(
+        self, headless: bool = config.HEADLESS_BROWSER, timeout_ms: int = config.BROWSER_TIMEOUT_MS
+    ):
         self.headless = headless
         self.timeout_ms = timeout_ms
         self.screenshot_dir = config.SCREENSHOT_DIR
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
     def _sanitize_filename(self, url: str) -> str:
-        clean = re.sub(r'https?://', '', url)
-        clean = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', clean)
+        clean = re.sub(r"https?://", "", url)
+        clean = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", clean)
         return clean[:60]
 
     @staticmethod
@@ -34,10 +47,14 @@ class LiveLinkChecker:
         """
         import ipaddress
         import socket
+
         try:
             parsed = urllib.parse.urlparse(url_str)
             if parsed.scheme not in ("http", "https"):
-                return False, f"Prohibited scheme: '{parsed.scheme}'. Only HTTP and HTTPS are allowed."
+                return (
+                    False,
+                    f"Prohibited scheme: '{parsed.scheme}'. Only HTTP and HTTPS are allowed.",
+                )
 
             hostname = parsed.hostname
             if not hostname:
@@ -53,8 +70,17 @@ class LiveLinkChecker:
                 for entry in addr_info:
                     ip_str = entry[4][0]
                     ip = ipaddress.ip_address(ip_str)
-                    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
-                        return False, f"Prohibited destination: '{hostname}' resolves to private/internal IP {ip_str}."
+                    if (
+                        ip.is_private
+                        or ip.is_loopback
+                        or ip.is_link_local
+                        or ip.is_reserved
+                        or ip.is_multicast
+                    ):
+                        return (
+                            False,
+                            f"Prohibited destination: '{hostname}' resolves to private/internal IP {ip_str}.",
+                        )
             except socket.gaierror:
                 return False, f"DNS resolution failed for hostname '{hostname}'."
 
@@ -68,7 +94,7 @@ class LiveLinkChecker:
         student_id: str = "student_demo",
         project_name: str = "Student Project",
         claimed_keywords: Optional[List[str]] = None,
-        save_to_db: bool = True
+        save_to_db: bool = True,
     ) -> Dict[str, Any]:
         """
         Runs full verification of a student's deployed live link with SSRF protection.
@@ -97,7 +123,7 @@ class LiveLinkChecker:
                 "content_evaluation": {"is_blank_page": True},
                 "quality_score": 0.0,
                 "recommendations": [f"Deploy to a public internet URL. {ssrf_reason}"],
-                "passed": False
+                "passed": False,
             }
 
         start_time = time.time()
@@ -118,7 +144,10 @@ class LiveLinkChecker:
 
         # Playwright mobile device emulation (iPhone 13 style)
         mobile_device = {
-            "viewport": {"width": config.DEFAULT_VIEWPORT_WIDTH, "height": config.DEFAULT_VIEWPORT_HEIGHT},
+            "viewport": {
+                "width": config.DEFAULT_VIEWPORT_WIDTH,
+                "height": config.DEFAULT_VIEWPORT_HEIGHT,
+            },
             "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1",
             "is_mobile": True,
             "has_touch": True,
@@ -127,94 +156,141 @@ class LiveLinkChecker:
 
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(
-                    headless=self.headless,
-                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-                )
-                
-                context = browser.new_context(
-                    **mobile_device,
-                    ignore_https_errors=True
-                )
-                page: Page = context.new_page()
-
-                # Event listeners for error tracking
-                def on_console(msg):
-                    if msg.type == "error":
-                        console_errors.append(msg.text)
-                    elif msg.type == "warning":
-                        console_warnings.append(msg.text)
-
-                def on_page_error(exc):
-                    page_errors.append(str(exc))
-
-                def on_request_failed(request):
-                    failure = request.failure
-                    error_text = failure if failure else "Failed to load resource"
-                    # Filter out analytics/tracking aborts if any
-                    if not any(track in request.url for track in ["google-analytics", "doubleclick", "hotjar"]):
-                        network_errors.append({"url": request.url, "error": str(error_text)})
-
-                page.on("console", on_console)
-                page.on("pageerror", on_page_error)
-                page.on("requestfailed", on_request_failed)
-
-                # Navigate to the target live link
-                response = page.goto(
-                    url,
-                    wait_until="domcontentloaded",
-                    timeout=self.timeout_ms
-                )
-
-                # Wait briefly for client-side single-page apps (React/Vue/Next) to mount
+                browser = None
+                context = None
                 try:
-                    page.wait_for_load_state("networkidle", timeout=6000)
-                except Exception:
-                    pass  # Network idle timeout is non-fatal
+                    browser = p.chromium.launch(
+                        headless=self.headless,
+                        args=[
+                            "--no-sandbox",
+                            "--disable-setuid-sandbox",
+                            "--disable-dev-shm-usage",
+                        ],
+                    )
+                    context = browser.new_context(**mobile_device, ignore_https_errors=True)
+                    page: Page = context.new_page()
+                    safe_destination_cache: Dict[str, Tuple[bool, str]] = {}
 
-                if response:
-                    status_code = response.status
-                    is_live = (200 <= status_code < 400)
-                else:
-                    is_live = False
+                    # Revalidate every redirect and subresource to prevent DNS rebinding
+                    # or a public page from pivoting the browser into an internal network.
+                    def route_public_requests(route):
+                        request_url = route.request.url
+                        parsed_request = urllib.parse.urlparse(request_url)
+                        cache_key = f"{parsed_request.scheme}://{parsed_request.hostname}"
+                        safety = safe_destination_cache.get(cache_key)
+                        if safety is None:
+                            safety = self.is_safe_public_url(request_url)
+                            safe_destination_cache[cache_key] = safety
 
-                page_title = page.title() or ""
-                
-                # Check DOM text & white-screen / blank-app detection
-                body_text = page.evaluate("() => document.body ? document.body.innerText : ''")
-                body_text_length = len(body_text.strip()) if body_text else 0
-                is_blank_page = (body_text_length < 25)
+                        if safety[0]:
+                            route.continue_()
+                            return
 
-                # Check mobile horizontal overflow & responsiveness
-                horizontal_overflow = page.evaluate("""
-                    () => {
-                        const doc = document.documentElement;
-                        return doc.scrollWidth > (window.innerWidth + 2);
-                    }
-                """)
-                
-                has_viewport_meta = page.evaluate("""
-                    () => !!document.querySelector('meta[name="viewport"]')
-                """)
-                mobile_friendly = has_viewport_meta and not horizontal_overflow
+                        network_errors.append(
+                            {
+                                "url": request_url,
+                                "error": f"Blocked unsafe destination: {safety[1]}",
+                            }
+                        )
+                        route.abort("blockedbyclient")
 
-                # Keyword verification (if student claimed specific tech/features in README)
-                if claimed_keywords and body_text:
-                    lower_body = body_text.lower() + " " + page_title.lower()
-                    matched_keywords = [kw for kw in claimed_keywords if kw.lower() in lower_body]
+                    context.route("**/*", route_public_requests)
 
-                # Capture mobile screenshot
-                timestamp = int(time.time())
-                sanitized_name = self._sanitize_filename(url)
-                screenshot_filename = f"{sanitized_name}_{timestamp}.png"
-                screenshot_local_path = self.screenshot_dir / screenshot_filename
-                
-                page.screenshot(
-                    path=str(screenshot_local_path),
-                    full_page=False  # Captures mobile above-the-fold viewport
-                )
+                    # Event listeners for error tracking
+                    def on_console(msg):
+                        if msg.type == "error":
+                            console_errors.append(msg.text)
+                        elif msg.type == "warning":
+                            console_warnings.append(msg.text)
 
-                browser.close()
+                    def on_page_error(exc):
+                        page_errors.append(str(exc))
+
+                    def on_request_failed(request):
+                        failure = request.failure
+                        error_text = failure if failure else "Failed to load resource"
+                        if not any(
+                            track in request.url
+                            for track in ["google-analytics", "doubleclick", "hotjar"]
+                        ):
+                            network_errors.append({"url": request.url, "error": str(error_text)})
+
+                    def on_response(response):
+                        if response.status >= 400 and not any(
+                            track in response.url
+                            for track in ["google-analytics", "doubleclick", "hotjar"]
+                        ):
+                            network_errors.append(
+                                {
+                                    "url": response.url,
+                                    "error": f"HTTP {response.status}",
+                                }
+                            )
+
+                    page.on("console", on_console)
+                    page.on("pageerror", on_page_error)
+                    page.on("requestfailed", on_request_failed)
+                    page.on("response", on_response)
+
+                    # Navigate to the target live link
+                    response = page.goto(
+                        url, wait_until="domcontentloaded", timeout=self.timeout_ms
+                    )
+
+                    # Wait briefly for client-side single-page apps (React/Vue/Next) to mount.
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=6000)
+                    except PlaywrightTimeoutError:
+                        page_errors.append("Network did not become idle within 6000ms")
+
+                    if response:
+                        status_code = response.status
+                        is_live = 200 <= status_code < 400
+                    else:
+                        is_live = False
+
+                    page_title = page.title() or ""
+
+                    # Check DOM text & white-screen / blank-app detection
+                    body_text = page.evaluate("() => document.body ? document.body.innerText : ''")
+                    body_text_length = len(body_text.strip()) if body_text else 0
+                    is_blank_page = body_text_length < 25
+
+                    # Check mobile horizontal overflow & responsiveness
+                    horizontal_overflow = page.evaluate("""
+                        () => {
+                            const doc = document.documentElement;
+                            return doc.scrollWidth > (window.innerWidth + 2);
+                        }
+                    """)
+
+                    has_viewport_meta = page.evaluate("""
+                        () => !!document.querySelector('meta[name="viewport"]')
+                    """)
+                    mobile_friendly = has_viewport_meta and not horizontal_overflow
+
+                    # Keyword verification (if student claimed specific tech/features in README)
+                    if claimed_keywords and body_text:
+                        lower_body = body_text.lower() + " " + page_title.lower()
+                        matched_keywords = [
+                            kw for kw in claimed_keywords if kw.lower() in lower_body
+                        ]
+
+                    # Capture mobile screenshot
+                    timestamp = int(time.time())
+                    sanitized_name = self._sanitize_filename(url)
+                    screenshot_filename = f"{sanitized_name}_{timestamp}.png"
+                    screenshot_local_path = self.screenshot_dir / screenshot_filename
+
+                    page.screenshot(
+                        path=str(screenshot_local_path),
+                        full_page=False,  # Captures mobile above-the-fold viewport
+                    )
+                finally:
+                    if context is not None:
+                        context.close()
+                    if browser is not None:
+                        browser.close()
 
         except PlaywrightError as pe:
             is_live = False
@@ -233,7 +309,7 @@ class LiveLinkChecker:
             page_errors=page_errors,
             console_errors=console_errors,
             mobile_friendly=mobile_friendly,
-            load_time_ms=load_time_ms
+            load_time_ms=load_time_ms,
         )
 
         # Upload screenshot to Supabase Storage if available
@@ -250,7 +326,7 @@ class LiveLinkChecker:
             page_errors=page_errors,
             mobile_friendly=mobile_friendly,
             load_time_ms=load_time_ms,
-            horizontal_overflow=horizontal_overflow
+            horizontal_overflow=horizontal_overflow,
         )
 
         result_payload = {
@@ -262,7 +338,8 @@ class LiveLinkChecker:
             "status_code": status_code,
             "load_time_ms": load_time_ms,
             "mobile_friendly": mobile_friendly,
-            "screenshot_url": remote_screenshot_url or (str(screenshot_local_path) if screenshot_local_path else ""),
+            "screenshot_url": remote_screenshot_url
+            or (str(screenshot_local_path) if screenshot_local_path else ""),
             "screenshot_local_path": str(screenshot_local_path) if screenshot_local_path else "",
             "console_errors": console_errors,
             "console_warnings": console_warnings[:5],
@@ -273,12 +350,14 @@ class LiveLinkChecker:
                 "body_characters": body_text_length,
                 "is_blank_page": is_blank_page,
                 "horizontal_overflow": horizontal_overflow,
+                "viewport_width": config.DEFAULT_VIEWPORT_WIDTH,
+                "viewport_height": config.DEFAULT_VIEWPORT_HEIGHT,
                 "claimed_keywords_checked": claimed_keywords or [],
-                "matched_keywords": matched_keywords
+                "matched_keywords": matched_keywords,
             },
             "quality_score": quality_score,
             "recommendations": recommendations,
-            "passed": is_live and not is_blank_page and quality_score >= 60.0
+            "passed": is_live and not is_blank_page and quality_score >= 60.0,
         }
 
         # Sync to Supabase / Local DB
@@ -295,7 +374,7 @@ class LiveLinkChecker:
         page_errors: List[str],
         console_errors: List[str],
         mobile_friendly: bool,
-        load_time_ms: int
+        load_time_ms: int,
     ) -> float:
         if not is_live:
             return 0.0
@@ -343,32 +422,46 @@ class LiveLinkChecker:
         page_errors: List[str],
         mobile_friendly: bool,
         load_time_ms: int,
-        horizontal_overflow: bool
+        horizontal_overflow: bool,
     ) -> List[str]:
         tips = []
         if not is_live:
-            tips.append(f"Deploy the project on Vercel, Netlify, or Render. Link failed with HTTP {status_code or 'Timeout'}.")
+            tips.append(
+                f"Deploy the project on Vercel, Netlify, or Render. Link failed with HTTP {status_code or 'Timeout'}."
+            )
             return tips
 
         if is_blank:
-            tips.append("Detected a blank page / white-screen. Check client-side bundle hydration and console errors.")
+            tips.append(
+                "Detected a blank page / white-screen. Check client-side bundle hydration and console errors."
+            )
 
         if page_errors:
             tips.append(f"Fix uncaught JavaScript exceptions: {page_errors[0][:100]}")
 
         if len(console_errors) > 0:
-            tips.append(f"Resolve {len(console_errors)} browser console error(s) to ensure recruiter's DevTools show clean code.")
+            tips.append(
+                f"Resolve {len(console_errors)} browser console error(s) to ensure recruiter's DevTools show clean code."
+            )
 
         if horizontal_overflow:
-            tips.append("Mobile layout has horizontal overflow (content spills past width). Fix CSS container padding and max-width: 100%.")
+            tips.append(
+                "Mobile layout has horizontal overflow (content spills past width). Fix CSS container padding and max-width: 100%."
+            )
 
         if not mobile_friendly and not horizontal_overflow:
-            tips.append("Add `<meta name='viewport' content='width=device-width, initial-scale=1.0'>` in your HTML header.")
+            tips.append(
+                "Add `<meta name='viewport' content='width=device-width, initial-scale=1.0'>` in your HTML header."
+            )
 
         if load_time_ms > 4500:
-            tips.append(f"Load time was {load_time_ms/1000:.1f}s. Optimize large images and bundle sizes for faster initial paint.")
+            tips.append(
+                f"Load time was {load_time_ms / 1000:.1f}s. Optimize large images and bundle sizes for faster initial paint."
+            )
 
         if not tips:
-            tips.append("Excellent deployment! Site loads swiftly, passes mobile checks, and runs without console errors.")
+            tips.append(
+                "Excellent deployment! Site loads swiftly, passes mobile checks, and runs without console errors."
+            )
 
         return tips
