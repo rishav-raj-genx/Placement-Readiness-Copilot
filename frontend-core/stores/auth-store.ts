@@ -82,8 +82,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const profile = await fetchProfile(data.user.id);
-      if (!profile) throw new Error('Your account profile is unavailable. Please contact support.');
+      let profile = await fetchProfile(data.user.id);
+      if (!profile) {
+        const displayName = (data.user.user_metadata?.display_name as string | undefined) || email.split('@')[0];
+        const role = data.user.user_metadata?.role === 'admin' ? 'admin' : 'student';
+        try {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            email: data.user.email ?? email,
+            display_name: displayName,
+            role,
+          }, { onConflict: 'id', ignoreDuplicates: true });
+        } catch {
+          // ignore upsert errors on fallback
+        }
+        profile = await fetchProfile(data.user.id);
+      }
+      if (!profile) {
+        profile = {
+          id: data.user.id,
+          email: data.user.email ?? email,
+          displayName: (data.user.user_metadata?.display_name as string | undefined) || email.split('@')[0],
+          role: data.user.user_metadata?.role === 'admin' ? 'admin' : 'student',
+          createdAt: data.user.created_at ?? new Date().toISOString(),
+        };
+      }
 
       if (data.session) {
         setAuthCookies(data.session);

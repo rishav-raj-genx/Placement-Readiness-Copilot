@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useAuthStore } from '@/stores/auth-store';
 import { DemoBanner } from '@/components/shared/demo-banner';
 import { toast } from 'sonner';
+import HoldButton from '@/components/HoldButton';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -75,23 +76,31 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
           </span>
         )}
       </div>
-      <Button
-        variant="outline"
-        size={collapsed ? 'icon' : 'default'}
+      <HoldButton
+        size="sm"
+        radius={10}
+        holdTime={1400}
+        backgroundColor="hsl(var(--card))"
+        fillColor="hsl(var(--destructive))"
+        textColor="hsl(var(--foreground))"
+        fillTextColor="#ffffff"
+        icon={<LogOut className="h-4 w-4" />}
+        doneIcon={<LogOut className="h-4 w-4" />}
+        doneLabel={collapsed ? '' : 'Signed Out'}
         className={cn(
-          'group border-border text-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors',
-          collapsed ? 'h-9 w-9 mx-auto flex' : 'w-full justify-start'
+          'border border-border hover:border-destructive/40 transition-colors font-medium text-xs',
+          collapsed ? '!p-0 w-9 h-9 mx-auto' : 'w-full'
         )}
-        onClick={async () => {
+        onHold={async () => {
           onNavigate?.();
           await handleSignOut();
         }}
-        aria-label="Sign Out"
-        title="Sign Out"
+        onTap={() => {
+          toast.info('Press and hold to sign out', { duration: 2500 });
+        }}
       >
-        <LogOut className={cn('h-4 w-4 shrink-0 text-muted-foreground group-hover:text-destructive transition-colors', !collapsed && 'mr-2')} />
-        {!collapsed && 'Sign Out'}
-      </Button>
+        {!collapsed ? 'Hold to Sign Out' : null}
+      </HoldButton>
     </div>
   );
 

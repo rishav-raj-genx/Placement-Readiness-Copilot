@@ -50,23 +50,36 @@ export function AuthModal() {
         toast.error('Please enter your display name');
         return;
       }
-      await signUp(email.trim(), password, displayName.trim());
+      const result = await signUp(email.trim(), password, displayName.trim());
+      const state = useAuthStore.getState();
+      if (result === 'authenticated' && state.user) {
+        toast.success('Account created successfully', { duration: 5000 });
+        close();
+        const target =
+          redirectUrl && redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')
+            ? (redirectUrl.startsWith('/admin') && state.user.role !== 'admin' ? '/dashboard' : redirectUrl)
+            : (state.user.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+        router.push(target);
+      } else if (result === 'confirmation_required') {
+        toast.success('Account created! Please check your email to confirm, then sign in.', { duration: 6000 });
+        setMode('signin');
+      } else if (state.error) {
+        toast.error(state.error);
+      }
     } else {
       await signIn(email.trim(), password);
-    }
-
-    const state = useAuthStore.getState();
-    if (state.user) {
-      const message = mode === 'signup' ? 'Account created successfully' : 'Signed in successfully';
-      toast.success(message, { duration: 5000 });
-      close();
-      const target =
-        redirectUrl && redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')
-          ? (redirectUrl.startsWith('/admin') && state.user.role !== 'admin' ? '/dashboard' : redirectUrl)
-          : (state.user.role === 'admin' ? '/admin/dashboard' : '/dashboard');
-      router.push(target);
-    } else if (state.error) {
-      toast.error(state.error);
+      const state = useAuthStore.getState();
+      if (state.user) {
+        toast.success('Signed in successfully', { duration: 5000 });
+        close();
+        const target =
+          redirectUrl && redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')
+            ? (redirectUrl.startsWith('/admin') && state.user.role !== 'admin' ? '/dashboard' : redirectUrl)
+            : (state.user.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+        router.push(target);
+      } else if (state.error) {
+        toast.error(state.error);
+      }
     }
   };
 

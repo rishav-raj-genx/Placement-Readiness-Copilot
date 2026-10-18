@@ -555,8 +555,14 @@ export default function ConfigureInterviewPage() {
 
                 {/* Stylish Dropdown Menu */}
                 {isCompanyDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl p-2 space-y-1 max-h-64 overflow-y-auto animate-in fade-in-0 zoom-in-95 duration-150">
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between border-b border-border/50 pb-1.5 mb-1">
+                  <div
+                    data-lenis-prevent="true"
+                    data-lenis-prevent-wheel="true"
+                    data-lenis-prevent-touch="true"
+                    onWheel={(e) => e.stopPropagation()}
+                    className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-2xl p-2 space-y-1 max-h-64 overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/25 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/45 [&::-webkit-scrollbar-track]:bg-transparent animate-in fade-in-0 zoom-in-95 duration-150"
+                  >
+                    <div className="sticky top-0 bg-card/95 backdrop-blur-md z-10 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between border-b border-border/50 pb-1.5 mb-1">
                       <span>Top Tech Companies</span>
                       <span className="text-[10px] text-muted-foreground/70 font-normal">Click or type custom</span>
                     </div>
