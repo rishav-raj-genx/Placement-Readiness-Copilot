@@ -3,7 +3,7 @@ name: Automation Worker (Job Discovery & Link Check)
 on:
   # Runs automatically at the top of every hour
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */6 * * *'
   # Allows manual trigger from GitHub Actions UI
   workflow_dispatch:
 
