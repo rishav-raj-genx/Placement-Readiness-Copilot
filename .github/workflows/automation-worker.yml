@@ -36,4 +36,4 @@ jobs:
 
       - name: 🚀 Run Automation Script
         working-directory: ./automation-and-job-discovery
-        run: python run.py discover-jobs --skills python javascript react --max-results 20
+        run: python run.py discover-jobs --skills "python,javascript,react" --limit 20
