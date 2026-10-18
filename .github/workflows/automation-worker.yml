@@ -1,0 +1,39 @@
+name: Automation Worker (Job Discovery & Link Check)
+
+on:
+  # Runs automatically at the top of every hour
+  schedule:
+    - cron: '0 * * * *'
+  # Allows manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  run-automation:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      HEADLESS_BROWSER: 'true'
+      AUTOMATION_E2E_MODE: 'false'
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 📦 Install Python dependencies
+        working-directory: ./automation-and-job-discovery
+        run: pip install -r requirements.txt
+
+      - name: 🌐 Install Playwright Chromium (with OS deps)
+        working-directory: ./automation-and-job-discovery
+        run: playwright install chromium --with-deps
+
+      - name: 🚀 Run Automation Script
+        working-directory: ./automation-and-job-discovery
+        run: python run.py discover-jobs --skills python javascript react --max-results 20
