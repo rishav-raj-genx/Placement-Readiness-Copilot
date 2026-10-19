@@ -7,6 +7,7 @@ import { ArrowRight, Loader2, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-r
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import { getAuthenticatedDestination } from '@/lib/auth-routing';
+import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 
 interface LoginFormProps {
   onToggleSignUp: () => void;
@@ -22,6 +23,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,19 +37,29 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
     const state = useAuthStore.getState();
 
     if (state.user) {
+      setIsRedirecting(true);
       toast.success('Welcome back to Hireable!');
-      router.replace(
-        getAuthenticatedDestination({
-          role: state.user.role,
-          onboardingCompleted: Boolean(state.user.onboardingCompletedAt),
-          requestedPath: redirectTo,
-        }),
-      );
+      const destination = getAuthenticatedDestination({
+        role: state.user.role,
+        onboardingCompleted: Boolean(state.user.onboardingCompletedAt),
+        requestedPath: redirectTo,
+      });
+      router.replace(destination);
       router.refresh();
     } else if (state.error) {
       toast.error(state.error);
     }
   };
+
+  if (isRedirecting) {
+    return (
+      <SegmentedLoader
+        message="Building your Copilot..."
+        subtitle="Loading candidate workspace..."
+        fullScreen
+      />
+    );
+  }
 
   return (
     <motion.div

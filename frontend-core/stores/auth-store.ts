@@ -80,6 +80,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         };
       }
 
+      if (!profile.onboardingCompletedAt) {
+        const now = new Date().toISOString();
+        try {
+          await supabase.from('profiles').update({ onboarding_completed_at: now }).eq('id', data.user.id);
+        } catch {
+          // non-blocking
+        }
+        profile = { ...profile, onboardingCompletedAt: now };
+      }
+
       set({ user: profile, isLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign in failed';

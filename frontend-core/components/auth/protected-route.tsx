@@ -4,14 +4,16 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import type { UserRole } from '@/types';
-import { ShieldAlert, Lock } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 
 export interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: UserRole;
   fallbackUrl?: string;
+  allowGuest?: boolean;
 }
 
 /**
@@ -21,15 +23,16 @@ export interface ProtectedRouteProps {
  * with the correct role can view protected routes.
  *
  * Rules:
- *  1. If user is unauthenticated -> redirects to /auth?redirectTo=<pathname>
- *  2. While checking auth state -> renders clean verification skeleton
- *  3. Incomplete students resume the canonical signup flow without touching /onboarding
+ *  1. If user is unauthenticated -> redirects to /auth?redirectTo=<pathname> (unless allowGuest)
+ *  2. While checking auth state -> renders SegmentedLoader
+ *  3. Incomplete students resume the canonical signup flow without touching /onboarding (unless allowGuest)
  *  4. Admins stay in the admin workspace; students cannot access admin routes
  */
 export function ProtectedRoute({
   children,
   requiredRole = 'student',
   fallbackUrl = '/auth',
+  allowGuest = false,
 }: ProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -38,31 +41,35 @@ export function ProtectedRoute({
   useEffect(() => {
     if (!isHydrated) return;
     if (!user) {
+      if (allowGuest) return;
       const redirectTarget = pathname ? `${fallbackUrl}?redirectTo=${encodeURIComponent(pathname)}` : fallbackUrl;
       router.replace(redirectTarget);
       return;
     }
-    if (user.role === 'student' && !user.onboardingCompletedAt) {
+    if (user.role === 'student' && !user.onboardingCompletedAt && !allowGuest) {
       router.replace('/auth?mode=signup&resume=1');
       return;
     }
     if (requiredRole === 'student' && user.role === 'admin') {
       router.replace('/admin/dashboard');
     }
-  }, [fallbackUrl, isHydrated, pathname, requiredRole, router, user]);
+  }, [allowGuest, fallbackUrl, isHydrated, pathname, requiredRole, router, user]);
 
   if (!isHydrated) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 border border-brand/20 animate-pulse">
-          <Lock className="h-5 w-5 text-brand" />
-        </div>
-        <p className="text-xs text-muted-foreground animate-pulse">Verifying authentication...</p>
-      </div>
+      <SegmentedLoader
+        message="Building your Copilot..."
+        subtitle="Verifying candidate authentication..."
+        fullScreen
+      />
     );
   }
 
-  if (!user || (user.role === 'student' && !user.onboardingCompletedAt)) {
+  if (!user && allowGuest) {
+    return <>{children}</>;
+  }
+
+  if (!user || (user.role === 'student' && !user.onboardingCompletedAt && !allowGuest)) {
     return null;
   }
 

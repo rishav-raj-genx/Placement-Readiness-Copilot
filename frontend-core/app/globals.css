@@ -59,6 +59,13 @@
   }
 }
 
+/* Hide default OS cursor only on devices with a fine pointer (mouse/trackpad), preserving touch fallback */
+@media (pointer: fine) {
+  *, *::before, *::after {
+    cursor: none !important;
+  }
+}
+
 @layer components {
   .glass-panel {
     @apply border border-white/10 bg-slate-950/60 shadow-2xl shadow-indigo-950/20 backdrop-blur-xl;

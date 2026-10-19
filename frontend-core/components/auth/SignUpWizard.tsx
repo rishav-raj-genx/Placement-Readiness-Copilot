@@ -28,6 +28,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { LinkedInPdfTooltip } from './LinkedInPdfTooltip';
 import { SignupPdfDropzone } from './SignupPdfDropzone';
+import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 
 interface SignUpWizardProps {
   onToggleLogin: () => void;
@@ -324,11 +325,11 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
 
   if (isSuccess) {
     return (
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-lg rounded-3xl border border-emerald-500/30 bg-[#0F1D21]/90 p-10 text-center shadow-[0_0_60px_rgba(16,185,129,0.3)] backdrop-blur-2xl">
-        <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-300" />
-        <h2 className="mt-6 font-[var(--font-display)] text-2xl font-bold">Profile assembled</h2>
-        <p className="mt-2 text-sm text-emerald-200/70">Opening your dashboard while the readiness review starts.</p>
-      </motion.div>
+      <SegmentedLoader
+        message="Building your Copilot..."
+        subtitle="Opening your verified readiness dashboard..."
+        fullScreen
+      />
     );
   }
 

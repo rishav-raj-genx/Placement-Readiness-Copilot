@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Providers } from '@/components/providers';
 import { Toaster } from '@/components/ui/sonner';
+import { CustomCursor } from '@/components/ui/CustomCursor';
 import { GeistSans } from 'geist/font/sans';
 import { displayFont } from '@/lib/fonts';
 
@@ -33,6 +34,7 @@ export default function RootLayout({
     <html lang="en" className={`dark ${displayFont.variable}`} suppressHydrationWarning>
       <body className={`${GeistSans.className} min-h-screen bg-background antialiased`}>
         <Providers>
+          <CustomCursor />
           {children}
           <Toaster />
         </Providers>
