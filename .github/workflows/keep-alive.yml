@@ -1,0 +1,21 @@
+name: Keep Render Backends Alive
+
+on:
+  schedule:
+    # Runs every 12 minutes to prevent Render's 15-minute inactivity spindown
+    - cron: '*/12 * * * *'
+  workflow_dispatch: # Allows manual trigger anytime from the Actions tab
+
+jobs:
+  ping-services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Profile Review API
+        run: |
+          echo "Pinging Profile Review API..."
+          curl -s -o /dev/null -w "Status Code: %{http_code}\n" https://profile-review-api.onrender.com/health
+
+      - name: Ping Mock Interview Service
+        run: |
+          echo "Pinging Mock Interview Service..."
+          curl -s -o /dev/null -w "Status Code: %{http_code}\n" https://mock-interview-service-dxs9.onrender.com/health
