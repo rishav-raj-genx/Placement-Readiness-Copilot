@@ -12,10 +12,13 @@ POPULAR_GREENHOUSE_BOARDS = [
     "datadog",
     "figma",
     "reddit",
-    "hashicorp",
+    "stripe",
     "elastic",
     "canonical",
     "instacart",
+    "airbnb",
+    "discord",
+    "dropbox",
 ]
 
 

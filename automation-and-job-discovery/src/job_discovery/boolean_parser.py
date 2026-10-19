@@ -116,10 +116,22 @@ class BooleanSearchParser:
 
         role_keywords = ["intern", "internship", "graduate", "junior", "associate"]
         if target_role:
-            role_terms = [target_role] + [
-                f"{target_role} {k}" for k in ["Intern", "Internship", "Junior"]
-            ]
-            role_clause = " OR ".join([f'"{r.strip()}"' for r in role_terms[:4]])
+            role_terms = [target_role]
+            words = target_role.split()
+            if len(words) > 1:
+                role_terms.append(" ".join(words[:2]))
+                for w in words:
+                    if len(w) > 3 and w.lower() not in ("intern", "junior", "level"):
+                        role_terms.append(w)
+            role_terms.extend(["Intern", "Internship", "Associate", "Junior", "Engineer", "Developer"])
+            seen_terms = set()
+            clean_terms = []
+            for r in role_terms:
+                r_clean = r.strip()
+                if r_clean.lower() not in seen_terms:
+                    seen_terms.add(r_clean.lower())
+                    clean_terms.append(r_clean)
+            role_clause = " OR ".join([f'"{r}"' for r in clean_terms[:6]])
             parts.append(f"({role_clause})")
         else:
             role_clause = " OR ".join([f'"{k}"' for k in role_keywords])

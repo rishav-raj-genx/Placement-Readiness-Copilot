@@ -117,6 +117,84 @@ def cmd_discover_jobs(args):
     )
 
 
+def cmd_seed_jobs(args):
+    """Fetches real tech jobs across multiple roles, exports a SQL seed file, and syncs to DB."""
+    console.print(
+        Panel(
+            "[bold cyan]Seeding Real Tech Jobs from Greenhouse ATS, Lever ATS & RSS Feeds[/bold cyan]",
+            title="Module: Job Board Seeder",
+        )
+    )
+    aggregator = JobAggregator()
+    profiles = [
+        {"skills": ["React", "TypeScript", "JavaScript", "Next.js"], "role": "Frontend Engineer"},
+        {"skills": ["Python", "FastAPI", "Django", "SQL", "PostgreSQL"], "role": "Backend Engineer"},
+        {"skills": ["React", "Node.js", "Python", "TypeScript"], "role": "Full Stack Engineer"},
+        {"skills": ["Python", "Machine Learning", "Data", "SQL"], "role": "Software Engineer Intern"},
+    ]
+    all_seeded_jobs = []
+    seen_urls = set()
+
+    for p in profiles:
+        with console.status(f"[bold green]Discovering {p['role']} roles..."):
+            jobs = aggregator.discover_jobs(
+                student_skills=p["skills"],
+                target_role=p["role"],
+                max_results=args.limit_per_role,
+                save_to_db=True,
+            )
+            for j in jobs:
+                if j["url"] not in seen_urls:
+                    seen_urls.add(j["url"])
+                    all_seeded_jobs.append(j)
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sql_statements = [
+        "-- Seed Real Tech Jobs from Greenhouse & Lever",
+        "-- Generated automatically by placement automation pipeline",
+        "",
+    ]
+    for j in all_seeded_jobs:
+        def esc(val):
+            return str(val or "").replace("'", "''")
+
+        skills_json = json.dumps(j.get("matched_skills", [])).replace("'", "''")
+        req_skills_json = json.dumps(j.get("required_skills", [])).replace("'", "''")
+        is_remote_str = "true" if j.get("is_remote") else "false"
+        posted_at_sql = f"'{esc(j.get('posted_at'))}'" if j.get("posted_at") else "now()"
+
+        sql = f"""INSERT INTO public.discovered_jobs (
+    id, title, company, location, url, source, description,
+    required_skills, matched_skills, relevance_score, match_reason,
+    is_remote, job_type, employment_type, publication_status, posted_at, updated_at
+) VALUES (
+    '{esc(j['id'])}', '{esc(j['title'])}', '{esc(j['company'])}', '{esc(j.get('location', 'Remote'))}',
+    '{esc(j['url'])}', '{esc(j['source'])}', '{esc(j.get('description', ''))}',
+    '{req_skills_json}'::jsonb, '{skills_json}'::jsonb, {j.get('relevance_score', 0)}, '{esc(j.get('match_reason', ''))}',
+    {is_remote_str}, '{esc(j.get('job_type', 'full_time'))}', '{esc(j.get('employment_type', 'full_time'))}',
+    'published', {posted_at_sql}, now()
+) ON CONFLICT (url) DO UPDATE SET
+    title = EXCLUDED.title,
+    company = EXCLUDED.company,
+    relevance_score = EXCLUDED.relevance_score,
+    match_reason = EXCLUDED.match_reason,
+    publication_status = 'published',
+    updated_at = now();"""
+        sql_statements.append(sql)
+
+    output_path.write_text("\n\n".join(sql_statements) + "\n", encoding="utf-8")
+
+    console.print(
+        f"\n[bold green]Successfully collected {len(all_seeded_jobs)} real jobs![/bold green]"
+    )
+    console.print(f"[bold cyan]Exported SQL seed file to:[/bold cyan] {output_path}")
+    console.print(
+        "[dim]You can run this SQL directly in the Supabase SQL Editor to populate the live Job Board immediately.[/dim]"
+    )
+
+
 def cmd_calculate_score(args):
     """Executes Module 4 placement readiness score calculation."""
     input_file = Path(args.file)
@@ -274,6 +352,15 @@ def main():
         "--file", default="data/sample_student_input.json", help="Path to student profile JSON"
     )
 
+    # Command: seed-jobs
+    p_seed = subparsers.add_parser(
+        "seed-jobs", help="Fetch real jobs across multiple profiles and export seed SQL"
+    )
+    p_seed.add_argument("--limit-per-role", type=int, default=15, help="Jobs per role")
+    p_seed.add_argument(
+        "--output", default="data/seed_discovered_jobs.sql", help="Path to output SQL seed file"
+    )
+
     # Command: demo
     subparsers.add_parser("demo", help="Run end-to-end demonstration of all 3 tasks")
 
@@ -290,6 +377,8 @@ def main():
         cmd_check_link(args)
     elif args.command == "discover-jobs":
         cmd_discover_jobs(args)
+    elif args.command == "seed-jobs":
+        cmd_seed_jobs(args)
     elif args.command == "calculate-score":
         cmd_calculate_score(args)
     elif args.command == "demo":

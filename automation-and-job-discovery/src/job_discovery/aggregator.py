@@ -34,30 +34,13 @@ class JobAggregator:
         self.greenhouse = GreenhouseFetcher()
         self.lever = LeverFetcher()
         self.rss = RSSJobFetcher()
+        self._cached_pool: Optional[List[Dict[str, Any]]] = None
 
-    def discover_jobs(
-        self,
-        student_skills: List[str],
-        target_role: str = "Software Engineer Intern",
-        boolean_query: Optional[str] = None,
-        locations: Optional[List[str]] = None,
-        max_results: int = 25,
-        save_to_db: bool = True,
-    ) -> List[Dict[str, Any]]:
-        """
-        Discovers, filters, scores, and ranks jobs for a student profile.
-        """
-        # If boolean query is not explicitly given, automatically construct one
-        if not boolean_query:
-            boolean_query = BooleanSearchParser.build_query_from_profile(
-                skills=student_skills,
-                target_role=target_role,
-                locations=locations or ["remote", "bangalore", "india", "worldwide"],
-            )
+    def get_raw_pool(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Gathers and deduplicates jobs from ATS & RSS sources with memory caching."""
+        if self._cached_pool is not None and not force_refresh:
+            return self._cached_pool
 
-        logger.info(f"Using Boolean Search Query: {boolean_query}")
-
-        # Gather from compliant streams, or deterministic compliant fixtures in E2E mode.
         raw_pool: List[Dict[str, Any]] = []
         if config.AUTOMATION_E2E_MODE:
             raw_pool.extend(build_e2e_jobs())
@@ -77,12 +60,36 @@ class JobAggregator:
             except Exception as e:
                 logger.warning(f"RSS fetch encountered issues: {e}")
 
-        # Enforce source policy at the aggregation boundary. This prevents a
-        # misconfigured or replaced fetcher from introducing LinkedIn scraping.
+        # Enforce source policy at the aggregation boundary.
         compliant_pool = [job for job in raw_pool if self._is_permitted_job(job)]
+        self._cached_pool = self._deduplicate_jobs(compliant_pool)
+        return self._cached_pool
 
-        # 1. Deduplication
-        deduped = self._deduplicate_jobs(compliant_pool)
+    def discover_jobs(
+        self,
+        student_skills: List[str],
+        target_role: str = "Software Engineer Intern",
+        boolean_query: Optional[str] = None,
+        locations: Optional[List[str]] = None,
+        max_results: int = 25,
+        save_to_db: bool = True,
+        force_refresh: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Discovers, filters, scores, and ranks jobs for a student profile.
+        """
+        # If boolean query is not explicitly given, automatically construct one
+        if not boolean_query:
+            boolean_query = BooleanSearchParser.build_query_from_profile(
+                skills=student_skills,
+                target_role=target_role,
+                locations=locations or ["remote", "bangalore", "india", "worldwide"],
+            )
+
+        logger.info(f"Using Boolean Search Query: {boolean_query}")
+
+        # 1. Deduplicated compliant pool
+        deduped = self.get_raw_pool(force_refresh=force_refresh)
 
         # 2. Boolean filter & scoring
         matched_jobs: List[Dict[str, Any]] = []
@@ -113,6 +120,12 @@ class JobAggregator:
 
             # Keep if matches boolean query OR has high skill overlap
             if matches_query or relevance >= 40.0:
+                is_intern = any(
+                    k in job["title"].lower() or k in job.get("description", "").lower()
+                    for k in ["intern", "internship", "co-op", "trainee", "graduate"]
+                )
+                emp_type = "internship" if is_intern else "full_time"
+
                 job_record = {
                     "id": job["id"],
                     "title": job["title"],
@@ -120,10 +133,15 @@ class JobAggregator:
                     "location": job.get("location", "Remote"),
                     "url": job["url"],
                     "source": job["source"],
-                    "is_remote": job.get("is_remote", False),
+                    "description": job.get("description", "") or match_reason,
+                    "required_skills": matched_skills_found or clean_skills,
                     "matched_skills": matched_skills_found,
                     "relevance_score": relevance,
                     "match_reason": match_reason,
+                    "is_remote": job.get("is_remote", False),
+                    "job_type": "internship/entry-level" if is_intern else "full_time",
+                    "employment_type": emp_type,
+                    "publication_status": "published",
                     "posted_at": job.get("posted_at"),
                     "boolean_matched": matches_query,
                 }

@@ -6,7 +6,7 @@ import requests
 logger = logging.getLogger("lever_fetcher")
 
 # Popular tech companies using public Lever job boards
-POPULAR_LEVER_COMPANIES = ["postman", "coursera", "palantir", "leverdemo"]
+POPULAR_LEVER_COMPANIES = ["palantir", "spotify", "leverdemo"]
 
 
 class LeverFetcher:

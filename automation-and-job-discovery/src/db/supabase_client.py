@@ -221,12 +221,17 @@ class SupabaseHandler:
             "location",
             "url",
             "source",
+            "description",
+            "required_skills",
             "matched_skills",
             "relevance_score",
             "match_reason",
             "is_remote",
             "job_type",
+            "employment_type",
+            "publication_status",
             "posted_at",
+            "updated_at",
         }
         cleaned_jobs = [{k: v for k, v in job.items() if k in allowed_columns} for job in jobs]
 

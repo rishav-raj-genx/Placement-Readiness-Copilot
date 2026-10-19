@@ -1,11 +1,23 @@
 name: Automation Worker (Job Discovery & Link Check)
 
 on:
-  # Runs automatically at the top of every hour
   schedule:
+    # Runs every 6 hours
     - cron: '0 */6 * * *'
-  # Allows manual trigger from GitHub Actions UI
   workflow_dispatch:
+    inputs:
+      skills:
+        description: 'Candidate skills to search for (comma-separated)'
+        required: false
+        default: 'React, Node.js, Python, TypeScript, Java'
+      role:
+        description: 'Target Role'
+        required: false
+        default: 'Software Engineer'
+      limit:
+        description: 'Maximum jobs to discover per role search'
+        required: false
+        default: '30'
 
 jobs:
   run-automation:
@@ -13,7 +25,8 @@ jobs:
 
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_KEY }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_KEY }}
       HEADLESS_BROWSER: 'true'
       AUTOMATION_E2E_MODE: 'false'
 
@@ -25,15 +38,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: './automation-and-job-discovery/requirements.txt'
 
       - name: 📦 Install Python dependencies
         working-directory: ./automation-and-job-discovery
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: 🌐 Install Playwright Chromium (with OS deps)
+      - name: 🚀 Run Job Discovery Pipeline (Greenhouse, Lever & RSS)
         working-directory: ./automation-and-job-discovery
-        run: playwright install chromium --with-deps
-
-      - name: 🚀 Run Automation Script
-        working-directory: ./automation-and-job-discovery
-        run: python run.py discover-jobs --skills "python,javascript,react" --limit 20
+        run: |
+          SKILLS="${{ github.event.inputs.skills || 'React, TypeScript, Python, Node.js' }}"
+          ROLE="${{ github.event.inputs.role || 'Software Engineer' }}"
+          LIMIT="${{ github.event.inputs.limit || '30' }}"
+          echo "Running Job Discovery for: Skills='$SKILLS', Role='$ROLE', Limit='$LIMIT'"
+          python run.py discover-jobs --skills "$SKILLS" --role "$ROLE" --limit "$LIMIT"
+          # Also discover targeted junior / intern roles to ensure student opportunities are populated
+          python run.py discover-jobs --skills "Python, FastAPI, Django, SQL" --role "Backend Engineer" --limit 20
+          python run.py discover-jobs --skills "React, TypeScript, Next.js, CSS" --role "Frontend Engineer" --limit 20
