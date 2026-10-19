@@ -1,4 +1,4 @@
-# Placement Readiness Copilot
+# Hireable
 
 Integrated development environment for the Next.js frontend and three Python
 services: profile review, mock interview, and readiness/job automation.

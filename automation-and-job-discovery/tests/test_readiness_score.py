@@ -12,7 +12,6 @@ from src.readiness_score.models import (
     ALGORITHM_VERSION,
     CanonicalInterviewResult,
     CoCurricularInput,
-    CodingPracticeInput,
     GitHubActivityInput,
     LinkedInInput,
     ProjectItem,
@@ -25,13 +24,12 @@ EXPECTED_WEIGHTS = {
     "projects": 0.25,
     "mock_interview": 0.20,
     "github": 0.10,
-    "coding_practice": 0.10,
-    "linkedin": 0.05,
-    "co_curricular": 0.05,
+    "linkedin": 0.10,
+    "co_curricular": 0.10,
 }
 
 
-def build_seven_component_profile() -> StudentProfileEvaluation:
+def build_complete_profile() -> StudentProfileEvaluation:
     return StudentProfileEvaluation(
         student_id="integration_student",
         resume=ResumeInput(score=80.0),
@@ -50,7 +48,6 @@ def build_seven_component_profile() -> StudentProfileEvaluation:
             transcript=[],
         ),
         github=GitHubActivityInput(score=75.0),
-        coding_practice=CodingPracticeInput(score=70.0),
         linkedin=LinkedInInput(score=90.0),
         co_curricular=CoCurricularInput(score=60.0),
     )
@@ -62,21 +59,20 @@ def test_weights_sum_to_one():
     assert abs(total_weight - 1.0) < 0.0001
 
 
-def test_seven_component_fixture_calculates_79_5():
+def test_complete_profile_uses_six_component_weights():
     report = PlacementReadinessCalculator.calculate_readiness(
-        build_seven_component_profile(),
+        build_complete_profile(),
         save_to_db=False,
     )
 
-    assert report.total_score == 79.5
+    assert report.total_score == 80.0
     assert report.category_scores["projects"]["raw_score"] == 82.0
     assert report.category_scores["resume"]["weighted_points"] == 20.0
     assert report.category_scores["projects"]["weighted_points"] == 20.5
     assert report.category_scores["mock_interview"]["weighted_points"] == 17.0
     assert report.category_scores["github"]["weighted_points"] == 7.5
-    assert report.category_scores["coding_practice"]["weighted_points"] == 7.0
-    assert report.category_scores["linkedin"]["weighted_points"] == 4.5
-    assert report.category_scores["co_curricular"]["weighted_points"] == 3.0
+    assert report.category_scores["linkedin"]["weighted_points"] == 9.0
+    assert report.category_scores["co_curricular"]["weighted_points"] == 6.0
     assert len(report.top_actions) == 5
     assert report.persistence.source == "not_requested"
 
@@ -85,7 +81,7 @@ def test_supabase_upsert_contract_and_persistence_receipt(monkeypatch):
     captured: dict[str, object] = {}
 
     class FakeResponse:
-        data = [{"student_id": "integration_student", "total_score": 79.5}]
+        data = [{"student_id": "integration_student", "total_score": 80.0}]
 
     class FakeTable:
         def upsert(self, payload: dict[str, object], on_conflict: str) -> "FakeTable":
@@ -106,12 +102,12 @@ def test_supabase_upsert_contract_and_persistence_receipt(monkeypatch):
     database_client.supabase = FakeSupabase()
     monkeypatch.setattr(calculator_module, "db_client", database_client)
     report = PlacementReadinessCalculator.calculate_readiness(
-        build_seven_component_profile(),
+        build_complete_profile(),
         save_to_db=True,
         require_supabase=True,
     )
 
-    assert report.total_score == 79.5
+    assert report.total_score == 80.0
     assert report.persistence.model_dump() == {
         "attempted": True,
         "success": True,
@@ -121,7 +117,7 @@ def test_supabase_upsert_contract_and_persistence_receipt(monkeypatch):
     assert captured["on_conflict"] == "student_id"
     payload = captured["payload"]
     assert isinstance(payload, dict)
-    assert payload["total_score"] == 79.5
+    assert payload["total_score"] == 80.0
     assert payload["algorithm_version"] == ALGORITHM_VERSION
 
 
@@ -135,7 +131,7 @@ def test_require_supabase_rejects_local_fallback(monkeypatch):
 
     with pytest.raises(ReadinessPersistenceError, match="not written to Supabase"):
         PlacementReadinessCalculator.calculate_readiness(
-            build_seven_component_profile(),
+            build_complete_profile(),
             save_to_db=True,
             require_supabase=True,
         )
@@ -167,7 +163,6 @@ def test_all_scores_present_canonical_interview():
         ],
         interview_session_result=CanonicalInterviewResult(**interview_payload),
         github=GitHubActivityInput(score=75.0),
-        coding_practice=CodingPracticeInput(score=80.0),
         linkedin=LinkedInInput(score=70.0),
         co_curricular=CoCurricularInput(score=85.0),
     )
@@ -197,7 +192,6 @@ def test_missing_interview_does_not_silently_pass():
         ],
         interview_session_result=None,  # Missing!
         github=GitHubActivityInput(score=90.0),
-        coding_practice=CodingPracticeInput(score=90.0),
         linkedin=LinkedInInput(score=90.0),
         co_curricular=CoCurricularInput(score=90.0),
     )
@@ -220,7 +214,6 @@ def test_missing_resume_and_projects():
         projects=[],
         interview_session_result=CanonicalInterviewResult(**interview_payload),
         github=None,
-        coding_practice=None,
         linkedin=None,
         co_curricular=None,
     )
@@ -308,7 +301,6 @@ def test_from_profile_review_api_adapter():
     assert profile.resume.score == 82.0
     assert profile.github.score == 76.0
     assert profile.linkedin.score == 79.0
-    assert profile.coding_practice is None  # Optional/absent LeetCode
 
     report = PlacementReadinessCalculator.calculate_readiness(profile, save_to_db=False)
     assert report.category_scores["resume"]["raw_score"] == 82.0

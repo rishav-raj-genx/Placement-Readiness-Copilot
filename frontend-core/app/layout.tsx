@@ -2,11 +2,26 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Providers } from '@/components/providers';
 import { Toaster } from '@/components/ui/sonner';
+import { GeistSans } from 'geist/font/sans';
+import { displayFont } from '@/lib/fonts';
 
 export const metadata: Metadata = {
-  title: 'MSOT — AI-Powered Interview Preparation',
+  title: {
+    default: 'Hireable',
+    template: '%s | Hireable',
+  },
   description:
-    'Practise realistic interviews with AI, strengthen your answers, and discover what to improve before the real thing.',
+    'A single workspace for candidate readiness, profile review, interviews, and job applications.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -15,8 +30,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className={`dark ${displayFont.variable}`} suppressHydrationWarning>
+      <body className={`${GeistSans.className} min-h-screen bg-background antialiased`}>
         <Providers>
           {children}
           <Toaster />

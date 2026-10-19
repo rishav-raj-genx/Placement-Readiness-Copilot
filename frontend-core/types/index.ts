@@ -1,17 +1,37 @@
 export type UserRole = 'student' | 'admin';
 
+export interface CandidateProject {
+  id: string;
+  name: string;
+  repositoryUrl: string;
+  liveUrl?: string;
+  description: string;
+}
+
+export interface CoCurricularProfile {
+  hackathonsCount: number;
+  certificationsCount: number;
+  clubLeadership: boolean;
+}
+
+export type ProfileAnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
 export interface UserProfile {
   id: string;
   email: string;
   displayName: string;
   role: UserRole;
   createdAt: string;
-}
-
-export interface ProfileLinks {
-  linkedin: string;
-  github: string;
-  leetcode: string;
+  targetRole?: string;
+  targetLocations: string[];
+  skills: string[];
+  githubUsername?: string;
+  resumePdfPath?: string;
+  linkedinPdfPath?: string;
+  projects: CandidateProject[];
+  coCurricular?: CoCurricularProfile;
+  onboardingCompletedAt?: string;
+  updatedAt?: string;
 }
 
 export type InterviewType =
@@ -105,6 +125,7 @@ export type ApplicationStatus =
 export interface JobApplication {
   id: string;
   userId: string;
+  jobId?: string;
   company: string;
   jobTitle: string;
   status: ApplicationStatus;
@@ -139,7 +160,6 @@ export interface JobPosting {
 export type ChatMessageRole = 'user' | 'assistant';
 export type AttachmentStatus = 'uploaded' | 'processing' | 'analyzed' | 'error';
 export type ChatAttachmentKind = 'resume' | 'document' | 'profile_link';
-export type ProfileLinkType = 'linkedin' | 'github' | 'leetcode';
 
 export interface ChatAttachment {
   id: string;
@@ -150,7 +170,6 @@ export interface ChatAttachment {
   statusMessage: string;
   kind: ChatAttachmentKind;
   url?: string;
-  linkType?: ProfileLinkType;
 }
 
 export interface ChatMessage {
@@ -164,14 +183,64 @@ export interface ChatMessage {
 export interface ReadinessAction {
   title: string;
   priority: string;
+  category?: string;
+  potentialPointGain?: number;
+  description?: string;
+}
+
+export interface ReadinessBreakdownItem {
+  rawScore: number;
+  weight: number;
+  weightedPoints: number;
+  present: boolean;
 }
 
 export interface ReadinessScore {
   totalScore: number;
   readinessLevel: string;
   topActions: ReadinessAction[];
-  breakdown: Record<string, number>;
+  breakdown: Record<string, ReadinessBreakdownItem>;
+  isProvisional?: boolean;
+  missingComponents?: string[];
   updatedAt?: string;
+}
+
+export interface ResumeReviewResult {
+  score: number;
+  page_count: number;
+  is_one_page: boolean;
+  is_ats_friendly: boolean;
+  uses_action_verbs: boolean;
+  has_spelling_or_grammar_issues: boolean;
+  spelling_grammar_issues: string[];
+  specific_fixes: string[];
+}
+
+export interface GithubReviewResult {
+  score: number;
+  specific_fixes: string[];
+}
+
+export interface LinkedInReviewResult {
+  score: number;
+  has_complete_profile: boolean;
+  skills_relevant: boolean;
+  suggested_rewrites: string[];
+}
+
+export interface CandidateProfileReview {
+  resume_review: ResumeReviewResult;
+  github_review: GithubReviewResult;
+  linkedin_review: LinkedInReviewResult | null;
+  total_readiness_score: number;
+}
+
+export interface CandidateProfileReviewRecord {
+  studentId: string;
+  status: ProfileAnalysisStatus;
+  result: CandidateProfileReview | null;
+  errorMessage?: string;
+  updatedAt: string;
 }
 
 export type DocumentType = 'resume' | 'job_description' | 'project_description';

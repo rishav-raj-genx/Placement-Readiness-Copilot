@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 
 # Contract version for interview session payload
 CANONICAL_INTERVIEW_CONTRACT_VERSION = "v0"
-ALGORITHM_VERSION = "v1.0.0"
+ALGORITHM_VERSION = "v2.0.0"
 
 
 class InterviewDimensions(BaseModel):
@@ -62,16 +62,6 @@ class GitHubActivityInput(BaseModel):
     has_profile_readme: bool = False
 
 
-class CodingPracticeInput(BaseModel):
-    score: float = Field(
-        default=0.0, ge=0.0, le=100.0, description="LeetCode / coding profile score (0-100)"
-    )
-    problems_solved: int = 0
-    mediums_solved: int = 0
-    hards_solved: int = 0
-    contest_rating: Optional[int] = None
-
-
 class LinkedInInput(BaseModel):
     score: float = Field(
         default=0.0, ge=0.0, le=100.0, description="LinkedIn profile score (0-100)"
@@ -99,7 +89,6 @@ class StudentProfileEvaluation(BaseModel):
     # Provisional backward compatibility
     mock_interview_legacy_score: Optional[float] = None
     github: Optional[GitHubActivityInput] = None
-    coding_practice: Optional[CodingPracticeInput] = None
     linkedin: Optional[LinkedInInput] = None
     co_curricular: Optional[CoCurricularInput] = None
 

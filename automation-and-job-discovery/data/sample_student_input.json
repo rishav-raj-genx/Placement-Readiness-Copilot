@@ -77,13 +77,6 @@
     "recent_commit_streak_days": 12,
     "has_profile_readme": true
   },
-  "coding_practice": {
-    "score": 70.0,
-    "problems_solved": 140,
-    "mediums_solved": 65,
-    "hards_solved": 8,
-    "contest_rating": 1580
-  },
   "linkedin": {
     "score": 60.0,
     "has_headline": true,

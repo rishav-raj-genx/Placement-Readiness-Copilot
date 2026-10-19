@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS profiles (
     linkedin_url TEXT,
     resume_pdf_path TEXT,
     linkedin_pdf_path TEXT,
-    leetcode_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

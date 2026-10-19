@@ -51,13 +51,6 @@ python mock_interview_worker.py
 
 The worker will register with LiveKit and wait for room assignments.
 
-### 4. Docker
-
-```bash
-docker build -t mock-interview-worker .
-docker run --env-file .env mock-interview-worker
-```
-
 ## How It Works
 
 1. **Registration**: The worker registers with LiveKit as agent `mock-interview`.
@@ -131,7 +124,6 @@ All logs are sanitized — no PII, tokens, or API keys are logged. Log levels:
 worker/
 ├── mock_interview_worker.py   # Main worker script
 ├── requirements.txt            # Python dependencies
-├── Dockerfile                  # Container build
 ├── .env.example                # Environment template
 └── README.md                   # This file
 ```

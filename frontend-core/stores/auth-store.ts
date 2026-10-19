@@ -1,21 +1,17 @@
 'use client';
 
 import { create } from 'zustand';
-import type { UserProfile, UserRole } from '@/types';
+import type { UserProfile } from '@/types';
+import { normalizeUserProfile } from '@/lib/profile-adapters';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
-import { setAuthCookies, clearAllAuthCookies } from '@/lib/auth-cookies';
 
 export type SignUpResult = 'authenticated' | 'confirmation_required' | 'failed';
 
-type ProfileRecord = Record<string, unknown>;
-
-function isProfileRecord(value: unknown): value is ProfileRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isUserRole(value: unknown): value is UserRole {
-  return value === 'student' || value === 'admin';
-}
+const PROFILE_COLUMNS = [
+  'id', 'email', 'display_name', 'role', 'created_at', 'target_role', 'target_locations',
+  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path',
+  'projects', 'co_curricular', 'onboarding_completed_at', 'updated_at',
+].join(',');
 
 interface AuthState {
   user: UserProfile | null;
@@ -30,36 +26,13 @@ interface AuthState {
 }
 
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, display_name, role, created_at')
-      .eq('id', userId)
-      .maybeSingle();
-
-    const profileData: unknown = data;
-    if (
-      !error &&
-      isProfileRecord(profileData) &&
-      typeof profileData.id === 'string' &&
-      typeof profileData.email === 'string' &&
-      typeof profileData.display_name === 'string' &&
-      typeof profileData.created_at === 'string' &&
-      isUserRole(profileData.role)
-    ) {
-      return {
-        id: profileData.id,
-        email: profileData.email,
-        displayName: profileData.display_name,
-        role: profileData.role,
-        createdAt: profileData.created_at,
-      };
-    }
-  } catch {
-    // Ignore schema cache or network error on profiles table
-  }
-
-  return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_COLUMNS)
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return normalizeUserProfile(data as unknown);
 }
 
 let authListenerRegistered = false;
@@ -85,17 +58,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       let profile = await fetchProfile(data.user.id);
       if (!profile) {
         const displayName = (data.user.user_metadata?.display_name as string | undefined) || email.split('@')[0];
-        const role = data.user.user_metadata?.role === 'admin' ? 'admin' : 'student';
-        try {
-          await supabase.from('profiles').upsert({
-            id: data.user.id,
-            email: data.user.email ?? email,
-            display_name: displayName,
-            role,
-          }, { onConflict: 'id', ignoreDuplicates: true });
-        } catch {
-          // ignore upsert errors on fallback
-        }
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email: data.user.email ?? email,
+          display_name: displayName,
+          role: 'student',
+        }, { onConflict: 'id', ignoreDuplicates: true });
+        if (upsertError) throw upsertError;
         profile = await fetchProfile(data.user.id);
       }
       if (!profile) {
@@ -103,13 +72,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           id: data.user.id,
           email: data.user.email ?? email,
           displayName: (data.user.user_metadata?.display_name as string | undefined) || email.split('@')[0],
-          role: data.user.user_metadata?.role === 'admin' ? 'admin' : 'student',
+          role: 'student',
           createdAt: data.user.created_at ?? new Date().toISOString(),
+          targetLocations: [],
+          skills: [],
+          projects: [],
         };
-      }
-
-      if (data.session) {
-        setAuthCookies(data.session);
       }
 
       set({ user: profile, isLoading: false });
@@ -131,7 +99,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName } },
+        options: {
+          data: { display_name: displayName },
+          emailRedirectTo: typeof window === 'undefined'
+            ? undefined
+            : `${window.location.origin}/auth/callback?next=${encodeURIComponent('/auth?mode=signup&resume=1')}`,
+        },
       });
       if (error) throw error;
       if (!data.user) throw new Error('Sign up failed — no user returned');
@@ -156,10 +129,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const profile = await fetchProfile(data.user.id);
       if (!profile) throw new Error('Failed to load profile after signup');
 
-      if (data.session) {
-        setAuthCookies(data.session);
-      }
-
       set({ user: profile, isLoading: false });
       return 'authenticated';
     } catch (err) {
@@ -170,7 +139,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
-    clearAllAuthCookies();
     try {
       const { error } = await supabase.auth.signOut();
       set({ user: null, error: error?.message ?? null });
@@ -186,17 +154,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
-        clearAllAuthCookies();
+    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
+      if (!authUser) {
         set({ user: null, isHydrated: true });
         return;
       }
-      const profile = await fetchProfile(session.user.id);
-      if (profile) {
-        setAuthCookies(session);
-      }
-      if (!profile) clearAllAuthCookies();
+      const profile = await fetchProfile(authUser.id);
       set({ user: profile, isHydrated: true });
     }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Unable to restore your session.';
@@ -208,14 +171,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        clearAllAuthCookies();
         set({ user: null });
         return;
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!session) return;
         (async () => {
-          setAuthCookies(session);
           const currentUser = get().user;
           // Avoid re-fetching profile and re-rendering all components if token refreshed for same user
           if (currentUser && currentUser.id === session.user.id) {

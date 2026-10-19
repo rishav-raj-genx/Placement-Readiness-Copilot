@@ -11,12 +11,12 @@ import {
   AlertCircle,
   Loader2,
   Volume2,
+  VolumeX,
   Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +42,9 @@ import type {
   LiveKitErrorPayload,
 } from '@/types';
 import { normalizeInterviewResult } from '@/lib/interview-result-adapter';
+import { AudioWaveform } from '@/components/interview/audio-waveform';
+import { CountdownTimer } from '@/components/interview/countdown-timer';
+import { TranscriptDrawer } from '@/components/interview/transcript-drawer';
 
 export default function InterviewSessionPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -52,7 +55,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   const [connectionAttempted, setConnectionAttempted] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const finishTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   const isLiveKitId = id.startsWith('intv_');
 
@@ -164,11 +166,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     })();
   }, [isLiveKitId, connectionAttempted, user, livekit, liveKitStore]);
 
-  // Auto-scroll transcript
-  useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [livekit.transcripts]);
-
   // Only persisted LiveKit session IDs are valid.
   if (!isLiveKitId) {
     return null;
@@ -265,6 +262,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {currentInterview?.startedAt && <CountdownTimer startedAt={currentInterview.startedAt} durationMinutes={currentInterview.durationMinutes || 15} onExpire={() => void handleFinishInterview()} />}
           <ConnectionStatusBadge status={status} />
         </div>
       </div>
@@ -323,40 +321,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         </Card>
       )}
 
-      {/* Transcript */}
-      {transcripts.length > 0 && (
-        <Card>
-          <CardContent className="p-0">
-            <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-medium">Live Transcript</h3>
-            </div>
-            <ScrollArea className="h-64 px-4 py-3">
-              <div className="space-y-3">
-                {transcripts.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className={`flex ${entry.speaker === 'student' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                        entry.speaker === 'student'
-                          ? 'bg-brand/10 text-foreground'
-                          : 'bg-muted text-foreground'
-                      }`}
-                    >
-                      <span className="text-xs font-medium text-muted-foreground block mb-0.5">
-                        {entry.speaker === 'student' ? 'You' : 'Interviewer'}
-                      </span>
-                      {entry.text}
-                    </div>
-                  </div>
-                ))}
-                <div ref={transcriptEndRef} />
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
+      <div className="flex justify-end"><TranscriptDrawer transcripts={transcripts} /></div>
 
       {/* Audio Controls */}
       <Card>
@@ -374,6 +339,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                 <MicOff className="h-5 w-5" />
               )}
             </Button>
+            <AudioWaveform level={livekit.localAudioLevel} label="Microphone input level" />
             <div>
               <p className="text-sm font-medium">
                 {livekit.isMicrophoneEnabled ? 'Microphone on' : 'Microphone muted'}
@@ -384,9 +350,12 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Volume2 className="h-4 w-4" />
-            <span>Speaker audio active</span>
+          <div className="flex items-center gap-2">
+            <AudioWaveform level={livekit.remoteAudioLevel} label="Interviewer audio level" />
+            <Button variant="ghost" size="sm" onClick={livekit.toggleSpeaker} aria-label={livekit.isSpeakerEnabled ? 'Mute interviewer audio' : 'Enable interviewer audio'}>
+              {livekit.isSpeakerEnabled ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
+              {livekit.isSpeakerEnabled ? 'Speaker on' : 'Speaker off'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -395,7 +364,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>Session timeout: 30 minutes</span>
+          <span>Automatic finish at the configured duration</span>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>

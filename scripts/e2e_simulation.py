@@ -162,7 +162,6 @@ async def simulate() -> dict[str, Any]:
             ],
             "interview_session_result": interview_result,
             "github": {"score": 75},
-            "coding_practice": {"score": 70},
             "linkedin": {"score": 90},
             "co_curricular": {"score": 60},
         }

@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/shared/page-header';
 import { DemoLabel } from '@/components/shared/demo-label';
 import { useJobStore } from '@/stores/job-store';
-import { OnboardingTrigger } from '@/components/onboarding-trigger';
 
 export default function AdminDashboardPage() {
   const { jobs, isHydrated, hydrate } = useJobStore();
@@ -130,7 +129,6 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      <OnboardingTrigger />
     </div>
   );
 }

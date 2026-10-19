@@ -4,37 +4,38 @@
 
 @layer base {
   :root {
-    --background: 30 25% 99%;
-    --foreground: 20 14% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 20 14% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 14% 12%;
-    --primary: 20 14% 12%;
+    color-scheme: dark;
+    --background: 229 47% 6%;
+    --foreground: 220 33% 97%;
+    --card: 226 33% 10%;
+    --card-foreground: 220 33% 97%;
+    --popover: 226 33% 10%;
+    --popover-foreground: 220 33% 97%;
+    --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 30 10% 96%;
-    --secondary-foreground: 20 14% 12%;
-    --muted: 30 10% 95%;
-    --muted-foreground: 20 10% 45%;
-    --accent: 30 10% 95%;
-    --accent-foreground: 20 14% 12%;
-    --destructive: 0 72% 51%;
+    --secondary: 226 25% 15%;
+    --secondary-foreground: 220 33% 97%;
+    --muted: 226 25% 15%;
+    --muted-foreground: 218 15% 65%;
+    --accent: 255 48% 18%;
+    --accent-foreground: 240 100% 90%;
+    --destructive: 0 72% 56%;
     --destructive-foreground: 0 0% 100%;
-    --border: 30 10% 90%;
-    --input: 30 10% 90%;
-    --ring: 20 14% 12%;
-    --brand: 20 85% 55%;
+    --border: 226 24% 20%;
+    --input: 226 24% 20%;
+    --ring: 239 84% 67%;
+    --brand: 249 85% 67%;
     --brand-foreground: 0 0% 100%;
-    --success: 142 60% 45%;
+    --success: 153 71% 48%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 42 96% 57%;
     --warning-foreground: 0 0% 100%;
     --chart-1: 20 85% 55%;
     --chart-2: 142 60% 45%;
     --chart-3: 197 37% 40%;
     --chart-4: 38 92% 50%;
     --chart-5: 0 72% 51%;
-    --radius: 0.5rem;
+    --radius: 0.875rem;
   }
 }
 
@@ -44,48 +45,35 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 15% 10%, hsl(249 85% 60% / 0.15), transparent 28rem),
+      radial-gradient(circle at 85% 0%, hsl(275 80% 58% / 0.1), transparent 24rem),
+      linear-gradient(hsl(226 30% 15% / 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(226 30% 15% / 0.2) 1px, transparent 1px);
+    background-size: auto, auto, 48px 48px, 48px 48px;
+    background-attachment: fixed;
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/10 bg-slate-950/60 shadow-2xl shadow-indigo-950/20 backdrop-blur-xl;
   }
 
-  @media (pointer: fine) {
-    html.custom-cursor-active,
-    html.custom-cursor-active * {
-      cursor: none !important;
-    }
+  .auth-input {
+    @apply w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-11 text-sm text-white outline-none transition-all placeholder:text-white/20 focus:border-indigo-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-indigo-500/50;
   }
+}
 
-  .orange-cursor {
-    position: fixed;
-    z-index: 9999;
-    top: 0;
-    left: 0;
-    width: 24px;
-    height: 24px;
-    border: 1px solid hsl(var(--brand) / 0.8);
-    border-radius: 9999px;
-    background: hsl(var(--brand) / 0.2);
-    box-shadow: 0 0 18px hsl(var(--brand) / 0.2);
-    opacity: 0;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-    transition: width 180ms ease, height 180ms ease, background-color 180ms ease, opacity 180ms ease;
-  }
-
-  .orange-cursor.is-hovering {
-    width: 36px;
-    height: 36px;
-    background: hsl(var(--brand) / 0.32);
-    box-shadow: 0 0 24px hsl(var(--brand) / 0.3);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .orange-cursor {
-      transition: none;
-    }
-  }
-
-  @media (pointer: coarse) {
-    .orange-cursor {
-      display: none;
-    }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

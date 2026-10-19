@@ -1,264 +1,71 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Briefcase,
-  MapPin,
-  Building2,
-  ExternalLink,
-  Search,
-  Save,
-} from 'lucide-react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/page-header';
-import { DemoLabel } from '@/components/shared/demo-label';
-import { EmptyState } from '@/components/shared/empty-state';
-import { useJobStore } from '@/stores/job-store';
+import { JobBoard } from '@/components/jobs/job-board';
+import { ApplicationKanban } from '@/components/jobs/application-kanban';
 import { useApplicationStore } from '@/stores/application-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useJobStore } from '@/stores/job-store';
+import { normalizeDiscoveredJobs } from '@/lib/data-adapters';
 import type { JobPosting } from '@/types';
 import { toast } from 'sonner';
+import { isOfficialJob } from '@/lib/jobs';
 
-const employmentTypeLabels: Record<string, string> = {
-  full_time: 'Full-Time',
-  part_time: 'Part-Time',
-  contract: 'Contract',
-  internship: 'Internship',
-};
+type JobsTab = 'matched' | 'official' | 'tracker';
 
-export default function JobsPage() {
-  const { jobs, isHydrated, error, hydrate } = useJobStore();
-  const { addApplication } = useApplicationStore();
-  const { user } = useAuthStore();
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [selectedJob, setSelectedJob] = useState<JobPosting | null>(null);
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [saveCompany, setSaveCompany] = useState('');
-  const [saveTitle, setSaveTitle] = useState('');
-  const [saveUrl, setSaveUrl] = useState('');
-  const [saveNotes, setSaveNotes] = useState('');
+function JobsWorkspace() {
+  const params = useSearchParams();
+  const [tab, setTab] = useState<JobsTab>(params.get('tab') === 'tracker' ? 'tracker' : 'matched');
+  const [matchedJobs, setMatchedJobs] = useState<JobPosting[]>([]);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const autoDiscoveryRequested = useRef(false);
+  const user = useAuthStore((state) => state.user);
+  const { jobs, isHydrated, hydrate } = useJobStore();
+  const { applications, isHydrated: applicationsHydrated, hydrate: hydrateApplications, addApplication, moveApplication } = useApplicationStore();
+  useEffect(() => { if (!isHydrated) void hydrate(); }, [hydrate, isHydrated]);
+  useEffect(() => { if (user?.id && !applicationsHydrated) void hydrateApplications(user.id); }, [applicationsHydrated, hydrateApplications, user?.id]);
+
+  const discover = useCallback(async () => {
+    setDiscovering(true); setDiscoveryError(null);
+    try {
+      const response = await fetch('/api/jobs/discover', { method: 'POST' });
+      const payload: unknown = await response.json();
+      if (!response.ok) throw new Error(typeof payload === 'object' && payload !== null && 'error' in payload ? String(payload.error) : 'Discovery unavailable.');
+      const rawJobs = typeof payload === 'object' && payload !== null && 'jobs' in payload ? payload.jobs : [];
+      setMatchedJobs(normalizeDiscoveredJobs(rawJobs));
+    } catch (error) {
+      setDiscoveryError(error instanceof Error ? error.message : 'Discovery unavailable.');
+      setMatchedJobs(jobs.filter((job) => !isOfficialJob(job)));
+    } finally { setDiscovering(false); }
+  }, [jobs]);
 
   useEffect(() => {
-    if (!isHydrated) void hydrate();
-  }, [isHydrated, hydrate]);
+    if (!isHydrated || autoDiscoveryRequested.current) return;
+    autoDiscoveryRequested.current = true;
+    void discover();
+  }, [discover, isHydrated]);
 
-  const publishedJobs = jobs.filter((j) => j.status === 'published');
-
-  const filteredJobs = publishedJobs
-    .filter((j) => typeFilter === 'all' || j.employmentType === typeFilter)
-    .filter(
-      (j) =>
-        !search ||
-        j.title.toLowerCase().includes(search.toLowerCase()) ||
-        j.company.toLowerCase().includes(search.toLowerCase()) ||
-        j.requiredSkills.some((s) => s.toLowerCase().includes(search.toLowerCase()))
-    );
-
-  const handleSaveToTracker = (job: JobPosting) => {
-    setSaveCompany(job.company);
-    setSaveTitle(job.title);
-    setSaveUrl(job.applicationUrl || '');
-    setSaveNotes('');
-    setSelectedJob(job);
-    setSaveDialogOpen(true);
-  };
-
-  const confirmSave = async (): Promise<void> => {
-    if (!user) {
-      toast.error('Your session has expired. Please sign in again.');
-      return;
-    }
+  const applyAndLog = async (job: JobPosting) => {
+    if (!user || !job.applicationUrl) return;
+    window.open(job.applicationUrl, '_blank', 'noopener,noreferrer');
     try {
-      await addApplication({
-        userId: user.id,
-        company: saveCompany,
-        jobTitle: saveTitle,
-        status: 'saved',
-        applicationDate: new Date().toISOString().split('T')[0],
-        notes: saveNotes.trim(),
-        jobPostingUrl: saveUrl.trim(),
-      });
-      toast.success('Saved to application tracker');
-      setSaveDialogOpen(false);
-    } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : 'Unable to save this job.';
-      toast.error(message);
-    }
+      await addApplication({ jobId: job.id, userId: user.id, company: job.company, jobTitle: job.title, status: 'applied', applicationDate: new Date().toISOString().slice(0, 10), jobPostingUrl: job.applicationUrl });
+      toast.success('Application opened and logged.');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not log the application.'); }
   };
 
-  if (!isHydrated) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
-  }
+  const officialJobs = jobs.filter((job) => job.status === 'published' && isOfficialJob(job));
+  const fallbackMatched = matchedJobs.length ? matchedJobs : jobs.filter((job) => job.status === 'published' && !isOfficialJob(job));
+  const tabs: Array<{ id: JobsTab; label: string }> = [{ id: 'matched', label: 'Matched jobs' }, { id: 'official', label: 'Hireable Official' }, { id: 'tracker', label: 'Tracker' }];
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader
-        title="Job Board"
-        description="Browse job opportunities and save interesting ones to your tracker."
-      />
+  return <div className="space-y-6"><PageHeader title="Jobs Workspace" description="Discover profile-matched roles, browse official placements, and track each application in one place." action={tab === 'matched' ? <Button variant="outline" disabled={discovering} onClick={() => void discover()}>{discovering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh matches</Button> : undefined} /><div role="tablist" aria-label="Jobs workspace" className="inline-flex rounded-xl border border-white/10 bg-slate-950/60 p-1">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === item.id ? 'bg-indigo-500/20 text-indigo-100' : 'text-muted-foreground hover:text-white'}`}>{item.label}</button>)}</div>{discoveryError && tab === 'matched' && <p className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">Automation unavailable; showing Supabase fallback. {discoveryError}</p>}{tab === 'matched' && <JobBoard jobs={fallbackMatched} onApply={applyAndLog} emptyMessage="No matched jobs are available yet." />}{tab === 'official' && <JobBoard jobs={officialJobs} onApply={applyAndLog} emptyMessage="No Hireable Official jobs are currently published." />}{tab === 'tracker' && <ApplicationKanban applications={applications} onMove={moveApplication} />}</div>;
+}
 
-      {error && (
-        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground/80">
-          Supabase is unavailable; showing the local fallback data. {error}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by title, company, or skill..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="full_time">Full-Time</SelectItem>
-            <SelectItem value="part_time">Part-Time</SelectItem>
-            <SelectItem value="contract">Contract</SelectItem>
-            <SelectItem value="internship">Internship</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">
-          Active opportunities aligned with your interview targets.
-        </span>
-      </div>
-
-      {filteredJobs.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <EmptyState
-              icon={<Briefcase className="h-6 w-6 text-muted-foreground" />}
-              title="No jobs found"
-              description="Try adjusting your search or filter to find more opportunities."
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filteredJobs.map((job) => (
-            <Card key={job.id} className="transition-shadow hover:shadow-md">
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <h3 className="text-base font-medium">{job.title}</h3>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Building2 className="h-3.5 w-3.5" />
-                      {job.company}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <Badge variant="outline">{employmentTypeLabels[job.employmentType]}</Badge>
-                    {job.matchScore !== undefined && (
-                      <Badge variant="secondary" className="bg-success/10 text-success">
-                        {job.matchScore}% match
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  {job.location}
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-2">{job.description}</p>
-                {job.matchReason && (
-                  <p className="rounded-md bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
-                    {job.matchReason}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-1.5">
-                  {job.requiredSkills.map((skill) => (
-                    <Badge key={skill} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={() => handleSaveToTracker(job)}>
-                    <Save className="mr-1.5 h-3.5 w-3.5" />
-                    Save to Tracker
-                  </Button>
-                  {job.applicationUrl && (
-                    <a href={job.applicationUrl} target="_blank" rel="noopener noreferrer">
-                      <Button variant="ghost" size="sm">
-                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                        Apply
-                      </Button>
-                    </a>
-                  )}
-                </div>
-                {job.source && (
-                  <p className="text-[11px] text-muted-foreground">Source: {job.source}</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Save to Tracker Dialog */}
-      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save to Application Tracker</DialogTitle>
-            <DialogDescription>
-              Review the details and add any notes before saving.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="saveCompany">Company</Label>
-              <Input id="saveCompany" value={saveCompany} onChange={(e) => setSaveCompany(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="saveTitle">Job Title</Label>
-              <Input id="saveTitle" value={saveTitle} onChange={(e) => setSaveTitle(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="saveUrl">Job Posting URL</Label>
-              <Input id="saveUrl" value={saveUrl} onChange={(e) => setSaveUrl(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="saveNotes">Notes (Optional)</Label>
-              <Textarea id="saveNotes" value={saveNotes} onChange={(e) => setSaveNotes(e.target.value)} rows={3} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
-            <Button variant="brand" onClick={confirmSave}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+export default function JobsPage() {
+  return <Suspense fallback={<div className="grid min-h-64 place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>}><JobsWorkspace /></Suspense>;
 }

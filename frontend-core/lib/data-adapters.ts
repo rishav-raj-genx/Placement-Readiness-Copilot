@@ -4,6 +4,7 @@ import type {
   JobPosting,
   JobStatus,
   ReadinessAction,
+  ReadinessBreakdownItem,
   ReadinessScore,
 } from '@/types';
 
@@ -46,7 +47,22 @@ function normalizeReadinessAction(value: unknown): ReadinessAction | null {
 
   return {
     title: title.trim(),
-    priority: readString(value.priority, 'Recommended'),
+    priority: readString(value.priority) || readString(value.category, 'Recommended'),
+    category: readString(value.category) || undefined,
+    potentialPointGain: value.potential_point_gain === undefined
+      ? undefined
+      : readNumber(value.potential_point_gain),
+    description: readString(value.description) || undefined,
+  };
+}
+
+function normalizeBreakdownItem(value: unknown): ReadinessBreakdownItem | null {
+  if (!isRecord(value)) return null;
+  return {
+    rawScore: clampScore(value.raw_score),
+    weight: Math.min(1, Math.max(0, readNumber(value.weight))),
+    weightedPoints: Math.max(0, readNumber(value.weighted_points)),
+    present: value.present === true,
   };
 }
 
@@ -59,18 +75,28 @@ export function normalizeReadinessScore(value: unknown): ReadinessScore | null {
     .filter((action): action is ReadinessAction => action !== null)
     .slice(0, 5);
 
-  const breakdown: Record<string, number> = {};
-  if (isRecord(value.breakdown)) {
-    for (const [key, score] of Object.entries(value.breakdown)) {
-      breakdown[key] = clampScore(score);
+  const breakdown: Record<string, ReadinessBreakdownItem> = {};
+  const rawBreakdown = isRecord(value.breakdown)
+    ? value.breakdown
+    : isRecord(value.category_scores)
+      ? value.category_scores
+      : {};
+  if (isRecord(rawBreakdown)) {
+    for (const [key, item] of Object.entries(rawBreakdown)) {
+      const normalized = normalizeBreakdownItem(item);
+      if (normalized) breakdown[key] = normalized;
     }
   }
+
+  const rawInputs = isRecord(value.raw_inputs) ? value.raw_inputs : value;
 
   return {
     totalScore: clampScore(value.total_score),
     readinessLevel: readString(value.readiness_level, 'Not ready'),
     topActions,
     breakdown,
+    isProvisional: rawInputs.is_provisional === true,
+    missingComponents: readStringArray(rawInputs.missing_components),
     updatedAt: readString(value.updated_at) || undefined,
   };
 }
@@ -149,6 +175,7 @@ export function normalizeApplications(value: unknown): JobApplication[] {
     return [{
       id,
       userId,
+      jobId: readString(item.job_id) || undefined,
       company,
       jobTitle,
       status: normalizeApplicationStatus(item.status),

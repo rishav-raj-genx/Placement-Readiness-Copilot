@@ -7,7 +7,6 @@ from src.readiness_score.calculator import PlacementReadinessCalculator
 from src.readiness_score.models import (
     CanonicalInterviewResult,
     CoCurricularInput,
-    CodingPracticeInput,
     GitHubActivityInput,
     LinkedInInput,
     ProjectItem,
@@ -37,7 +36,6 @@ def build_fixture() -> StudentProfileEvaluation:
             transcript=[],
         ),
         github=GitHubActivityInput(score=75.0),
-        coding_practice=CodingPracticeInput(score=70.0),
         linkedin=LinkedInInput(score=90.0),
         co_curricular=CoCurricularInput(score=60.0),
     )

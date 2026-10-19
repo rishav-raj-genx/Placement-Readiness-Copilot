@@ -21,27 +21,35 @@ export interface ProtectedRouteProps {
  * with the correct role can view protected routes.
  *
  * Rules:
- *  1. If user is unauthenticated -> redirects immediately to /signin?redirectTo=<pathname>
+ *  1. If user is unauthenticated -> redirects to /auth?redirectTo=<pathname>
  *  2. While checking auth state -> renders clean verification skeleton
- *  3. If user lacks required role -> displays Access Denied screen
+ *  3. Incomplete students resume the canonical signup flow without touching /onboarding
+ *  4. Admins stay in the admin workspace; students cannot access admin routes
  */
 export function ProtectedRoute({
   children,
   requiredRole = 'student',
-  fallbackUrl = '/signin',
+  fallbackUrl = '/auth',
 }: ProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isHydrated } = useAuthStore();
 
   useEffect(() => {
-    if (isHydrated && !user) {
-      const redirectTarget = pathname
-        ? `${fallbackUrl}?redirectTo=${encodeURIComponent(pathname)}`
-        : fallbackUrl;
-      router.push(redirectTarget);
+    if (!isHydrated) return;
+    if (!user) {
+      const redirectTarget = pathname ? `${fallbackUrl}?redirectTo=${encodeURIComponent(pathname)}` : fallbackUrl;
+      router.replace(redirectTarget);
+      return;
     }
-  }, [isHydrated, user, router, pathname, fallbackUrl]);
+    if (user.role === 'student' && !user.onboardingCompletedAt) {
+      router.replace('/auth?mode=signup&resume=1');
+      return;
+    }
+    if (requiredRole === 'student' && user.role === 'admin') {
+      router.replace('/admin/dashboard');
+    }
+  }, [fallbackUrl, isHydrated, pathname, requiredRole, router, user]);
 
   if (!isHydrated) {
     return (
@@ -54,12 +62,15 @@ export function ProtectedRoute({
     );
   }
 
-  if (!user) {
+  if (!user || (user.role === 'student' && !user.onboardingCompletedAt)) {
     return null;
   }
 
-  // Admin users have full system access; students cannot access admin routes
-  const hasAccess = requiredRole === 'admin' ? user.role === 'admin' : true;
+  const hasAccess = user.role === requiredRole;
+
+  if (requiredRole === 'student' && user.role === 'admin') {
+    return null;
+  }
 
   if (!hasAccess) {
     return (

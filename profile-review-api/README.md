@@ -7,7 +7,7 @@ LinkedIn, and GitHub reviews.
 
 ```bash
 uv sync --dev
-uv run uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8001
 ```
 
 ## LLM provider selection
@@ -20,14 +20,19 @@ API modes fall back to Ollama by default; disable this only with
 ## Resume review
 
 ```bash
-curl -F 'file=@resume.pdf;type=application/pdf' http://127.0.0.1:8000/review/resume
+curl -F 'file=@resume.pdf;type=application/pdf' http://127.0.0.1:8001/review/resume
 ```
 
 The endpoint extracts text with PyMuPDF and returns the verified PDF page count,
 ATS compatibility, action-verb usage, spelling/grammar issues, score, and fixes.
 
+## Unified profile review
+
+`POST /analyze-profile` accepts `github_username`, required `resume`, and
+optional `linkedin_pdf`.
+
 ## Tests
 
 ```bash
-uv run pytest -q -s
+uv run --locked pytest
 ```

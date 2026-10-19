@@ -22,6 +22,7 @@ export interface LiveKitInterviewRecord {
   interviewId: string;
   roomName: string;
   targetRole: string;
+  durationMinutes: number;
   serverUrl: string;
   token: string;
   status: LiveKitInterviewStatus;
@@ -44,7 +45,8 @@ interface LiveKitInterviewState {
     roomName: string,
     targetRole: string,
     serverUrl: string,
-    token: string
+    token: string,
+    durationMinutes: number
   ) => void;
   setCreating: (creating: boolean) => void;
   setCreateError: (error: string | null) => void;
@@ -90,12 +92,14 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
     roomName: string,
     targetRole: string,
     serverUrl: string,
-    token: string
+    token: string,
+    durationMinutes: number
   ) => {
     const record: LiveKitInterviewRecord = {
       interviewId,
       roomName,
       targetRole,
+      durationMinutes,
       serverUrl,
       token,
       status: 'connecting',

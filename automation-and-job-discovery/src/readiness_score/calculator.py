@@ -25,15 +25,14 @@ WEIGHTS = {
     "projects": 0.25,
     "mock_interview": 0.20,
     "github": 0.10,
-    "coding_practice": 0.10,
-    "linkedin": 0.05,
-    "co_curricular": 0.05,
+    "linkedin": 0.10,
+    "co_curricular": 0.10,
 }
 
 
 class PlacementReadinessCalculator:
     """
-    Placement Readiness Score Algorithm v1.0.0.
+    Placement Readiness Score Algorithm v2.0.0.
     Implements canonical extraction from `interview_sessions.result` (contract_version: v0),
     official weights, bounding [0, 100], missing-input handling, and top 5 actions.
     """
@@ -124,21 +123,14 @@ class PlacementReadinessCalculator:
             github_raw = 0.0
             missing_components.append("github")
 
-        # 5. Coding practice
-        if profile.coding_practice is not None:
-            coding_raw = cls.clamp(profile.coding_practice.score)
-        else:
-            coding_raw = 0.0
-            missing_components.append("coding_practice")
-
-        # 6. LinkedIn
+        # 5. LinkedIn
         if profile.linkedin is not None:
             linkedin_raw = cls.clamp(profile.linkedin.score)
         else:
             linkedin_raw = 0.0
             missing_components.append("linkedin")
 
-        # 7. Co-curricular
+        # 6. Co-curricular
         if profile.co_curricular is not None:
             co_curr_raw = cls.clamp(profile.co_curricular.score)
         else:
@@ -170,12 +162,6 @@ class PlacementReadinessCalculator:
                 "raw_score": github_raw,
                 "weighted_points": round(github_raw * WEIGHTS["github"], 2),
                 "present": "github" not in missing_components,
-            },
-            "coding_practice": {
-                "weight": WEIGHTS["coding_practice"],
-                "raw_score": coding_raw,
-                "weighted_points": round(coding_raw * WEIGHTS["coding_practice"], 2),
-                "present": "coding_practice" not in missing_components,
             },
             "linkedin": {
                 "weight": WEIGHTS["linkedin"],
@@ -291,7 +277,7 @@ class PlacementReadinessCalculator:
 
         # Deficit scoring
         for cat, info in breakdown.items():
-            if info["present"] and info["raw_score"] < 85.0:
+            if info["present"] and info["raw_score"] <= 85.0:
                 potential_gain = round((90.0 - info["raw_score"]) * info["weight"], 1)
                 if cat == "projects":
                     candidates.append(
@@ -318,15 +304,6 @@ class PlacementReadinessCalculator:
                             "action": "Retake AI mock interview to improve technical depth and communication",
                             "potential_point_gain": max(2.0, potential_gain),
                             "description": "Higher mock viva scores directly raise your placement readiness tier.",
-                        }
-                    )
-                elif cat == "coding_practice":
-                    candidates.append(
-                        {
-                            "category": "Coding Practice",
-                            "action": "Solve 20 more LeetCode Medium problems in DSA",
-                            "potential_point_gain": max(1.5, potential_gain),
-                            "description": "Screening rounds require strong fundamentals in Graphs, Trees, and DP.",
                         }
                     )
                 elif cat == "github":

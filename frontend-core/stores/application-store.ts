@@ -5,6 +5,7 @@ import type { ApplicationStatus, JobApplication } from '@/types';
 import { loadFromStorage, saveToStorage } from '@/lib/storage';
 import { normalizeApplications } from '@/lib/data-adapters';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
+import { findMatchingApplication } from '@/lib/applications';
 
 type NewApplication = Omit<JobApplication, 'id' | 'createdAt'>;
 
@@ -62,6 +63,11 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
   },
 
   addApplication: async (application) => {
+    const existing = findMatchingApplication(get().applications, application);
+    if (existing) {
+      await get().updateApplication(existing.id, application);
+      return;
+    }
     const createdAt = new Date().toISOString();
     const newApplication: JobApplication = {
       ...application,
@@ -75,6 +81,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
         .insert({
           id: newApplication.id,
           student_id: newApplication.userId,
+          job_id: newApplication.jobId || null,
           company: newApplication.company,
           role: newApplication.jobTitle,
           url: newApplication.jobPostingUrl || null,
@@ -107,6 +114,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
       const { error } = await supabase
         .from('application_tracker')
         .update({
+          job_id: next.jobId || null,
           company: next.company,
           role: next.jobTitle,
           url: next.jobPostingUrl || null,

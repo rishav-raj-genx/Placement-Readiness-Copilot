@@ -1,8 +1,5 @@
 -- Frontend integration fields, secure profile provisioning, and MSOT Admin job management.
 
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS leetcode_url text;
-
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS trigger
 LANGUAGE plpgsql

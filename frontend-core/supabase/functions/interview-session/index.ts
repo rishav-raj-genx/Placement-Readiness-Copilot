@@ -26,6 +26,8 @@ interface StudentInfo {
   name: string;
   email: string;
   targetRole: string;
+  skills: string[];
+  githubUsername: string;
 }
 
 interface ResumeInfo {
@@ -126,7 +128,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await serviceClient
       .from("profiles")
-      .select("id, email, display_name, role, github_username, linkedin_url, resume_pdf_path, linkedin_pdf_path")
+      .select("id, email, display_name, role, target_role, skills, github_username, resume_pdf_path, linkedin_pdf_path")
       .eq("id", jwtUserId)
       .maybeSingle();
 
@@ -195,7 +197,9 @@ Deno.serve(async (req: Request) => {
         id: jwtUserId,
         name: studentName,
         email: jwtEmail,
-        targetRole: body.targetRole,
+        targetRole: profile?.target_role || body.targetRole,
+        skills: Array.isArray(profile?.skills) ? profile.skills : [],
+        githubUsername: profile?.github_username || "",
       },
       resume: resumeInfo,
       job: jobInfo,

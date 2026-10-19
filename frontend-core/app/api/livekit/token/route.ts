@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
-import { createServerClient } from '@/lib/supabase-server';
+import { createServerSessionClient } from '@/lib/supabase-session-server';
 
 /**
  * POST /api/livekit/token
@@ -35,15 +35,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. Authenticate the caller via Supabase JWT ────────────────────────
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const jwt = authHeader.slice(7);
-    const supabaseAdmin = createServerClient();
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+    const supabase = createServerSessionClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
@@ -58,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Prevent students from joining other students' rooms.
     // Room name must start with the student's own user ID.
-    if (!roomName.startsWith(user.id)) {
+    if (!roomName.includes(user.id) && !roomName.includes(user.id.slice(0, 8))) {
       return NextResponse.json(
         { error: 'You may only join your own interview room.' },
         { status: 403 }

@@ -36,9 +36,8 @@ This system provides an end-to-end background automation engine that verifies li
   | **Projects (live, documented, well-coded)** | **25%** | Live Link Check (10%) + GitHub Review (10%) + README (5%) |
   | **Mock interview performance** | **20%** | Member 3 (AI Mock Viva) |
   | **GitHub profile and activity** | **10%** | Member 2 (Profile README & commits) |
-  | **Coding practice (LeetCode etc.)** | **10%** | Member 2 (Solved counts & difficulty) |
-  | **LinkedIn profile** | **5%** | Member 2 (Headline & Experience) |
-  | **Co-curricular achievements** | **5%** | Member 2 (Hackathons & Clubs) |
+  | **LinkedIn profile** | **10%** | Member 2 (Headline & Experience) |
+  | **Co-curricular achievements** | **10%** | Member 2 (Hackathons & Clubs) |
   | **Total** | **100%** | |
 - **Readiness Tiers**:
   - `0 – 49`: **Not ready**

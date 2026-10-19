@@ -33,7 +33,10 @@ interface UseLiveKitInterviewReturn {
   status: LiveKitSessionStatus;
   connectionQuality: ConnectionQuality | null;
   isMicrophoneEnabled: boolean;
+  isSpeakerEnabled: boolean;
   isInterviewerSpeaking: boolean;
+  localAudioLevel: number;
+  remoteAudioLevel: number;
   transcripts: LiveKitTranscriptEntry[];
   currentGreeting: string | null;
   currentQuestion: LiveKitQuestionPayload | null;
@@ -42,6 +45,7 @@ interface UseLiveKitInterviewReturn {
   connect: (sessionData: LiveKitSessionResponse) => Promise<void>;
   disconnect: () => Promise<void>;
   toggleMicrophone: () => Promise<void>;
+  toggleSpeaker: () => void;
   sendFinishMessage: () => void;
 }
 
@@ -72,7 +76,10 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   const [status, setStatus] = useState<LiveKitSessionStatus>('idle');
   const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality | null>(null);
   const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
+  const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
   const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
+  const [localAudioLevel, setLocalAudioLevel] = useState(0);
+  const [remoteAudioLevel, setRemoteAudioLevel] = useState(0);
   const [transcripts, setTranscripts] = useState<LiveKitTranscriptEntry[]>([]);
   const [currentGreeting, setCurrentGreeting] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<LiveKitQuestionPayload | null>(null);
@@ -225,6 +232,15 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     setIsMicrophoneEnabled(newState);
   }, [isMicrophoneEnabled]);
 
+  const toggleSpeaker = useCallback(() => {
+    if (!roomRef.current) return;
+    const enabled = !isSpeakerEnabled;
+    roomRef.current.remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((publication) => publication.setEnabled(enabled));
+    });
+    setIsSpeakerEnabled(enabled);
+  }, [isSpeakerEnabled]);
+
   const sendFinishMessage = useCallback(() => {
     if (!roomRef.current) return;
     const message = JSON.stringify({
@@ -236,6 +252,17 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
       reliable: true,
     });
   }, []);
+
+  useEffect(() => {
+    if (status !== 'connected' && status !== 'active') return;
+    const interval = window.setInterval(() => {
+      const room = roomRef.current;
+      if (!room) return;
+      setLocalAudioLevel(room.localParticipant.audioLevel);
+      setRemoteAudioLevel(Math.max(0, ...Array.from(room.remoteParticipants.values()).map((participant) => participant.audioLevel)));
+    }, 120);
+    return () => window.clearInterval(interval);
+  }, [status]);
 
   useEffect(() => {
     return () => {
@@ -250,7 +277,10 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     status,
     connectionQuality,
     isMicrophoneEnabled,
+    isSpeakerEnabled,
     isInterviewerSpeaking,
+    localAudioLevel,
+    remoteAudioLevel,
     transcripts,
     currentGreeting,
     currentQuestion,
@@ -259,6 +289,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     connect,
     disconnect,
     toggleMicrophone,
+    toggleSpeaker,
     sendFinishMessage,
   };
 }

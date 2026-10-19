@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
 } from 'lucide-react';
+import { HireableLogo } from '@/components/brand/hireable-logo';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -17,7 +18,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useAuthStore } from '@/stores/auth-store';
 import { DemoBanner } from '@/components/shared/demo-banner';
 import { toast } from 'sonner';
-import HoldButton from '@/components/HoldButton';
 
 const adminNavItems = [
   { href: '/admin/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
@@ -59,31 +59,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </span>
         )}
       </div>
-      <HoldButton
+      <Button
+        variant="outline"
         size="sm"
-        radius={10}
-        holdTime={1400}
-        backgroundColor="hsl(var(--card))"
-        fillColor="hsl(var(--destructive))"
-        textColor="hsl(var(--foreground))"
-        fillTextColor="#ffffff"
-        icon={<LogOut className="h-4 w-4" />}
-        doneIcon={<LogOut className="h-4 w-4" />}
-        doneLabel={collapsed ? '' : 'Signed Out'}
-        className={cn(
-          'border border-border hover:border-destructive/40 transition-colors font-medium text-xs',
-          collapsed ? '!p-0 w-9 h-9 mx-auto' : 'w-full'
-        )}
-        onHold={async () => {
-          onNavigate?.();
-          await handleSignOut();
-        }}
-        onTap={() => {
-          toast.info('Press and hold to sign out', { duration: 2500 });
-        }}
+        className={cn(collapsed ? 'mx-auto h-9 w-9 p-0' : 'w-full')}
+        onClick={() => { onNavigate?.(); void handleSignOut(); }}
+        aria-label="Sign out"
       >
-        {!collapsed ? 'Hold to Sign Out' : null}
-      </HoldButton>
+        <LogOut className={cn('h-4 w-4', !collapsed && 'mr-2')} />
+        {!collapsed && 'Sign out'}
+      </Button>
     </div>
   );
 
@@ -135,12 +120,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             title={sidebarCollapsed ? 'Expand navigation bar' : 'Close navigation bar'}
           >
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 border border-brand/20 transition-colors group-hover:bg-brand/20">
-                <Brain className="h-4.5 w-4.5 text-brand" />
-              </div>
+              <HireableLogo size={32} withGlow priority />
               {!sidebarCollapsed && (
                 <div className="text-left overflow-hidden">
-                  <div className="text-base font-semibold tracking-tight text-foreground whitespace-nowrap">MSOT</div>
+                  <div className="text-base font-semibold tracking-tight text-foreground whitespace-nowrap">Hireable</div>
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Admin</div>
                 </div>
               )}
@@ -171,8 +154,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <div className="flex h-full flex-col">
                 <SheetHeader className="border-b border-border px-6 py-4 text-left">
                   <SheetTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Brain className="h-6 w-6 text-brand" />
-                    MSOT Admin
+                    <HireableLogo size={24} />
+                    Hireable Admin
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto p-4">
@@ -184,8 +167,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </Sheet>
 
           <Link href="/admin/dashboard" className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-brand" />
-            <span className="font-semibold text-foreground">MSOT Admin</span>
+            <HireableLogo size={24} />
+            <span className="font-semibold text-foreground">Hireable Admin</span>
           </Link>
           <div className="w-9" />
         </header>

@@ -9,6 +9,14 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        display: ['var(--font-display)', 'sans-serif'],
+        sans: ['var(--font-geist-sans)', 'sans-serif'],
+      },
+      boxShadow: {
+        glass: '0 24px 80px hsl(239 84% 20% / 0.24)',
+        glow: '0 0 40px hsl(var(--brand) / 0.2)',
+      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':

@@ -74,10 +74,32 @@ mkdir -p "$LOG_DIR"
 rm -f "$READY_FILE" "$PID_FILE"
 
 if [[ -f "$ROOT_DIR/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$ROOT_DIR/.env"
-  set +a
+  while IFS= read -r dotenv_line || [[ -n "$dotenv_line" ]]; do
+    dotenv_line="${dotenv_line%$'\r'}"
+    dotenv_line="${dotenv_line#"${dotenv_line%%[![:space:]]*}"}"
+    if [[ -z "$dotenv_line" || "$dotenv_line" == \#* ]]; then
+      continue
+    fi
+    if [[ "$dotenv_line" != *=* ]]; then
+      echo "Invalid dotenv entry: expected KEY=VALUE" >&2
+      exit 1
+    fi
+    dotenv_key="${dotenv_line%%=*}"
+    dotenv_value="${dotenv_line#*=}"
+    dotenv_key="${dotenv_key%"${dotenv_key##*[![:space:]]}"}"
+    dotenv_value="${dotenv_value#"${dotenv_value%%[![:space:]]*}"}"
+    if [[ ! "$dotenv_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo "Invalid dotenv variable name" >&2
+      exit 1
+    fi
+    if [[ ${#dotenv_value} -ge 2 ]]; then
+      if [[ "${dotenv_value:0:1}" == '"' && "${dotenv_value: -1}" == '"' ]] ||
+         [[ "${dotenv_value:0:1}" == "'" && "${dotenv_value: -1}" == "'" ]]; then
+        dotenv_value="${dotenv_value:1:${#dotenv_value}-2}"
+      fi
+    fi
+    export "$dotenv_key=$dotenv_value"
+  done < "$ROOT_DIR/.env"
 fi
 
 PIDS=()
@@ -130,7 +152,7 @@ NAMES+=("automation")
   cd "$ROOT_DIR/frontend-core"
   exec env \
     PROFILE_REVIEW_API_URL="http://127.0.0.1:$PROFILE_PORT/health" \
-    MOCK_INTERVIEW_API_URL="http://127.0.0.1:$INTERVIEW_PORT/health" \
+    INTERVIEW_SERVICE_URL="http://127.0.0.1:$INTERVIEW_PORT/health" \
     AUTOMATION_API_URL="http://127.0.0.1:$AUTOMATION_PORT/" \
     pnpm dev --hostname 127.0.0.1 --port "$FRONTEND_PORT"
 ) >"$LOG_DIR/frontend.log" 2>&1 &

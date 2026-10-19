@@ -15,14 +15,20 @@ export async function createInterviewSession(
     throw new Error('You must be signed in to start a LiveKit interview.');
   }
 
-  const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/interview-session`;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase public configuration is missing.');
+  }
+
+  const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/interview-session`;
 
   const response = await fetch(functionUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      apikey: supabaseAnonKey,
     },
     body: JSON.stringify(requestBody),
   });
