@@ -215,9 +215,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (!session) return;
         (async () => {
+          setAuthCookies(session);
+          const currentUser = get().user;
+          // Avoid re-fetching profile and re-rendering all components if token refreshed for same user
+          if (currentUser && currentUser.id === session.user.id) {
+            return;
+          }
           const profile = await fetchProfile(session.user.id);
           if (profile) {
-            setAuthCookies(session);
             set({ user: profile });
           }
         })();

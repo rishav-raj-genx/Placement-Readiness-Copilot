@@ -254,7 +254,12 @@ export default function ConfigureInterviewPage() {
 
   const isRecommended = (topic: string) => recommendedTopics.includes(topic);
 
+  const profileLoadedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    if (profileLoadedUserIdRef.current === (user?.id || 'anonymous')) return;
+    profileLoadedUserIdRef.current = user?.id || 'anonymous';
+
     const savedReadiness = loadFromStorage<{
       githubUsername?: string;
       linkedinUrl?: string;
@@ -267,7 +272,7 @@ export default function ConfigureInterviewPage() {
     setResumePdfName(savedReadiness.resumePdfName || '');
     setLinkedinPdfName(savedReadiness.linkedinPdfName || '');
 
-    if (!user) return;
+    if (!user?.id) return;
 
     let active = true;
     supabase
@@ -286,7 +291,7 @@ export default function ConfigureInterviewPage() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   const canProceedToStep2 =
     targetRole.trim() !== '' && (targetRole !== 'Other' || customRole.trim() !== '');

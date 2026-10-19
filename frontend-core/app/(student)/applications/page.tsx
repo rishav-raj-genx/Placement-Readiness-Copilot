@@ -76,8 +76,8 @@ export default function ApplicationsPage() {
   const [jobPostingUrl, setJobPostingUrl] = useState('');
 
   useEffect(() => {
-    if (user && !isHydrated) void hydrate(user.id);
-  }, [isHydrated, hydrate, user]);
+    if (user?.id && !isHydrated) void hydrate(user.id);
+  }, [isHydrated, hydrate, user?.id]);
 
   const openCreateForm = () => {
     setEditingApp(null);

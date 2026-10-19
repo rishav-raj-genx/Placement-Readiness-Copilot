@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Brain,
@@ -43,8 +43,13 @@ export default function DashboardPage() {
   } | null>(null);
   const [readinessScore, setReadinessScore] = useState<ReadinessScore | null>(null);
 
+  const dashboardLoadedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
+    if (dashboardLoadedUserIdRef.current === user.id) return;
+    dashboardLoadedUserIdRef.current = user.id;
+
     // Authoritative source: interview_sessions.result
     supabase
       .from('interview_sessions')
@@ -80,7 +85,7 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   const completedCount = getCompletedCount();
   const remainingCount = getRemainingCount();

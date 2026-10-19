@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   History,
@@ -60,8 +60,13 @@ export default function InterviewHistoryPage() {
   const [liveKitSessions, setLiveKitSessions] = useState<LiveKitHistoryEntry[]>([]);
   const [liveKitLoading, setLiveKitLoading] = useState(false);
 
+  const historyLoadedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
+    if (historyLoadedUserIdRef.current === user.id) return;
+    historyLoadedUserIdRef.current = user.id;
+
     setLiveKitLoading(true);
     supabase
       .from('interview_sessions')
@@ -73,7 +78,7 @@ export default function InterviewHistoryPage() {
         setLiveKitLoading(false);
         if (data) setLiveKitSessions(data as LiveKitHistoryEntry[]);
       });
-  }, [user]);
+  }, [user?.id]);
 
   const liveKitEntries: CombinedHistoryEntry[] = liveKitSessions
     .filter((s) => s.status === 'completed' || s.status === 'abandoned')

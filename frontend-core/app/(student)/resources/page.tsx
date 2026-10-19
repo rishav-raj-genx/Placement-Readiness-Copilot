@@ -70,8 +70,11 @@ export default function ResourcesPage() {
   const [isSavingLinks, setIsSavingLinks] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const loadedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
+    if (loadedUserIdRef.current === user.id) return;
     let active = true;
 
     supabase
@@ -81,6 +84,7 @@ export default function ResourcesPage() {
       .maybeSingle()
       .then(({ data, error }) => {
         if (!active || error || !data) return;
+        loadedUserIdRef.current = user.id;
         const githubUsername = typeof data.github_username === 'string' ? data.github_username : '';
         setProfileLinks({
           linkedin: typeof data.linkedin_url === 'string' ? data.linkedin_url : '',
@@ -93,7 +97,7 @@ export default function ResourcesPage() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
