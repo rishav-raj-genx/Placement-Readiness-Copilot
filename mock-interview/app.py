@@ -71,7 +71,7 @@ def create_app(
 
     @app.get("/api/interview/coding-problems")
     async def list_coding_problems() -> dict[str, object]:
-        """Return the curated problem bank for Round 2 DSA and Web Dev IDE tests."""
+        """Return the curated problem bank with public example cases only."""
         return {
             "status": "ok",
             "problems": [
@@ -83,7 +83,7 @@ def create_app(
                     "description": p.description,
                     "constraints": p.constraints,
                     "starter_code": p.starter_code,
-                    "test_cases": p.test_cases,
+                    "example_cases": p.test_cases[:1],  # Issue 24: Hide private evaluation test cases
                     "optimal_time_complexity": p.optimal_time_complexity,
                     "optimal_space_complexity": p.optimal_space_complexity,
                 }

@@ -1,10 +1,17 @@
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = Deno.env.get("ALLOWED_ORIGINS") || "http://localhost:3000";
+  const allowedList = allowed.split(",").map((s) => s.trim());
+  const matchedOrigin = allowedList.includes(origin) || allowedList.includes("*") ? origin : (allowedList[0] || "*");
+  return {
+    "Access-Control-Allow-Origin": matchedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Vary": "Origin",
+  };
+}
 
 interface SessionRequest {
   studentId?: string;
@@ -30,10 +37,20 @@ interface StudentInfo {
   githubUsername: string;
 }
 
+interface StructuredProject {
+  title?: string;
+  description?: string;
+  tech_stack?: string[];
+  live_url?: string;
+  github_url?: string;
+}
+
 interface ResumeInfo {
   parsedText: string;
   keySkills: string[];
   pdfUrl: string;
+  isVerified?: boolean;
+  structuredProjects?: StructuredProject[];
 }
 
 interface JobInfo {
@@ -68,6 +85,7 @@ declare const Deno: {
 };
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -121,6 +139,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Validate and bound duration between 10 and 30 minutes
+    const validatedDuration = Math.min(Math.max(body.durationMinutes || 20, 10), 30);
+    body.durationMinutes = validatedDuration;
+
     // JWT sub is the authoritative student ID. Any studentId in request body is advisory only.
     if (body.studentId && body.studentId !== jwtUserId) {
       console.info(`Advisory studentId ${body.studentId} provided; using authoritative JWT sub ${jwtUserId}`);
@@ -143,11 +165,20 @@ Deno.serve(async (req: Request) => {
       studentName = profile.display_name;
     }
 
+    // --- Fetch candidate projects to provide grounded structured context ---
+    const { data: candidateProjects } = await serviceClient
+      .from("projects")
+      .select("title, description, tech_stack, live_url, github_url")
+      .eq("student_id", jwtUserId)
+      .limit(5);
+
     // --- Fetch resume from private storage ---
     let resumeInfo: ResumeInfo = {
       parsedText: body.resumeId ? `Resume reference: ${body.resumeId}` : "",
-      keySkills: [],
+      keySkills: profile?.skills || [],
       pdfUrl: "",
+      isVerified: false,
+      structuredProjects: candidateProjects || [],
     };
 
     if (profile?.resume_pdf_path) {
@@ -161,8 +192,10 @@ Deno.serve(async (req: Request) => {
 
       resumeInfo = {
         parsedText: body.resumeId ? `Resume reference: ${body.resumeId}` : "",
-        keySkills: [],
+        keySkills: profile?.skills || [],
         pdfUrl: signedUrl,
+        isVerified: false,
+        structuredProjects: candidateProjects || [],
       };
     }
 
@@ -336,8 +369,8 @@ Deno.serve(async (req: Request) => {
             console.warn("Existing room metadata is not valid JSON:", metadataError);
           }
 
-          // Fallback only for a verified existing room belonging to the same interview
-          if (existingMetadata.interviewId === interviewId || matchingRoom.name === roomName) {
+          // Fallback ONLY for a verified existing room belonging to this exact interview
+          if (existingMetadata.interviewId === interviewId) {
             await roomService.updateRoomMetadata(roomName, metadataJson);
             roomCreated = true;
           } else {
@@ -405,12 +438,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Token TTL comfortably exceeds session duration (minimum 45 minutes)
+    const tokenTtlSeconds = Math.max((validatedDuration + 15) * 60, 45 * 60);
+
     // Generate the student participant token
     const livekitToken = new LiveKitAccessToken(liveKitApiKey, liveKitApiSecret, {
       identity: `student_${jwtUserId}`,
       name: studentName,
       metadata: JSON.stringify({ interviewId, role: "student" }),
-      ttl: 30 * 60, // 30 minutes
+      ttl: tokenTtlSeconds,
     });
 
     livekitToken.addGrant({

@@ -1,6 +1,10 @@
-from typing import List, Optional
+import logging
+import os
+import uuid
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from src.db.supabase_client import db_client
@@ -9,11 +13,36 @@ from src.link_checker.checker import LiveLinkChecker
 from src.readiness_score.calculator import PlacementReadinessCalculator
 from src.readiness_score.models import ReadinessReport, StudentProfileEvaluation
 
+logger = logging.getLogger("automation_api")
+
 app = FastAPI(
     title="Placement Readiness Automation API",
     description="Live link checking, compliant job discovery, and readiness score aggregation",
     version="1.0.0",
 )
+
+security = HTTPBearer(auto_error=False)
+
+
+def verify_service_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+) -> bool:
+    """Validates service-to-service authorization token to prevent unauthenticated public calls."""
+    expected_token = (
+        os.environ.get("AUTOMATION_SERVICE_TOKEN")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("INTERNAL_SERVICE_KEY")
+    )
+    if not expected_token:
+        # Development mode without explicit service key configured
+        return True
+    if not credentials or credentials.credentials != expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "UNAUTHORIZED", "message": "Missing or invalid service authorization token"},
+        )
+    return True
+
 
 link_checker = LiveLinkChecker()
 job_aggregator = JobAggregator()
@@ -32,6 +61,7 @@ class JobSearchRequest(BaseModel):
     boolean_query: Optional[str] = None
     locations: Optional[List[str]] = None
     max_results: Optional[int] = 20
+    force_refresh: Optional[bool] = False
 
 
 @app.get("/")
@@ -44,8 +74,11 @@ def root():
 
 
 @app.post("/api/link-check")
-def check_link(req: LinkCheckRequest):
-    """Triggers headless Playwright mobile check on a live URL."""
+def check_link(
+    req: LinkCheckRequest,
+    _auth: bool = Depends(verify_service_token),
+):
+    """Triggers headless Playwright mobile check on a live URL behind service authentication."""
     try:
         result = link_checker.check_project_url(
             url=req.url,
@@ -55,12 +88,20 @@ def check_link(req: LinkCheckRequest):
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"[{error_id}] Link check failed for url {req.url}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "LINK_CHECK_FAILED",
+                "message": f"Link verification failed. Reference ID: {error_id}",
+            },
+        )
 
 
 @app.post("/api/discover-jobs")
 def discover_jobs(req: JobSearchRequest):
-    """Fetches jobs from Greenhouse, Lever, and RSS matching boolean criteria."""
+    """Fetches jobs from Greenhouse, Lever, and RSS matching boolean criteria with cache control."""
     try:
         jobs = job_aggregator.discover_jobs(
             student_skills=req.skills,
@@ -68,17 +109,45 @@ def discover_jobs(req: JobSearchRequest):
             boolean_query=req.boolean_query,
             locations=req.locations,
             max_results=req.max_results or 20,
+            force_refresh=req.force_refresh or False,
         )
-        return {"count": len(jobs), "jobs": jobs}
+        freshness = job_aggregator.get_source_freshness()
+        return {
+            "count": len(jobs),
+            "jobs": jobs,
+            "freshness": freshness,
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(f"[{error_id}] Job discovery failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "JOB_DISCOVERY_FAILED",
+                "message": f"Job discovery failed. Reference ID: {error_id}",
+            },
+        )
 
 
 @app.post("/api/calculate-readiness", response_model=ReadinessReport)
-def calculate_readiness(profile: StudentProfileEvaluation):
+def calculate_readiness(
+    profile: StudentProfileEvaluation,
+    _auth: bool = Depends(verify_service_token),
+):
     """Calculates Module 4 composite placement readiness score and top 5 actions."""
     try:
         report = PlacementReadinessCalculator.calculate_readiness(profile, save_to_db=True)
         return report
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_id = str(uuid.uuid4())
+        logger.error(
+            f"[{error_id}] Readiness calculation failed for student {profile.student_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "CALCULATION_FAILED",
+                "message": f"Readiness calculation failed. Reference ID: {error_id}",
+            },
+        )

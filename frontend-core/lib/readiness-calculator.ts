@@ -1,4 +1,11 @@
-type ReadinessCategory = 'resume' | 'projects' | 'mock_interview' | 'github' | 'linkedin' | 'co_curricular';
+type ReadinessCategory =
+  | 'resume'
+  | 'projects'
+  | 'mock_interview'
+  | 'github'
+  | 'coding_practice'
+  | 'linkedin'
+  | 'co_curricular';
 
 interface ScoredEvidence {
   score: number;
@@ -23,6 +30,7 @@ export interface ReadinessCalculationInput {
   projects: ReadinessProjectInput[];
   interview_session_result: unknown;
   github: ScoredEvidence | null;
+  coding_practice?: ScoredEvidence | null;
   linkedin: ScoredEvidence | null;
   co_curricular: ScoredEvidence | null;
 }
@@ -59,8 +67,9 @@ const WEIGHTS: Record<ReadinessCategory, number> = {
   projects: 0.25,
   mock_interview: 0.2,
   github: 0.1,
-  linkedin: 0.1,
-  co_curricular: 0.1,
+  coding_practice: 0.1,
+  linkedin: 0.05,
+  co_curricular: 0.05,
 };
 
 const CATEGORY_LABELS: Record<ReadinessCategory, string> = {
@@ -68,6 +77,7 @@ const CATEGORY_LABELS: Record<ReadinessCategory, string> = {
   projects: 'Projects',
   mock_interview: 'Mock Interview',
   github: 'GitHub',
+  coding_practice: 'Coding Practice',
   linkedin: 'LinkedIn',
   co_curricular: 'Co-curricular',
 };
@@ -77,6 +87,7 @@ const CATEGORY_ACTIONS: Record<ReadinessCategory, string> = {
   projects: 'Add deployed projects with live links and complete documentation',
   mock_interview: 'Complete a focused AI mock interview and review the feedback',
   github: 'Pin representative repositories and improve their READMEs',
+  coding_practice: 'Solve more DSA problems on LeetCode/HackerRank to improve problem-solving speed',
   linkedin: 'Align your headline, skills, and experience with your target role',
   co_curricular: 'Add verified certifications, hackathons, or leadership evidence',
 };
@@ -116,9 +127,13 @@ export function calculateReadinessLocally(input: ReadinessCalculationInput): Rea
     projects: calculateProjectScore(input.projects),
     mock_interview: readInterviewScore(input.interview_session_result),
     github: input.github ? clampScore(input.github.score) : null,
+    coding_practice: input.coding_practice ? clampScore(input.coding_practice.score) : null,
     linkedin: input.linkedin ? clampScore(input.linkedin.score) : null,
     co_curricular: input.co_curricular ? clampScore(input.co_curricular.score) : null,
   };
+
+  const isInterviewProvisional = isRecord(input.interview_session_result) &&
+    (input.interview_session_result.is_provisional === true || input.interview_session_result.is_fallback === true);
 
   const categories = Object.keys(WEIGHTS) as ReadinessCategory[];
   const missingComponents = categories.filter((category) => scores[category] === null);

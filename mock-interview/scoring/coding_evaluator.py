@@ -331,6 +331,7 @@ class CodingEvaluationResult(BaseModel):
     optimal_code_diff_note: str
     evaluation_mode: str = "static_ast_analysis"
     test_execution_status: str = "sandbox_pending"
+    is_provisional: bool = True
 
 
 def _analyze_code_statically(problem_id: str, language: str, code: str) -> dict[str, Any]:
@@ -431,8 +432,16 @@ try:
                 v2 = cache.get(2)
                 if v1 == 1 and v2 == -1:
                     passed += 1
+        elif "{problem_id}" == "use_debounce":
+            fn = globals().get("debounce")
+            if fn and callable(fn):
+                passed += 1
+        elif "{problem_id}" == "fetch_with_retry":
+            fn = globals().get("request_with_retry") or globals().get("fetch_with_retry")
+            if fn and callable(fn):
+                passed += 1
         else:
-            passed += 1
+            pass
     print(json.dumps({{"passed": passed, "total": total, "status": "ok"}}))
 except Exception as e:
     print(json.dumps({{"passed": passed, "total": total, "status": "error", "error": str(e)}}))
@@ -569,7 +578,12 @@ def evaluate_coding_submission(
     analysis = _analyze_code_statically(problem.id, language, cleaned_code)
     total_tests = analysis["total_tests"]
 
-    enable_sandbox = run_sandbox or os.getenv("ENABLE_CODE_SANDBOX", "").lower() in {"1", "true", "yes"}
+    # Issue 4: Execute code in sandbox if explicitly requested or container runner is provisioned
+    enable_sandbox = (
+        run_sandbox
+        or os.getenv("ENABLE_CONTAINER_SANDBOX", "0").lower() in {"1", "true", "yes"}
+        or os.getenv("ENABLE_CODE_SANDBOX", "0").lower() in {"1", "true", "yes"}
+    )
     sandbox_res = None
     if enable_sandbox and language == "python" and analysis["has_valid_syntax"]:
         sandbox_res = run_sandboxed_python_tests(problem.id, cleaned_code)
@@ -580,12 +594,17 @@ def evaluate_coding_submission(
             "passed" if passed_tests == total_tests else "partial" if passed_tests > 0 else "failed"
         )
         evaluation_mode = "isolated_sandbox_execution"
+        is_provisional = False
         if sandbox_res.get("error"):
             test_execution_status = "runtime_error"
+            is_provisional = True
     else:
         passed_tests = 0
         test_execution_status = "sandbox_pending"
         evaluation_mode = "static_ast_analysis"
+        is_provisional = True
+        # Issue 5: Static AST analysis is provisional; cap score to 90 so unverified code does not claim 95+
+        correctness_score = min(correctness_score, 90)
 
     # Quality score based on static AST inspections
     quality_score = 65
@@ -669,4 +688,5 @@ def evaluate_coding_submission(
         optimal_code_diff_note=opt_note,
         evaluation_mode=evaluation_mode,
         test_execution_status=test_execution_status,
+        is_provisional=is_provisional,
     )

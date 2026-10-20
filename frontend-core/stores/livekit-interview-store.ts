@@ -59,8 +59,25 @@ interface LiveKitInterviewState {
   hydrate: () => void;
 }
 
+function persistState(record: LiveKitInterviewRecord | null) {
+  if (!record || record.status === 'completed' || record.status === 'abandoned') {
+    saveToStorage('livekit-current-interview', null);
+    return;
+  }
+  // Issue 6: Never persist LiveKit access tokens in localStorage; minimize transcript retention
+  const { token: _token, ...safeRecord } = record;
+  saveToStorage('livekit-current-interview', {
+    ...safeRecord,
+    token: '', // Keep token strictly in memory
+    transcripts: record.transcripts.slice(-30),
+  });
+}
+
 function loadStored(): LiveKitInterviewRecord | null {
-  return loadFromStorage<LiveKitInterviewRecord | null>('livekit-current-interview', null);
+  const stored = loadFromStorage<LiveKitInterviewRecord | null>('livekit-current-interview', null);
+  if (!stored) return null;
+  // Ensure token is empty on hydration from storage
+  return { ...stored, token: '' };
 }
 
 export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get) => ({
@@ -108,7 +125,7 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
       completedAt: null,
       createdAt: new Date().toISOString(),
     };
-    saveToStorage('livekit-current-interview', record);
+    persistState(record);
     set({ currentInterview: record, createError: null });
   },
 
@@ -116,7 +133,7 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
     const current = get().currentInterview;
     if (!current) return;
     const updated = { ...current, currentQuestion: question, status: 'active' as const };
-    saveToStorage('livekit-current-interview', updated);
+    persistState(updated);
     set({ currentInterview: updated });
   },
 
@@ -134,7 +151,7 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
       ...current,
       transcripts,
     };
-    saveToStorage('livekit-current-interview', updated);
+    persistState(updated);
     set({ currentInterview: updated });
   },
 
@@ -143,11 +160,12 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
     if (!current) return;
     const updated = {
       ...current,
+      token: '', // clear token from memory
       results,
       status: 'completed' as const,
       completedAt: new Date().toISOString(),
     };
-    saveToStorage('livekit-current-interview', updated);
+    persistState(null); // Clear from browser storage upon completion
     set({ currentInterview: updated });
   },
 
@@ -155,7 +173,11 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
     const current = get().currentInterview;
     if (!current) return;
     const updated = { ...current, status };
-    saveToStorage('livekit-current-interview', updated);
+    if (status === 'completed' || status === 'abandoned' || status === 'error') {
+      persistState(null);
+    } else {
+      persistState(updated);
+    }
     set({ currentInterview: updated });
   },
 
@@ -164,23 +186,24 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
     if (!current) return;
     const updated = {
       ...current,
+      token: '',
       status: 'completed' as const,
       completedAt: new Date().toISOString(),
     };
-    saveToStorage('livekit-current-interview', updated);
+    persistState(null); // Clear from browser storage
     set({ currentInterview: updated });
   },
 
   abandonInterview: () => {
     const current = get().currentInterview;
     if (!current) return;
-    const updated = { ...current, status: 'abandoned' as const };
-    saveToStorage('livekit-current-interview', updated);
+    const updated = { ...current, token: '', status: 'abandoned' as const };
+    persistState(null); // Clear from browser storage
     set({ currentInterview: updated });
   },
 
   reset: () => {
-    saveToStorage('livekit-current-interview', null);
+    persistState(null);
     set({ currentInterview: null, createError: null, isCreating: false });
   },
 }));

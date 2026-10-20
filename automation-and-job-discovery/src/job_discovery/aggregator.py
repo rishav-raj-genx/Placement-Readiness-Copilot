@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -30,39 +31,68 @@ class JobAggregator:
     Applies boolean query matching, deduplication, skill-scoring, and reason explanations.
     """
 
+    CACHE_TTL_SECONDS: float = 900.0  # 15 minutes bounded cache TTL
+
     def __init__(self):
         self.greenhouse = GreenhouseFetcher()
         self.lever = LeverFetcher()
         self.rss = RSSJobFetcher()
         self._cached_pool: Optional[List[Dict[str, Any]]] = None
+        self._cached_at: Optional[float] = None
+        self._source_status: Dict[str, str] = {}
+
+    def get_source_freshness(self) -> Dict[str, Any]:
+        """Returns metadata regarding cache age and upstream source health."""
+        now = time.time()
+        age_seconds = (now - self._cached_at) if self._cached_at else None
+        return {
+            "cached_at": self._cached_at,
+            "cache_age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+            "is_stale": age_seconds is None or age_seconds >= self.CACHE_TTL_SECONDS,
+            "ttl_seconds": self.CACHE_TTL_SECONDS,
+            "source_status": dict(self._source_status),
+        }
 
     def get_raw_pool(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
-        """Gathers and deduplicates jobs from ATS & RSS sources with memory caching."""
-        if self._cached_pool is not None and not force_refresh:
+        """Gathers and deduplicates jobs from ATS & RSS sources with bounded memory caching."""
+        now = time.time()
+        is_fresh = (
+            self._cached_pool is not None
+            and self._cached_at is not None
+            and (now - self._cached_at) < self.CACHE_TTL_SECONDS
+        )
+        if is_fresh and not force_refresh:
             return self._cached_pool
 
         raw_pool: List[Dict[str, Any]] = []
+        source_status: Dict[str, str] = {"greenhouse": "ok", "lever": "ok", "rss": "ok"}
         if config.AUTOMATION_E2E_MODE:
             raw_pool.extend(build_e2e_jobs())
+            source_status = {"e2e_fixtures": "ok"}
         else:
             try:
                 raw_pool.extend(self.greenhouse.fetch_all(max_per_board=10))
             except Exception as e:
                 logger.warning(f"Greenhouse fetch encountered issues: {e}")
+                source_status["greenhouse"] = f"failed: {str(e)}"
 
             try:
                 raw_pool.extend(self.lever.fetch_all(max_per_company=10))
             except Exception as e:
                 logger.warning(f"Lever fetch encountered issues: {e}")
+                source_status["lever"] = f"failed: {str(e)}"
 
             try:
                 raw_pool.extend(self.rss.fetch_all(max_per_feed=15))
             except Exception as e:
                 logger.warning(f"RSS fetch encountered issues: {e}")
+                source_status["rss"] = f"failed: {str(e)}"
 
         # Enforce source policy at the aggregation boundary.
         compliant_pool = [job for job in raw_pool if self._is_permitted_job(job)]
         self._cached_pool = self._deduplicate_jobs(compliant_pool)
+        self._cached_at = time.time()
+        self._source_status = source_status
         return self._cached_pool
 
     def discover_jobs(
@@ -98,8 +128,10 @@ class JobAggregator:
         for job in deduped:
             searchable_text = f"{job['title']} {job['company']} {job.get('location', '')} {job.get('description', '')}"
 
-            # Boolean logic match test
+            # Boolean logic match test: HARD filter (Issue 17: Boolean filters must be strictly respected)
             matches_query = BooleanSearchParser.matches(boolean_query, searchable_text)
+            if not matches_query:
+                continue
 
             # Skill scoring & matched skill extraction
             matched_skills_found = []
@@ -118,34 +150,32 @@ class JobAggregator:
                 matches_boolean=matches_query,
             )
 
-            # Keep if matches boolean query OR has high skill overlap
-            if matches_query or relevance >= 40.0:
-                is_intern = any(
-                    k in job["title"].lower() or k in job.get("description", "").lower()
-                    for k in ["intern", "internship", "co-op", "trainee", "graduate"]
-                )
-                emp_type = "internship" if is_intern else "full_time"
+            is_intern = any(
+                k in job["title"].lower() or k in job.get("description", "").lower()
+                for k in ["intern", "internship", "co-op", "trainee", "graduate"]
+            )
+            emp_type = "internship" if is_intern else "full_time"
 
-                job_record = {
-                    "id": job["id"],
-                    "title": job["title"],
-                    "company": job["company"],
-                    "location": job.get("location", "Remote"),
-                    "url": job["url"],
-                    "source": job["source"],
-                    "description": job.get("description", "") or match_reason,
-                    "required_skills": matched_skills_found or clean_skills,
-                    "matched_skills": matched_skills_found,
-                    "relevance_score": relevance,
-                    "match_reason": match_reason,
-                    "is_remote": job.get("is_remote", False),
-                    "job_type": "internship/entry-level" if is_intern else "full_time",
-                    "employment_type": emp_type,
-                    "publication_status": "published",
-                    "posted_at": job.get("posted_at"),
-                    "boolean_matched": matches_query,
-                }
-                matched_jobs.append(job_record)
+            job_record = {
+                "id": job["id"],
+                "title": job["title"],
+                "company": job["company"],
+                "location": job.get("location", "Remote"),
+                "url": job["url"],
+                "source": job["source"],
+                "description": job.get("description", "") or match_reason,
+                "required_skills": matched_skills_found or clean_skills,
+                "matched_skills": matched_skills_found,
+                "relevance_score": relevance,
+                "match_reason": match_reason,
+                "is_remote": job.get("is_remote", False),
+                "job_type": "internship/entry-level" if is_intern else "full_time",
+                "employment_type": emp_type,
+                "publication_status": "published",
+                "posted_at": job.get("posted_at"),
+                "boolean_matched": matches_query,
+            }
+            matched_jobs.append(job_record)
 
         # Sort by relevance score descending
         matched_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)

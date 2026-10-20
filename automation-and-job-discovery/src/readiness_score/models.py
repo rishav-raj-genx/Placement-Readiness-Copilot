@@ -20,6 +20,8 @@ class CanonicalInterviewResult(BaseModel):
     transcript: List[Dict[str, Any]] = Field(default_factory=list)
     summary: Optional[str] = ""
     dimensions: Optional[Dict[str, InterviewDimensions]] = None
+    is_provisional: bool = False
+    is_fallback: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -35,10 +37,10 @@ class CanonicalInterviewResult(BaseModel):
 
 class ResumeInput(BaseModel):
     score: float = Field(default=0.0, ge=0.0, le=100.0, description="Resume quality score (0-100)")
-    has_metrics: bool = True
+    has_metrics: bool = False
     page_count: int = 1
-    has_action_verbs: bool = True
-    has_clean_formatting: bool = True
+    has_action_verbs: bool = False
+    has_clean_formatting: bool = False
     missing_elements: List[str] = Field(default_factory=list)
 
 
@@ -49,8 +51,9 @@ class ProjectItem(BaseModel):
     live_link_score: float = Field(default=0.0, ge=0.0, le=100.0)
     code_quality_score: float = Field(default=0.0, ge=0.0, le=100.0)
     documentation_score: float = Field(default=0.0, ge=0.0, le=100.0)
-    has_readme: bool = True
+    has_readme: bool = False
     is_live: bool = False
+    is_verified: bool = False
 
 
 class GitHubActivityInput(BaseModel):
@@ -62,13 +65,23 @@ class GitHubActivityInput(BaseModel):
     has_profile_readme: bool = False
 
 
+class CodingPracticeInput(BaseModel):
+    score: float = Field(
+        default=0.0, ge=0.0, le=100.0, description="Coding practice / LeetCode score (0-100)"
+    )
+    problems_solved: int = 0
+    easy_count: int = 0
+    medium_count: int = 0
+    hard_count: int = 0
+
+
 class LinkedInInput(BaseModel):
     score: float = Field(
         default=0.0, ge=0.0, le=100.0, description="LinkedIn profile score (0-100)"
     )
     has_headline: bool = False
     has_about_summary: bool = False
-    experience_matches_resume: bool = True
+    experience_matches_resume: bool = False
 
 
 class CoCurricularInput(BaseModel):
@@ -89,6 +102,7 @@ class StudentProfileEvaluation(BaseModel):
     # Provisional backward compatibility
     mock_interview_legacy_score: Optional[float] = None
     github: Optional[GitHubActivityInput] = None
+    coding_practice: Optional[CodingPracticeInput] = None
     linkedin: Optional[LinkedInInput] = None
     co_curricular: Optional[CoCurricularInput] = None
 

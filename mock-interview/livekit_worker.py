@@ -28,7 +28,7 @@ from livekit.agents.llm import ChatMessage
 
 from agent.context_adapter import adapt_resume
 from agent.finalizer import InterviewFinalizer
-from agent.livekit_events import encode_event, results_event
+from agent.livekit_events import encode_event, question_event, results_event
 from agent.providers import GroqLLM, OllamaLLM, ResilientLLM
 from agent.session import build_question_plan
 from scoring.result_store import SupabaseInterviewSessionStore
@@ -69,13 +69,20 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     instructions = _interview_instructions(context, session_config)
 
-    # Selectable hosted vs local Ollama mode with resilient fallback
+    # Selectable hosted vs local Ollama mode with strict privacy policy
     mode = str(metadata.get("mode") or os.getenv("INTERVIEW_MODE", "hosted_api"))
     if mode == "ollama_local":
         interview_model = os.getenv("LIVEKIT_INTERVIEW_MODEL", "ollama/llama-3.1")
+        # Issue 7: Enforce strict local mode with zero cloud token leak when in ollama_local
         scoring_llm = ResilientLLM(
             primary=OllamaLLM(),
-            fallback=GroqLLM() if os.getenv("GROQ_API_KEY") else None,
+            fallback=None,
+        )
+        logger.info(
+            "Strict local mode configured: no cloud LLM fallback. "
+            "Pipeline notice: voice STT/TTS relies on LiveKit plugins (%s / %s).",
+            os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-3"),
+            os.getenv("LIVEKIT_TTS_MODEL", "deepgram/aura-2-thalia-en"),
         )
     else:
         interview_model = os.getenv("LIVEKIT_INTERVIEW_MODEL", "groq/llama-3.1-8b-instant")
@@ -99,15 +106,49 @@ async def entrypoint(ctx: JobContext) -> None:
         interview_id=interview_id,
     )
 
+    plan = build_question_plan(context, session_config)
+    current_question_index = 0
+
     @session.on("conversation_item_added")
     def on_conversation_item_added(event: ConversationItemAddedEvent) -> None:
+        nonlocal current_question_index
         if not isinstance(event.item, ChatMessage):
             return
         if event.item.role not in {"assistant", "user"}:
             return
         finalizer.record(event.item.role, event.item.text_content)
 
+        # Broadcast question state when assistant asks a question
+        if event.item.role == "assistant" and current_question_index < len(plan):
+            q_item = plan[current_question_index]
+            current_question_index += 1
+            with suppress(Exception):
+                asyncio.create_task(
+                    ctx.room.local_participant.publish_data(
+                        encode_event(
+                            question_event(
+                                text=q_item.text,
+                                question_index=current_question_index,
+                                total_questions=len(plan),
+                                category=q_item.category.value,
+                            )
+                        ),
+                        reliable=True,
+                    )
+                )
+
+    # Issue 12: Atomic finalization state to ensure exactly-once execution across tasks
+    finalization_lock = asyncio.Lock()
+    is_finalized = False
+
     async def finalize_interview(*, publish: bool) -> bool:
+        nonlocal is_finalized
+        async with finalization_lock:
+            if is_finalized:
+                logger.info("Interview already finalized; ignoring duplicate invocation")
+                return True
+            is_finalized = True
+
         try:
             result = await asyncio.to_thread(finalizer.finish)
             if publish:

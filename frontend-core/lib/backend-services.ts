@@ -61,8 +61,13 @@ interface ServiceRequestOptions extends RequestInit {
 export async function serviceRequest(url: string, options: ServiceRequestOptions = {}): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+  const serviceToken = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.INTERNAL_SERVICE_KEY || 'service-role-internal';
+  const headers = new Headers(options.headers);
+  if (!headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${serviceToken}`);
+  }
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+    const response = await fetch(url, { ...options, headers, signal: controller.signal, cache: 'no-store' });
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const detail = typeof payload === 'object' && payload !== null && 'detail' in payload ? String(payload.detail) : `${response.status} ${response.statusText}`;

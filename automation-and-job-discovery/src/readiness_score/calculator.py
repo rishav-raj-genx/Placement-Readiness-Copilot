@@ -19,14 +19,15 @@ class ReadinessPersistenceError(RuntimeError):
     """Raised when a caller requires a live Supabase write but it did not occur."""
 
 
-# Official weights (Problem 2, Page 12)
+# Official canonical weights (Problem 2, Page 12)
 WEIGHTS = {
     "resume": 0.25,
     "projects": 0.25,
     "mock_interview": 0.20,
     "github": 0.10,
-    "linkedin": 0.10,
-    "co_curricular": 0.10,
+    "coding_practice": 0.10,
+    "linkedin": 0.05,
+    "co_curricular": 0.05,
 }
 
 
@@ -123,14 +124,21 @@ class PlacementReadinessCalculator:
             github_raw = 0.0
             missing_components.append("github")
 
-        # 5. LinkedIn
+        # 5. Coding Practice (LeetCode / DSA)
+        if profile.coding_practice is not None:
+            coding_raw = cls.clamp(profile.coding_practice.score)
+        else:
+            coding_raw = 0.0
+            missing_components.append("coding_practice")
+
+        # 6. LinkedIn
         if profile.linkedin is not None:
             linkedin_raw = cls.clamp(profile.linkedin.score)
         else:
             linkedin_raw = 0.0
             missing_components.append("linkedin")
 
-        # 6. Co-curricular
+        # 7. Co-curricular
         if profile.co_curricular is not None:
             co_curr_raw = cls.clamp(profile.co_curricular.score)
         else:
@@ -163,6 +171,12 @@ class PlacementReadinessCalculator:
                 "weighted_points": round(github_raw * WEIGHTS["github"], 2),
                 "present": "github" not in missing_components,
             },
+            "coding_practice": {
+                "weight": WEIGHTS["coding_practice"],
+                "raw_score": coding_raw,
+                "weighted_points": round(coding_raw * WEIGHTS["coding_practice"], 2),
+                "present": "coding_practice" not in missing_components,
+            },
             "linkedin": {
                 "weight": WEIGHTS["linkedin"],
                 "raw_score": linkedin_raw,
@@ -178,7 +192,12 @@ class PlacementReadinessCalculator:
         }
 
         total_score = round(sum(item["weighted_points"] for item in weighted_breakdown.values()), 2)
-        is_provisional = len(missing_components) > 0
+        is_interview_provisional = False
+        if profile.interview_session_result is not None:
+            if getattr(profile.interview_session_result, "is_provisional", False) or getattr(profile.interview_session_result, "is_fallback", False):
+                is_interview_provisional = True
+
+        is_provisional = len(missing_components) > 0 or is_interview_provisional
 
         # Readiness level (Problem 2, Page 12)
         # 0–49: Not ready, 50–74: Almost ready, 75–100: Placement ready
@@ -265,6 +284,16 @@ class PlacementReadinessCalculator:
                 }
             )
 
+        if "coding_practice" in missing_components:
+            candidates.append(
+                {
+                    "category": "Coding Practice",
+                    "action": "Link your LeetCode profile and solve 25+ foundational DSA problems",
+                    "potential_point_gain": round(100 * WEIGHTS["coding_practice"], 1),
+                    "description": "Coding practice is worth 10% of your placement readiness score.",
+                }
+            )
+
         if "resume" in missing_components:
             candidates.append(
                 {
@@ -313,6 +342,15 @@ class PlacementReadinessCalculator:
                             "action": "Improve repository READMEs and publish recent project commits",
                             "potential_point_gain": max(1.0, potential_gain),
                             "description": "Clear documentation and recent activity make project work easier to verify.",
+                        }
+                    )
+                elif cat == "coding_practice":
+                    candidates.append(
+                        {
+                            "category": "Coding Practice",
+                            "action": "Practice Medium-difficulty DSA problems on arrays, hash maps, and trees",
+                            "potential_point_gain": max(1.5, potential_gain),
+                            "description": "Solving medium problems directly boosts technical assessment performance.",
                         }
                     )
                 elif cat == "linkedin":

@@ -67,18 +67,21 @@ export async function POST(): Promise<NextResponse> {
     await admin.from('candidate_profile_reviews').upsert({ student_id: studentId, status: 'processing', result: null, error_message: null, started_at: new Date().toISOString(), completed_at: null }, { onConflict: 'student_id' });
 
     const resumePath = requireOwnedPath(profile.resumePdfPath, studentId, 'Resume');
-    const linkedinPath = requireOwnedPath(profile.linkedinPdfPath, studentId, 'LinkedIn PDF');
-    const [resumeDownload, linkedinDownload] = await Promise.all([
-      admin.storage.from('candidate-documents').download(resumePath),
-      admin.storage.from('candidate-documents').download(linkedinPath),
-    ]);
+    const resumeDownload = await admin.storage.from('candidate-documents').download(resumePath);
     if (resumeDownload.error || !resumeDownload.data) throw resumeDownload.error ?? new Error('Unable to download the resume.');
-    if (linkedinDownload.error || !linkedinDownload.data) throw linkedinDownload.error ?? new Error('Unable to download the LinkedIn PDF.');
+
+    let linkedinDownloadData: Blob | null = null;
+    if (profile.linkedinPdfPath && profile.linkedinPdfPath.startsWith(`${studentId}/`)) {
+      const { data: dlData } = await admin.storage.from('candidate-documents').download(profile.linkedinPdfPath);
+      if (dlData) linkedinDownloadData = dlData;
+    }
 
     const form = new FormData();
     form.append('github_username', profile.githubUsername ?? '');
     form.append('resume', resumeDownload.data, 'resume.pdf');
-    form.append('linkedin_pdf', linkedinDownload.data, 'linkedin.pdf');
+    if (linkedinDownloadData) {
+      form.append('linkedin_pdf', linkedinDownloadData, 'linkedin.pdf');
+    }
     const review = await serviceRequest(`${getProfileReviewBaseUrl()}/analyze-profile`, { method: 'POST', body: form, timeoutMs: 60_000 });
     if (!isRecord(review)) throw new Error('Profile review returned an invalid response.');
 
@@ -87,17 +90,44 @@ export async function POST(): Promise<NextResponse> {
     const readinessProjects = profile.projects.map((project, index) => {
       const check = projectChecks[index];
       const checked = isRecord(check) ? check : null;
+      const isLive = checked?.is_live === true;
+      const liveLinkScore = checked && isLive ? readNumber(checked.quality_score) : 0;
+      const codeQualityScore = checked && typeof checked.code_quality_score === 'number'
+        ? readNumber(checked.code_quality_score)
+        : 0;
+      const documentationScore = checked && typeof checked.documentation_score === 'number'
+        ? readNumber(checked.documentation_score)
+        : 0;
+      const hasReadme = checked ? checked.has_readme === true : false;
+
       return {
-        name: project.name, live_url: project.liveUrl ?? null, repo_url: project.repositoryUrl,
-        live_link_score: checked ? readNumber(checked.quality_score) : 0,
-        code_quality_score: 50,
-        documentation_score: Math.min(100, 50 + Math.min(50, project.description.trim().length / 4)),
-        has_readme: true,
-        is_live: checked?.is_live === true,
+        name: project.name,
+        live_url: project.liveUrl ?? null,
+        repo_url: project.repositoryUrl,
+        live_link_score: liveLinkScore,
+        code_quality_score: codeQualityScore,
+        documentation_score: documentationScore,
+        has_readme: hasReadme,
+        is_live: isLive,
       };
     });
 
-    const { data: latestInterview } = await admin.from('interview_sessions').select('result').eq('student_id', studentId).eq('status', 'completed').not('result', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data: latestInterview } = await admin
+      .from('interview_sessions')
+      .select('result, is_provisional')
+      .eq('student_id', studentId)
+      .eq('status', 'completed')
+      .not('result', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Issue 15: Explicitly track provisional interview results so they don't masquerade as final
+    let interviewPayload = latestInterview?.result ? { ...(latestInterview.result as Record<string, unknown>) } : null;
+    if (interviewPayload && (latestInterview?.is_provisional === true || interviewPayload.is_provisional === true)) {
+      interviewPayload.is_provisional = true;
+    }
+
     const resumeReview = isRecord(review.resume_review) ? review.resume_review : null;
     const githubReview = isRecord(review.github_review) ? review.github_review : null;
     const linkedinReview = isRecord(review.linkedin_review) ? review.linkedin_review : null;
@@ -105,8 +135,9 @@ export async function POST(): Promise<NextResponse> {
       student_id: studentId, student_name: profile.displayName,
       resume: resumeReview ? { score: readNumber(resumeReview.score), page_count: readNumber(resumeReview.page_count), has_action_verbs: resumeReview.uses_action_verbs === true, has_clean_formatting: resumeReview.is_ats_friendly === true, missing_elements: Array.isArray(resumeReview.specific_fixes) ? resumeReview.specific_fixes : [] } : null,
       projects: readinessProjects,
-      interview_session_result: latestInterview?.result ?? null,
+      interview_session_result: interviewPayload as any,
       github: githubReview ? { score: readNumber(githubReview.score) } : null,
+      coding_practice: null,
       linkedin: linkedinReview ? { score: readNumber(linkedinReview.score), has_about_summary: linkedinReview.has_complete_profile === true, has_headline: linkedinReview.has_complete_profile === true } : null,
       co_curricular: profile.coCurricular ? { score: scoreCoCurricular(profile.coCurricular), hackathons_count: profile.coCurricular.hackathonsCount, certifications_count: profile.coCurricular.certificationsCount, club_leadership: profile.coCurricular.clubLeadership } : null,
     };
@@ -125,7 +156,7 @@ export async function POST(): Promise<NextResponse> {
         missing_components: Array.isArray(readiness.missing_components) ? readiness.missing_components : [],
         calculation_source: readinessResult.source,
       },
-      algorithm_version: typeof readiness.algorithm_version === 'string' ? readiness.algorithm_version : 'v1.0.0',
+      algorithm_version: typeof readiness.algorithm_version === 'string' ? readiness.algorithm_version : 'v2.0.0',
       updated_at: completedAt,
     }, { onConflict: 'student_id' });
     if (readinessSaveError) throw readinessSaveError;
@@ -133,13 +164,21 @@ export async function POST(): Promise<NextResponse> {
     if (saveError) throw saveError;
     return NextResponse.json({ review, readiness, calculationSource: readinessResult.source });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Profile analysis failed.';
+    const errorId = crypto.randomUUID();
+    console.error(`[ProfileAnalysisError:${errorId}]`, error);
+    const safeMessage = 'Profile analysis encountered an issue. Please review your uploads and try again.';
     if (studentId) {
       try {
         const admin = createAdminClient();
-        await admin.from('candidate_profile_reviews').upsert({ student_id: studentId, status: 'failed', error_message: message, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'student_id' });
+        await admin.from('candidate_profile_reviews').upsert({
+          student_id: studentId,
+          status: 'failed',
+          error_message: `Analysis error (Ref: ${errorId})`,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'student_id' });
       } catch { /* Preserve the original service failure. */ }
     }
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ error: safeMessage, errorId }, { status: 502 });
   }
 }

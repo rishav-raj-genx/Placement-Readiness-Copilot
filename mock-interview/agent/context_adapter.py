@@ -78,9 +78,17 @@ def adapt_resume(resume: object | None) -> InterviewContext:
         or _texts(student.get("skills"))
         or _skills_from_text(parsed_text)
     )
-    projects = _project_texts(resume_data.get("projects")) or _section_lines(parsed_text, "projects")
+    projects = (
+        _project_texts(resume_data.get("structuredProjects"))
+        or _project_texts(source.get("structuredProjects"))
+        or _project_texts(resume_data.get("projects"))
+        or _section_lines(parsed_text, "projects")
+    )
     experience = _texts(resume_data.get("experience")) or _section_lines(parsed_text, "experience")
     education = _texts(resume_data.get("education")) or _section_lines(parsed_text, "education")
+
+    if not parsed_text or parsed_text.startswith("Resume reference:"):
+        parsed_text = "[Provisional - candidate resume PDF not uploaded or parsed; using profile claims]"
 
     return InterviewContext(
         contract_version=CONTRACT_VERSION,

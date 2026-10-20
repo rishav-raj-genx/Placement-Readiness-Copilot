@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import urllib.parse
@@ -159,15 +160,15 @@ class LiveLinkChecker:
                 browser = None
                 context = None
                 try:
+                    launch_args = ["--disable-dev-shm-usage"]
+                    if os.environ.get("PLAYWRIGHT_NO_SANDBOX", "0") == "1":
+                        launch_args.extend(["--no-sandbox", "--disable-setuid-sandbox"])
+
                     browser = p.chromium.launch(
                         headless=self.headless,
-                        args=[
-                            "--no-sandbox",
-                            "--disable-setuid-sandbox",
-                            "--disable-dev-shm-usage",
-                        ],
+                        args=launch_args,
                     )
-                    context = browser.new_context(**mobile_device, ignore_https_errors=True)
+                    context = browser.new_context(**mobile_device, ignore_https_errors=False)
                     page: Page = context.new_page()
                     safe_destination_cache: Dict[str, Tuple[bool, str]] = {}
 
