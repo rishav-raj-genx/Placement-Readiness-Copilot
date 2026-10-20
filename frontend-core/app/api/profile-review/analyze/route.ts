@@ -61,7 +61,7 @@ async function calculateReadiness(
   }
 }
 
-export async function POST(): Promise<NextResponse> {
+export async function POST(request?: Request): Promise<NextResponse> {
   let studentId: string | null = null;
   try {
     const sessionClient = createServerSessionClient();

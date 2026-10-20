@@ -66,7 +66,14 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     if (get().isAnalyzing) return false;
     set({ isAnalyzing: true, error: null });
     try {
-      const response = await fetch('/api/profile-review/analyze', { method: 'POST' });
+      const internalKey = process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || process.env.INTERNAL_SERVICE_KEY || '';
+      const response = await fetch('/api/profile-review/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(internalKey ? { Authorization: `Bearer ${internalKey}` } : {}),
+        },
+      });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         const message = typeof payload === 'object' && payload !== null && 'error' in payload
