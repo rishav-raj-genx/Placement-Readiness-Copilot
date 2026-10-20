@@ -60,7 +60,7 @@ interface RecommendationDefinition {
 const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
   { category: 'resume', stepNumber: 1, title: 'Resume', eyebrow: 'Document intelligence', maxPoints: 25, actionLabel: 'Improve resume', actionHref: '/dashboard/profile', side: 'left' },
   { category: 'projects', stepNumber: 2, title: 'Projects', eyebrow: 'Proof of work', maxPoints: 25, actionLabel: 'Manage projects', actionHref: '/dashboard/profile', side: 'right' },
-  { category: 'mock_interview', stepNumber: 3, title: 'Mock Interview', eyebrow: '15-minute AI viva', maxPoints: 20, actionLabel: 'Launch interview', actionHref: '/interview/configure', side: 'left' },
+  { category: 'mock_interview', stepNumber: 3, title: 'Mock Interview', eyebrow: '15-minute AI viva', maxPoints: 20, actionLabel: 'Launch interview', actionHref: '/dashboard/interview', side: 'left' },
   { category: 'github', stepNumber: 4, title: 'GitHub', eyebrow: 'Engineering evidence', maxPoints: 10, actionLabel: 'Review GitHub score', actionHref: '/dashboard#readiness-breakdown', side: 'right' },
   { category: 'linkedin', stepNumber: 5, title: 'LinkedIn', eyebrow: 'Recruiter presence', maxPoints: 10, actionLabel: 'Update profile', actionHref: '/dashboard/profile', side: 'left' },
   { category: 'co_curricular', stepNumber: 6, title: 'Co-curricular', eyebrow: 'Initiative and leadership', maxPoints: 10, actionLabel: 'Add achievements', actionHref: '/dashboard/profile', side: 'right' },
@@ -80,7 +80,7 @@ const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefiniti
   mock_interview: {
     title: 'Practice your interview delivery',
     description: (score) => `Your mock interview score is ${score}/100. Complete a focused AI viva and act on its weakest-topic feedback.`,
-    href: '/interview/configure',
+    href: '/dashboard/interview',
   },
   github: {
     title: 'Showcase your best GitHub work',

@@ -19,7 +19,7 @@ Next.js 14 student workspace for evidence-backed profile review, placement readi
 4. `/dashboard` starts or shows asynchronous analysis and renders seven weighted readiness components. Missing evidence is displayed as **Not assessed**.
 5. `/review` shows Resume, GitHub, LinkedIn, and Live Link findings.
 6. `/jobs` combines matched jobs, exact-source `MSOT Admin` jobs, and the accessible DnD Kit tracker. `/applications` redirects to `/jobs?tab=tracker`.
-7. `/interview/configure` reuses the unified profile and defaults to 15 minutes. The live room uses wall-clock countdown timing, audio levels, mic/speaker controls, and a transcript drawer.
+7. `/dashboard/interview` reuses the unified profile and defaults to 15 minutes. The live room uses wall-clock countdown timing, audio levels, mic/speaker controls, and a transcript drawer.
 
 ## Environment
 

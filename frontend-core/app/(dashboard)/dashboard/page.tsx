@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BriefcaseBusiness,
-  FileSearch,
   Files,
   Loader2,
   Mic2,
@@ -26,8 +25,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 
 const QUICK_LINKS = [
-  { href: '/interview/configure', label: 'Interview', description: 'Start a 15-minute AI viva', icon: Mic2 },
-  { href: '#readiness-breakdown', label: 'Review Engine', description: 'Jump to your verified readiness breakdown', icon: FileSearch },
+  { href: '/dashboard/interview', label: 'Interview', description: 'Start a 15-minute AI viva', icon: Mic2 },
   { href: '/dashboard/jobs', label: 'Jobs', description: 'Open role matches and official jobs', icon: BriefcaseBusiness },
   { href: '/dashboard/profile', label: 'Profile', description: 'Manage identity and documents', icon: Files },
 ] as const;
@@ -123,7 +121,7 @@ export default function DashboardHomePage() {
 
         <section aria-labelledby="quick-links-heading">
           <div className="mb-4 flex items-end justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-indigo-300">Keep moving</p><h2 id="quick-links-heading" className="mt-1 text-xl font-bold text-white">Quick links</h2></div></div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             {QUICK_LINKS.map(({ href, label, description, icon: Icon }) => (
               <Link key={href} href={href} className="group rounded-2xl border border-white/10 bg-[#0E1728]/75 p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
                 <div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15 text-indigo-200"><Icon className="h-5 w-5" aria-hidden="true" /></span><ArrowRight className="h-4 w-4 text-white/30 transition-transform group-hover:translate-x-1 group-hover:text-cyan-200" aria-hidden="true" /></div>

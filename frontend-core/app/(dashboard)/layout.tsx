@@ -87,7 +87,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </SheetContent>
             </Sheet>
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold"><HireableLogo size={25} />Hireable</Link>
-            <Link href="/dashboard/profile" aria-label="Open profile settings" className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 font-mono text-xs font-bold">{user?.displayName?.[0]?.toUpperCase() ?? 'C'}</Link>
           </div>
 
           <TopHeader />

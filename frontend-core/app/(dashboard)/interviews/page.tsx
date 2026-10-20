@@ -1,1 +1,5 @@
-export { default } from '../../(student)/interview/history/page';
+import { redirect } from 'next/navigation';
+
+export default function LegacyInterviewsPage(): never {
+  redirect('/dashboard/interviews');
+}

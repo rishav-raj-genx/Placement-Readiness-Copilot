@@ -8,6 +8,7 @@ import {
   BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
+  History,
   Home,
   LogOut,
   Mic2,
@@ -19,10 +20,11 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 
 export const DASHBOARD_NAV_ITEMS = [
-  { label: 'Home / Readiness Hub', href: '/dashboard', icon: Home },
+  { label: 'Home', href: '/dashboard', icon: Home },
   { label: 'Job Matches', href: '/dashboard/jobs', icon: BriefcaseBusiness },
   { label: 'Applications', href: '/dashboard/tracker', icon: BarChart3 },
-  { label: 'Interview History', href: '/dashboard/interviews', icon: Mic2 },
+  { label: 'Interview', href: '/dashboard/interview', icon: Mic2 },
+  { label: 'Interview History', href: '/dashboard/interviews', icon: History },
 ] as const;
 
 interface DashboardNavigationProps {
@@ -37,7 +39,7 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
   return (
     <nav aria-label="Dashboard navigation" className="space-y-2">
       {DASHBOARD_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-        const active = href === '/dashboard' ? pathname === href : pathname.startsWith(href);
+        const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
         return (
           <Link
             key={href}
@@ -60,7 +62,7 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
             )}
             <Icon
               className={cn(
-                'relative z-10 h-4 w-4 shrink-0 transition-colors',
+                'relative z-10 h-5 w-5 shrink-0 transition-colors',
                 active ? 'text-cyan-300' : 'text-white/40 group-hover:text-white'
               )}
               aria-hidden="true"
@@ -137,7 +139,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
             aria-label="Collapse sidebar"
             className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" />
           </button>
         )}
       </div>
@@ -149,17 +151,12 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           aria-label="Expand sidebar"
           className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-5 w-5" />
         </button>
       )}
 
       {/* Main Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        {!collapsed && (
-          <p className="mb-3 px-3 font-mono text-[9px] uppercase tracking-[0.2em] text-white/35">
-            Navigation
-          </p>
-        )}
         <DashboardNavigation collapsed={collapsed} />
       </div>
 
@@ -231,7 +228,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                 title="Profile Settings"
                 className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-5 w-5" />
               </Link>
               <button
                 type="button"
@@ -240,7 +237,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                 title="Sign out"
                 className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-5 w-5" />
               </button>
             </div>
           )}
