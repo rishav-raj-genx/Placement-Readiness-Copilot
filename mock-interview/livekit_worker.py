@@ -30,6 +30,7 @@ from agent.context_adapter import adapt_resume
 from agent.finalizer import InterviewFinalizer
 from agent.livekit_events import encode_event, results_event
 from agent.providers import GroqLLM
+from agent.session import build_question_plan
 from scoring.result_store import SupabaseInterviewSessionStore
 from scoring.schemas import InterviewContext, SessionConfig
 
@@ -63,7 +64,8 @@ async def entrypoint(ctx: JobContext) -> None:
         target_duration_minutes=target_duration,
         technical_question_count=6,
         project_deep_dive_count=2,
-        hr_question_count=2,
+        hr_question_count=1,
+        role_category=context.target_role or "backend",
     )
     instructions = _interview_instructions(context, session_config)
 
@@ -170,27 +172,27 @@ def _is_finish_packet(data: bytes) -> bool:
 
 
 def _interview_instructions(context: InterviewContext, config: SessionConfig) -> str:
-    # Grounded in Internshala & PrepLabsAI InterviewMentor standards.
+    # Grounded in Internshala & PrepLabsAI InterviewMentor standards using canonical plan
+    plan = build_question_plan(context, config)
+    plan_lines = "\n".join(
+        f"{idx + 1}. [{item.category.value.upper()}] {item.text} (Probe goal: {item.probe_goal})"
+        for idx, item in enumerate(plan)
+    )
+
     return (
         f"You are an experienced, empathetic, and professional mock interviewer conducting a {config.target_duration_minutes}-minute "
-        "technical and behavioral session. Speak at a calm, natural conversational cadence. "
-        "Do not sound robotic or rush through questions. "
-        "Always listen actively: before asking the next question, briefly acknowledge one concrete "
-        "point the candidate made in their preceding answer. If the candidate expresses uncertainty or "
-        "says they haven't worked with a tool, respond supportively and pivot constructively. "
-        "Ask questions one at a time: "
-        "Question 1 is a warm introduction and interest in the role. "
-        "Questions 2 and 3 must name a specific project from the candidate context, probing architecture, "
-        "personal contribution, technical trade-offs, and how the system behaves under 10x scale or failures. "
-        "Questions 4 through 7 probe listed technical skills in production depth, including edge cases and performance. "
-        "Question 8 probes debugging, reliability, or testing practices. "
-        "Questions 9 and 10 are HR/behavioral questions prompting for the STAR method (Situation, Task, Action, Result). "
-        "Ask at most one concise, context-aware follow-up per primary question if an answer lacks depth. "
-        f"Target {config.target_duration_minutes} minutes and finish by {config.effective_max_minutes} minutes. "
-        "Never reveal live scores or grading during the conversation. "
-        f"Candidate context: {context.model_dump_json(exclude_none=True)}\n\n"
-        "When the candidate asks to finish, warmly thank them for their time, acknowledge the conclusion "
-        "of the session, and explain that detailed diagnostic feedback is ready on their dashboard."
+        f"technical and behavioral session for the {context.target_role or config.role_category} position.\n\n"
+        "### Canonical Question Plan (Must Follow in Order)\n"
+        f"{plan_lines}\n\n"
+        "### Interview Conduct Guidelines\n"
+        "- Speak with a calm, conversational, professional cadence. Do not sound robotic.\n"
+        "- Ask questions one at a time. Never dump multiple questions simultaneously.\n"
+        "- Active Listening: Before asking the next primary question, briefly acknowledge a concrete point from the candidate's answer.\n"
+        "- Adaptive Follow-up: Ask at most ONE concise follow-up per question if the candidate gives a very brief or incomplete answer. If the candidate passes or says 'I don't know', do not grill them—supportively move to the next question.\n"
+        f"- Target {config.target_duration_minutes} minutes and wrap up by {config.effective_max_minutes} minutes.\n"
+        "- Never reveal live scores or grading during the conversation.\n"
+        f"- Verified Candidate Context: {context.model_dump_json(exclude_none=True)}\n\n"
+        "When all questions are answered or when the candidate asks to finish, warmly thank them for their time, acknowledge the conclusion of the session, and explain that detailed diagnostic feedback is ready on their dashboard."
     )
 
 

@@ -91,6 +91,11 @@ export function normalizeInterviewResult(value: unknown): LiveKitResultsPayload 
         .filter((fix): fix is LiveKitSuggestedFix => fix !== null)
     : [];
 
+  const isFallback = Boolean(value.is_fallback ?? value.isFallback);
+  const evaluationMode = readString(value.evaluation_mode ?? value.evaluationMode);
+  const rubricVersion = readString(value.rubric_version ?? value.rubricVersion);
+  const isProvisional = Boolean(value.is_provisional ?? value.isProvisional ?? isFallback);
+
   return {
     overallReadinessDelta: readNumber(value.overallReadinessDelta),
     finalScore,
@@ -98,5 +103,9 @@ export function normalizeInterviewResult(value: unknown): LiveKitResultsPayload 
     categoryScores,
     suggestedFixes,
     timestamp: readNumber(value.timestamp, Date.now()),
+    isFallback,
+    evaluationMode,
+    rubricVersion,
+    isProvisional,
   };
 }

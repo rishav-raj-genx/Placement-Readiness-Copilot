@@ -67,3 +67,27 @@ def test_profile_parser_text_shape_extracts_context_sections():
     assert context.skills[:2] == ["Python", "PostgreSQL"]
     assert context.projects == ["Placement Copilot - Built a resume review pipeline."]
     assert context.experience == ["Built reliable APIs."]
+
+
+def test_adapt_resume_resolves_placeholder_via_pdf_extractor(monkeypatch):
+    sample_text = (
+        "SKILLS\nRust Docker Kubernetes\n"
+        "PROJECTS\nMesh Proxy - High-throughput sidecar proxy.\n"
+        "EXPERIENCE\nDistributed systems engineer at CloudCorp."
+    )
+    monkeypatch.setattr("agent.context_adapter.extract_pdf_text", lambda url: sample_text)
+
+    context = adapt_resume(
+        {
+            "student": {"name": "Priya", "targetRole": "Cloud Architect"},
+            "resume": {
+                "parsedText": "Resume reference: intv_987654321",
+                "pdfUrl": "https://storage.supabase.co/v1/object/sign/resume.pdf",
+            },
+        }
+    )
+
+    assert context.candidate_name == "Priya"
+    assert "Rust" in context.skills
+    assert context.projects == ["Mesh Proxy - High-throughput sidecar proxy."]
+    assert context.experience == ["Distributed systems engineer at CloudCorp."]

@@ -356,6 +356,14 @@ function LiveKitResultsView({
                   {results.overallReadinessDelta >= 0 ? '+' : ''}{results.overallReadinessDelta}
                 </span>
               </div>
+              {(results.isProvisional || results.isFallback) && (
+                <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-500">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Provisional Assessment:</strong> This score was generated using fallback mode ({results.evaluationMode || 'heuristic_fallback'}). Results are provisional.
+                  </span>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground leading-relaxed">{results.summary}</p>
             </div>
           </div>

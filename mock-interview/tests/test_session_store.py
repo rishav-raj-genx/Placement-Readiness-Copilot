@@ -44,7 +44,8 @@ def test_platform_store_patches_authoritative_interview_session(monkeypatch):
     )
 
     assert captured["method"] == "PATCH"
-    assert captured["url"].endswith("/rest/v1/interview_sessions?id=eq.intv-1")
+    assert "id=eq.intv-1" in captured["url"]
+    assert "status=in.(created,active,in_progress)" in captured["url"]
     assert captured["payload"]["result"]["contract_version"] == "v0"
     assert captured["payload"]["result"]["interview_score"] == 84
     assert captured["payload"]["status"] == "completed"

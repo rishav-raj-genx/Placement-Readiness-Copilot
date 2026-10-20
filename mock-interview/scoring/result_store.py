@@ -74,6 +74,9 @@ class SupabaseResultStore:
             "feedback_notes": result.summary,
             "mode": mode,
             "duration_minutes": duration_minutes,
+            "is_fallback": result.is_fallback,
+            "evaluation_mode": result.evaluation_mode,
+            "is_provisional": getattr(result, "is_provisional", False),
             "created_at": datetime.now(UTC).isoformat(),
         }
         req = request.Request(
@@ -124,14 +127,16 @@ class SupabaseInterviewSessionStore:
             "status": "completed",
             "completed_at": datetime.now(UTC).isoformat(),
         }
+        # Conditional update: only transition if session is currently created, active, or in_progress
+        # This prevents duplicate finishes or stale workers from overwriting completed results
         req = request.Request(
-            f"{self.url}/rest/v1/interview_sessions?id=eq.{interview_id}",
+            f"{self.url}/rest/v1/interview_sessions?id=eq.{interview_id}&status=in.(created,active,in_progress)",
             data=json.dumps(payload).encode(),
             headers={
                 "apikey": self.service_key,
                 "Authorization": f"Bearer {self.service_key}",
                 "Content-Type": "application/json",
-                "Prefer": "return=minimal",
+                "Prefer": "return=representation",
             },
             method="PATCH",
         )

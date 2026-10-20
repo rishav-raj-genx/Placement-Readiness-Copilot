@@ -323,154 +323,82 @@ class CodingEvaluationResult(BaseModel):
     interviewer_follow_up: str
     optimal_solution_code: str = ""
     optimal_code_diff_note: str
+    evaluation_mode: str = "static_ast_analysis"
+    test_execution_status: str = "sandbox_pending"
 
 
-def _execute_server_side_tests(problem_id: str, language: str, code: str) -> tuple[int, int]:
-    """Execute code against test cases server-side in a sandboxed runner."""
+def _analyze_code_statically(problem_id: str, language: str, code: str) -> dict[str, Any]:
+    """Perform safe static AST structure analysis without executing untrusted code on the host."""
     problem = CODING_PROBLEM_BANK.get(problem_id)
-    if not problem:
-        return 0, 0
-    total_tests = len(problem.test_cases)
+    total_tests = len(problem.test_cases) if problem else 0
     cleaned = code.strip()
-    if not cleaned or len(cleaned.splitlines()) < 2:
-        return 0, total_tests
 
-    # 1. Python execution sandbox
+    has_valid_syntax = False
+    has_target_function = False
+    has_loops = False
+    has_hash_struct = False
+    has_error_handling = False
+
     if language == "python":
         import ast
 
         try:
-            ast.parse(cleaned)
+            tree = ast.parse(cleaned)
+            has_valid_syntax = True
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if problem_id == "two_sum" and "two_sum" in node.name.lower():
+                        has_target_function = True
+                elif isinstance(node, ast.ClassDef):
+                    if problem_id == "lru_cache" and "lru" in node.name.lower():
+                        has_target_function = True
+                elif isinstance(node, (ast.For, ast.While)):
+                    has_loops = True
+                elif isinstance(node, (ast.Dict, ast.Set)):
+                    has_hash_struct = True
+                elif isinstance(node, ast.Try):
+                    has_error_handling = True
         except SyntaxError:
-            return 0, total_tests
+            has_valid_syntax = False
 
-        passed = 0
-        safe_globals: dict[str, Any] = {
-            "__builtins__": {
-                "range": range, "len": len, "enumerate": enumerate, "int": int, "str": str,
-                "list": list, "dict": dict, "set": set, "tuple": tuple, "bool": bool,
-                "min": min, "max": max, "sum": sum, "abs": abs,
-            }
-        }
-        try:
-            local_scope: dict[str, Any] = {}
-            exec(cleaned, safe_globals, local_scope)  # noqa: S102
+    elif language in {"javascript", "typescript"}:
+        # Safe lexical structure analysis without subprocess
+        has_valid_syntax = "{" in cleaned and "}" in cleaned and len(cleaned.splitlines()) >= 2
+        if problem_id == "two_sum":
+            has_target_function = "twoSum" in cleaned or "function" in cleaned or "=>" in cleaned
+            has_hash_struct = "Map" in cleaned or "seen" in cleaned or "{}" in cleaned
+        elif problem_id == "lru_cache":
+            has_target_function = "LRUCache" in cleaned or "class" in cleaned
+            has_hash_struct = "Map" in cleaned or "cache" in cleaned
+        elif problem_id == "use_debounce":
+            has_target_function = "debounce" in cleaned
+            has_error_handling = "clearTimeout" in cleaned
+        elif problem_id == "fetch_with_retry":
+            has_target_function = "fetch" in cleaned
+            has_error_handling = "try" in cleaned or "catch" in cleaned or "status" in cleaned
 
-            if problem_id == "two_sum":
-                func = local_scope.get("two_sum")
-                if callable(func):
-                    for tc in problem.test_cases:
-                        inp = tc["input"]
-                        res = func(inp["nums"], inp["target"])
-                        if isinstance(res, (list, tuple)) and len(res) == 2:
-                            i0, i1 = int(res[0]), int(res[1])
-                            if (
-                                i0 != i1
-                                and 0 <= i0 < len(inp["nums"])
-                                and 0 <= i1 < len(inp["nums"])
-                                and inp["nums"][i0] + inp["nums"][i1] == inp["target"]
-                            ):
-                                passed += 1
-            elif problem_id == "lru_cache":
-                cache_cls = local_scope.get("LRUCache")
-                if callable(cache_cls):
-                    cache = cache_cls(2)
-                    cache.put(1, 1)
-                    cache.put(2, 2)
-                    if cache.get(1) == 1:
-                        cache.put(3, 3)
-                        if cache.get(2) == -1:
-                            passed = 1
-            else:
-                if "def " in cleaned and ("return" in cleaned or "Timer" in cleaned):
-                    passed = total_tests
-        except (SyntaxError, NameError, TypeError, ValueError, ZeroDivisionError, IndexError, KeyError, AttributeError):
-            passed = 0
+        has_loops = any(kw in cleaned for kw in ["for ", "for(", "while ", "while(", ".forEach", ".map"])
 
-        return passed, total_tests
-
-    # 2. JavaScript / TypeScript execution via Node or AST structure check
-    if language in {"javascript", "typescript"}:
-        import subprocess
-
-        test_script = f"""
-{cleaned}
-
-let passed = 0;
-const total = {total_tests};
-
-try {{
-  if ("{problem_id}" === "two_sum") {{
-    const fn = (typeof twoSum === "function") ? twoSum : null;
-    if (fn) {{
-      const t1 = fn([2, 7, 11, 15], 9);
-      if (Array.isArray(t1) && t1.length === 2 && [2,7,11,15][t1[0]] + [2,7,11,15][t1[1]] === 9) passed++;
-      const t2 = fn([3, 2, 4], 6);
-      if (Array.isArray(t2) && t2.length === 2 && [3,2,4][t2[0]] + [3,2,4][t2[1]] === 6) passed++;
-      const t3 = fn([3, 3], 6);
-      if (Array.isArray(t3) && t3.length === 2 && [3,3][t3[0]] + [3,3][t3[1]] === 6) passed++;
-    }}
-  }} else if ("{problem_id}" === "lru_cache") {{
-    const Cls = (typeof LRUCache === "function") ? LRUCache : null;
-    if (Cls) {{
-      const c = new Cls(2);
-      c.put(1, 1);
-      c.put(2, 2);
-      if (c.get(1) === 1) {{
-        c.put(3, 3);
-        if (c.get(2) === -1) passed = 1;
-      }}
-    }}
-  }} else if ("{problem_id}" === "use_debounce") {{
-    const fn = (typeof debounce === "function") ? debounce : null;
-    if (fn) {{
-      const d = fn(() => {{}}, 100);
-      if (typeof d === "function" && typeof d.cancel === "function") passed = 1;
-    }}
-  }} else if ("{problem_id}" === "fetch_with_retry") {{
-    const fn = (typeof fetchWithRetry === "function") ? fetchWithRetry : null;
-    if (fn && typeof fn === "function") passed = 3;
-  }}
-}} catch (e) {{}}
-
-console.log(JSON.stringify({{ passed, total }}));
-"""
-        try:
-            res = subprocess.run(
-                ["node", "-e", test_script],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=3,
-            )
-            if res.returncode == 0:
-                import json
-
-                data = json.loads(res.stdout.strip())
-                return int(data.get("passed", 0)), total_tests
-        except (subprocess.SubprocessError, json.JSONDecodeError, OSError, ValueError):
-            pass  # Fall through to static analysis if Node runtime is unavailable
-
-        # Static verification if node process was unavailable
-        if problem_id == "two_sum" and "return" in cleaned and ("seen" in cleaned or "for" in cleaned):
-            return (total_tests if "seen" in cleaned or "Map" in cleaned else total_tests - 1), total_tests
-        if problem_id == "use_debounce" and "clearTimeout" in cleaned:
-            return 1, total_tests
-        if problem_id == "fetch_with_retry" and "fetch" in cleaned and ("retry" in cleaned or "for" in cleaned or "while" in cleaned):
-            return 3, total_tests
-
-    return 0, total_tests
-
+    return {
+        "has_valid_syntax": has_valid_syntax,
+        "has_target_function": has_target_function,
+        "has_loops": has_loops,
+        "has_hash_struct": has_hash_struct,
+        "has_error_handling": has_error_handling,
+        "total_tests": total_tests,
+    }
 
 
 def evaluate_coding_submission(
     problem_id: str,
     language: str,
     code: str,
-    client_test_passed: int | None = None,
-    client_test_total: int | None = None,
 ) -> CodingEvaluationResult:
-    """Analyze student code against benchmarks and produce AI feedback."""
+    """Analyze student code via static AST benchmarks and produce AI feedback.
+    
+    Arbitrary dynamic code execution is disabled on the host for security until a
+    containerized, isolated sandbox environment (e.g. gVisor/Docker) is provisioned.
+    """
     problem = CODING_PROBLEM_BANK.get(problem_id)
     if not problem:
         problem = CODING_PROBLEM_BANK["two_sum"]
@@ -540,27 +468,28 @@ def evaluate_coding_submission(
             comp_diff = "Linear or fixed backoff detected. Consider exponential backoff with jitter for production stability."
             correctness_score = 78
 
-    # Server-side sandboxed test execution (never trust client_test_passed)
-    passed_tests, total_tests = _execute_server_side_tests(problem.id, language, cleaned_code)
+    # Safe static AST analysis (arbitrary dynamic execution disabled for security)
+    analysis = _analyze_code_statically(problem.id, language, cleaned_code)
+    total_tests = analysis["total_tests"]
+    passed_tests = 0  # Server-side execution disabled on host pending containerized sandbox
 
-    # Quality score
+    # Quality score based on static AST inspections
     quality_score = 65
     if has_edge_checks:
         quality_score += 15
     if has_error_handling or total_lines >= 8:
         quality_score += 15
-    if total_lines < 3 or passed_tests == 0:
+    if not analysis["has_valid_syntax"] or total_lines < 3:
         quality_score = min(quality_score, 40)
         correctness_score = min(correctness_score, 35)
 
-    test_ratio = (passed_tests / total_tests) if total_tests > 0 else 0
-    overall = round(0.50 * correctness_score + 0.30 * quality_score + 0.20 * (test_ratio * 100))
+    overall = round(0.60 * correctness_score + 0.40 * quality_score)
     overall = max(10, min(100, overall))
 
 
     strengths = []
     if correctness_score >= 80:
-        strengths.append(f"Reached working solution matching {time_comp} time constraints.")
+        strengths.append(f"Algorithm structure matches {time_comp} time constraints.")
     if has_hash_map or "Map" in cleaned_code:
         strengths.append("Leveraged hash-based data structures for fast lookups.")
     if has_edge_checks:
@@ -615,12 +544,15 @@ def evaluate_coding_submission(
         optimal_space_complexity=problem.optimal_space_complexity,
         complexity_comparison=comp_diff,
         code_quality_feedback=(
-            f"Evaluated {total_lines} lines of code. Solution passes {passed_tests}/{total_tests} test scenarios. "
-            f"Code demonstrates {time_comp} computational complexity with {space_comp} space overhead."
+            f"Evaluated {total_lines} lines of code via static AST and complexity analysis. "
+            f"Code demonstrates {time_comp} computational complexity with {space_comp} space overhead. "
+            "[Security Notice] Server-side dynamic code execution is disabled on the host until an isolated container sandbox is provisioned."
         ),
         strengths=strengths,
         improvement_areas=improvements,
         interviewer_follow_up=follow_up,
         optimal_solution_code=opt_code,
         optimal_code_diff_note=opt_note,
+        evaluation_mode="static_ast_analysis",
+        test_execution_status="sandbox_pending",
     )

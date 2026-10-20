@@ -182,10 +182,25 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // --- Generate interview ID and room name ---
-    const timestamp = Date.now();
-    const interviewId = `intv_${timestamp}`;
-    const roomName = `interview_${jwtUserId.slice(0, 8)}_${timestamp}`;
+    // --- Validate LiveKit configuration first before doing any database mutations ---
+    const livekitUrl = Deno.env.get("LIVEKIT_URL") || "";
+    const liveKitApiKey = Deno.env.get("LIVEKIT_API_KEY") || "";
+    const liveKitApiSecret = Deno.env.get("LIVEKIT_API_SECRET") || "";
+
+    if (!livekitUrl || !liveKitApiKey || !liveKitApiSecret) {
+      console.error("LiveKit environment variables not configured");
+      return new Response(
+        JSON.stringify({
+          error: "LiveKit is not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET as edge function secrets.",
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // --- Generate UUID-based interview ID and room name to prevent collisions ---
+    const sessionUuid = crypto.randomUUID();
+    const interviewId = `intv_${sessionUuid}`;
+    const roomName = `interview_${jwtUserId}_${sessionUuid.slice(0, 8)}`;
 
     // --- Build focus areas ---
     const focusAreas = body.focusAreas || body.topics || [];
@@ -230,22 +245,6 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Failed to create interview session record" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // --- Create LiveKit room and generate participant token ---
-    const livekitUrl = Deno.env.get("LIVEKIT_URL") || "";
-    const liveKitApiKey = Deno.env.get("LIVEKIT_API_KEY") || "";
-    const liveKitApiSecret = Deno.env.get("LIVEKIT_API_SECRET") || "";
-
-    if (!livekitUrl || !liveKitApiKey || !liveKitApiSecret) {
-      console.error("LiveKit environment variables not configured");
-      return new Response(
-        JSON.stringify({
-          error: "LiveKit is not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET as edge function secrets.",
-          interviewId,
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -296,6 +295,10 @@ Deno.serve(async (req: Request) => {
         }
       } catch (fallbackErr) {
         console.error("Failed to create or verify existing LiveKit room:", fallbackErr);
+        await serviceClient
+          .from("interview_sessions")
+          .update({ status: "failed" })
+          .eq("id", interviewId);
         // Fail closed!
         return new Response(
           JSON.stringify({
@@ -308,6 +311,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!roomCreated) {
+      await serviceClient
+        .from("interview_sessions")
+        .update({ status: "failed" })
+        .eq("id", interviewId);
       return new Response(
         JSON.stringify({ error: "Failed to establish LiveKit room", interviewId }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -327,6 +334,15 @@ Deno.serve(async (req: Request) => {
       });
     } catch (dispatchError) {
       console.error("Failed to dispatch mock-interview worker:", dispatchError);
+      try {
+        await roomService.deleteRoom(roomName);
+      } catch (delErr) {
+        console.warn("Failed to delete room after dispatch failure:", delErr);
+      }
+      await serviceClient
+        .from("interview_sessions")
+        .update({ status: "failed" })
+        .eq("id", interviewId);
       return new Response(
         JSON.stringify({
           error: "LiveKit worker dispatch failed",
@@ -355,10 +371,13 @@ Deno.serve(async (req: Request) => {
     const token = await livekitToken.toJwt();
 
     // Update session status to 'active'
-    await serviceClient
+    const { error: activeUpdateErr } = await serviceClient
       .from("interview_sessions")
       .update({ status: "active", started_at: new Date().toISOString() })
       .eq("id", interviewId);
+    if (activeUpdateErr) {
+      console.warn("Warning: Failed to update interview_session status to active:", activeUpdateErr);
+    }
 
     // --- Return the session response ---
     return new Response(

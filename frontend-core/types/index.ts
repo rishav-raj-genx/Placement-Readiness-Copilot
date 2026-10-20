@@ -353,6 +353,10 @@ export interface LiveKitResultsPayload {
   categoryScores: LiveKitCategoryScore[];
   suggestedFixes: LiveKitSuggestedFix[];
   timestamp: number;
+  isFallback?: boolean;
+  evaluationMode?: string;
+  rubricVersion?: string;
+  isProvisional?: boolean;
 }
 
 export interface LiveKitErrorPayload {

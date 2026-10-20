@@ -20,7 +20,9 @@ def two_sum(nums, target):
     result = evaluate_coding_submission("two_sum", "python", code)
     assert result.overall_score >= 85
     assert result.estimated_time_complexity == "O(N)"
-    assert result.passed_tests == 3
+    assert result.passed_tests == 0
+    assert result.evaluation_mode == "static_ast_analysis"
+    assert result.test_execution_status == "sandbox_pending"
     assert "optimal" in result.complexity_comparison.lower()
     assert len(result.strengths) >= 1
     assert "sorted" in result.interviewer_follow_up
@@ -86,3 +88,18 @@ def test_coding_endpoints_via_testclient():
     eval_data = eval_resp.json()
     assert eval_data["status"] == "ok"
     assert "overall_score" in eval_data["result"]
+    assert eval_data["result"]["passed_tests"] == 0
+    assert eval_data["result"]["test_execution_status"] == "sandbox_pending"
+
+    # 3. Test require_auth rejection
+    auth_app = create_app(require_auth=True)
+    auth_client = TestClient(auth_app)
+    unauth_resp = auth_client.post(
+        "/api/interview/coding-evaluate",
+        json={
+            "problem_id": "two_sum",
+            "language": "python",
+            "code": "def two_sum(n, t): return [0, 1]",
+        },
+    )
+    assert unauth_resp.status_code == 401

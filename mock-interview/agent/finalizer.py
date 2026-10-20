@@ -54,7 +54,13 @@ class InterviewFinalizer:
                     )
                 except (RuntimeError, ValueError, TypeError, OSError):
                     raw_result = None
-                self._result = parse_scoring_result(raw_result, self.transcript, self.context)
+                result = parse_scoring_result(raw_result, self.transcript, self.context)
+                student_turns_count = len([t for t in self.transcript if t.speaker == "student"])
+                if student_turns_count < 3:
+                    result.is_provisional = True
+                    if not result.summary.startswith("[PARTIAL"):
+                        result.summary = f"[PARTIAL / EARLY TERMINATION - {student_turns_count} ANSWERS] {result.summary}"
+                self._result = result
 
             if self.result_store is not None and not self._persisted:
                 if not self.interview_id:

@@ -81,7 +81,7 @@ def test_problem_2_full_configuration_and_question_bank():
         target_duration_minutes=20,
         technical_question_count=6,
         project_deep_dive_count=2,
-        hr_question_count=2,
+        hr_question_count=1,
         role_category="backend",
     )
     session = InterviewSession(
@@ -106,6 +106,7 @@ def test_problem_2_full_configuration_and_question_bank():
 
     # 1 intro + 2 project + 6 technical + 1 behavioral = 10 questions
     assert len(questions) == 10
+    assert len(questions) == config.total_question_target
     assert "Distributed Ledger" in questions[1]
     assert "Auth Gateway" in questions[2]
     assert "Python" in questions[3]  # skill

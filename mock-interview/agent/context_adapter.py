@@ -5,8 +5,13 @@ Only this module knows the currently provisional resume shape.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import re
 from collections.abc import Mapping
+from urllib import error, request
+
+from pypdf import PdfReader
 
 from scoring.schemas import CONTRACT_VERSION, InterviewContext
 
@@ -17,6 +22,29 @@ SECTION_HEADINGS = {
     "skills",
     "summary",
 }
+
+
+def extract_pdf_text(pdf_source: str | bytes) -> str:
+    """Safely extract plain text from a PDF signed URL or binary bytes using pypdf."""
+    pdf_bytes: bytes | None = None
+    if isinstance(pdf_source, bytes):
+        pdf_bytes = pdf_source
+    elif isinstance(pdf_source, str) and pdf_source.startswith(("http://", "https://")):
+        with contextlib.suppress(error.URLError, TimeoutError, ValueError, OSError):
+            req = request.Request(pdf_source, headers={"User-Agent": "Placement-Readiness-Copilot/1.0"})
+            with request.urlopen(req, timeout=10) as resp:
+                if resp.status == 200:
+                    pdf_bytes = resp.read()
+
+    if not pdf_bytes:
+        return ""
+
+    with contextlib.suppress(Exception):
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        pages_text = [page.extract_text() or "" for page in reader.pages]
+        return "\n".join(pages_text).strip()
+
+    return ""
 
 
 def adapt_resume(resume: object | None) -> InterviewContext:
@@ -33,10 +61,26 @@ def adapt_resume(resume: object | None) -> InterviewContext:
         or resume_data.get("text")
         or resume_data.get("summary")
     )
-    skills = _texts(resume_data.get("keySkills") or resume_data.get("skills"))
-    projects = _project_texts(resume_data.get("projects"))
-    experience = _texts(resume_data.get("experience"))
-    education = _texts(resume_data.get("education"))
+
+    pdf_url = _text(
+        resume_data.get("pdfUrl")
+        or resume_data.get("pdf_url")
+        or source.get("pdfUrl")
+        or source.get("pdf_url")
+    )
+    if pdf_url and (not parsed_text or parsed_text.startswith("Resume reference:") or len(parsed_text) < 30):
+        extracted = extract_pdf_text(pdf_url)
+        if extracted:
+            parsed_text = extracted
+
+    skills = (
+        _texts(resume_data.get("keySkills") or resume_data.get("skills"))
+        or _texts(student.get("skills"))
+        or _skills_from_text(parsed_text)
+    )
+    projects = _project_texts(resume_data.get("projects")) or _section_lines(parsed_text, "projects")
+    experience = _texts(resume_data.get("experience")) or _section_lines(parsed_text, "experience")
+    education = _texts(resume_data.get("education")) or _section_lines(parsed_text, "education")
 
     return InterviewContext(
         contract_version=CONTRACT_VERSION,
@@ -48,10 +92,10 @@ def adapt_resume(resume: object | None) -> InterviewContext:
             or source.get("role")
         ),
         summary=parsed_text,
-        skills=skills or _skills_from_text(parsed_text),
-        projects=projects or _section_lines(parsed_text, "projects"),
-        experience=experience or _section_lines(parsed_text, "experience"),
-        education=education or _section_lines(parsed_text, "education"),
+        skills=skills,
+        projects=projects,
+        experience=experience,
+        education=education,
     )
 
 

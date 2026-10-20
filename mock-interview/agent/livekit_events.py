@@ -87,6 +87,10 @@ def results_event(result: InterviewResult) -> dict[str, object]:
             "overallReadinessDelta": 0,
             "finalScore": result.interview_score,
             "summary": result.summary,
+            "isFallback": result.is_fallback,
+            "evaluationMode": result.evaluation_mode,
+            "rubricVersion": result.rubric_version,
+            "isProvisional": getattr(result, "is_provisional", False) or result.is_fallback,
             "categoryScores": [
                 {
                     "category": category,
@@ -94,6 +98,7 @@ def results_event(result: InterviewResult) -> dict[str, object]:
                     "benchmark": 0,
                     "strengths": score.strengths,
                     "critiques": score.improvement_areas,
+                    "evidence": getattr(score, "evidence", []),
                 }
                 for category, score in result.dimensions.items()
             ],

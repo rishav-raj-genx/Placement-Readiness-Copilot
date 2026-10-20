@@ -62,7 +62,7 @@ class InterviewSession:
             target_duration_minutes=15,
             technical_question_count=2,
             project_deep_dive_count=2,
-            hr_question_count=2,
+            hr_question_count=1,
         )
 
 
@@ -166,6 +166,11 @@ class InterviewSession:
 
         try:
             result = parse_scoring_result(raw, self.transcript, self.context)
+            student_turns_count = len([t for t in self.transcript if t.speaker == "student"])
+            if student_turns_count < 3:
+                result.is_provisional = True
+                if not result.summary.startswith("[PARTIAL"):
+                    result.summary = f"[PARTIAL / EARLY TERMINATION - {student_turns_count} ANSWERS] {result.summary}"
             self._cached_result = result
             self.state = SessionState.COMPLETED
             return result
@@ -386,8 +391,7 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
         )
 
     # 4. Behavioral / HR Questions (STAR framework)
-    hr_target = max(1, config.hr_question_count - 1)  # 1 was already used for intro
-    for idx in range(min(hr_target, len(BEHAVIORAL_QUESTION_POOL))):
+    for idx in range(min(config.hr_question_count, len(BEHAVIORAL_QUESTION_POOL))):
         q_text, probe_goal = BEHAVIORAL_QUESTION_POOL[idx]
         items.append(
             QuestionItem(

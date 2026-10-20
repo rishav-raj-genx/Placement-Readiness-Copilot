@@ -50,11 +50,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Prevent students from joining other students' rooms.
-    // Room name must start with the student's own user ID.
-    if (!roomName.includes(user.id) && !roomName.includes(user.id.slice(0, 8))) {
+    // Query interview_sessions to verify exact room ownership and eligible session state.
+    const { data: sessionRecord, error: sessionError } = await supabase
+      .from('interview_sessions')
+      .select('id, user_id, student_id, status, livekit_room_name')
+      .eq('livekit_room_name', roomName.trim())
+      .maybeSingle();
+
+    if (sessionError || !sessionRecord) {
+      return NextResponse.json(
+        { error: 'Interview room not found.' },
+        { status: 404 }
+      );
+    }
+
+    const sessionOwner = sessionRecord.user_id || sessionRecord.student_id;
+    if (sessionOwner !== user.id) {
       return NextResponse.json(
         { error: 'You may only join your own interview room.' },
         { status: 403 }
+      );
+    }
+
+    const eligibleStatuses = ['created', 'active', 'in_progress'];
+    if (!eligibleStatuses.includes(sessionRecord.status)) {
+      return NextResponse.json(
+        { error: `Interview session is no longer active (current status: ${sessionRecord.status}).` },
+        { status: 409 }
       );
     }
 

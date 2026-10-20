@@ -9,10 +9,10 @@ import contextlib
 import os
 from collections.abc import Mapping
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, status
+from pydantic import BaseModel, Field
 
-from agent.auth import AuthenticationError, authenticate_student
+from agent.auth import AuthenticationError, authenticate_student, parse_bearer_token
 from agent.context_adapter import adapt_resume
 from agent.providers import (
     DeepgramSTT,
@@ -34,9 +34,9 @@ from scoring.schemas import SessionConfig
 class CodingSubmissionPayload(BaseModel):
     problem_id: str
     language: str = "javascript"
-    code: str
-    client_test_passed: int | None = None
-    client_test_total: int | None = None
+    code: str = Field(..., max_length=20000)
+    auth_token: str | None = None
+    student_id: str | None = None
 
 
 def create_app(
@@ -92,14 +92,30 @@ def create_app(
         }
 
     @app.post("/api/interview/coding-evaluate")
-    async def evaluate_coding(submission: CodingSubmissionPayload) -> dict[str, object]:
-        """Evaluate submitted candidate code against benchmarks and produce AI feedback."""
+    async def evaluate_coding(
+        submission: CodingSubmissionPayload,
+        authorization: str | None = Header(None),
+    ) -> dict[str, object]:
+        """Evaluate submitted candidate code via static AST benchmarks with authentication."""
+        if require_auth:
+            token = submission.auth_token or (parse_bearer_token(authorization) if authorization else None)
+            if not token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication token is required for coding evaluation.",
+                )
+            try:
+                authenticate_student(token, submission.student_id)
+            except AuthenticationError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=str(exc),
+                ) from exc
+
         result = evaluate_coding_submission(
             problem_id=submission.problem_id,
             language=submission.language,
             code=submission.code,
-            client_test_passed=submission.client_test_passed,
-            client_test_total=submission.client_test_total,
         )
         return {
             "status": "ok",
