@@ -33,6 +33,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return response;
   }
 
+  // The landing page is always public. Client-side session state decides whether
+  // to show the intro or continue an authenticated user to their dashboard.
+  if (pathname === '/') {
+    return response;
+  }
+
   let userId: string | null = null;
   let profile: ProfileAccess | null = null;
 
@@ -61,6 +67,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   if (userId && !profile) {
     profile = { role: 'student', onboardingCompleted: false };
+  }
+
+  if (!userId && (pathname === '/auth' || pathname.startsWith('/auth/'))) {
+    return response;
   }
 
   if (userId && profile?.role !== 'admin' && isAdminPathname(pathname)) {

@@ -69,15 +69,15 @@ export function resolveAccessRedirect({
   const isLandingPage = pathname === '/';
 
   if (!isStudentPath && !isAdminPath && !isOnboardingPath && !isAuthPath && !isLandingPage) return null;
+  if (isLandingPage) return null;
 
   if (!authenticated) {
-    if (isLandingPage) return null;
     if (!isStudentPath && !isAdminPath && !isOnboardingPath) return null;
     return `/auth?redirectTo=${encodeURIComponent(`${pathname}${search}`)}`;
   }
 
   if (role === 'admin') {
-    return isStudentPath || isOnboardingPath || isAuthPath || isLandingPage ? '/admin-dashboard' : null;
+    return isStudentPath || isOnboardingPath || isAuthPath ? '/admin-dashboard' : null;
   }
 
   if (isAdminPath) return '/dashboard';
@@ -87,11 +87,11 @@ export function resolveAccessRedirect({
 
   if (!onboardingCompleted) {
     if (isResumeSignup) return null;
-    return isStudentPath || isOnboardingPath || isAuthPath || isLandingPage
+    return isStudentPath || isOnboardingPath || isAuthPath
       ? '/auth?mode=signup&resume=1'
       : null;
   }
 
-  if (isAdminPath || isOnboardingPath || isAuthPath || isLandingPage) return '/dashboard';
+  if (isAdminPath || isOnboardingPath || isAuthPath) return '/dashboard';
   return null;
 }
