@@ -21,17 +21,17 @@ export function HireableLogo({
     >
       {withGlow && (
         <div
-          className="absolute inset-0 -z-10 rounded-full bg-gradient-to-tr from-blue-600/40 via-cyan-400/30 to-purple-600/40 blur-md"
+          className="absolute inset-0 -z-10 rounded-full bg-red-600/10"
           aria-hidden="true"
         />
       )}
       <Image
-        src="/hireable-logo.png"
+        src="/logo.png"
         alt="Hireable"
         width={size}
         height={size}
         priority={priority}
-        className="h-full w-full object-contain drop-shadow-[0_2px_8px_rgba(59,130,246,0.3)]"
+        className="h-full w-full object-contain"
       />
     </div>
   );

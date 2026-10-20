@@ -31,13 +31,13 @@ export function TopHeader() {
   const pageTitle = getPageTitle(pathname);
 
   return (
-    <header className="sticky top-0 z-20 hidden h-16 items-center justify-between border-b border-white/10 bg-slate-950/70 px-6 backdrop-blur-xl md:flex">
-      {pageTitle && <p className="text-sm font-medium text-slate-300">{pageTitle}</p>}
+    <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-stone-800 bg-[#28201E]/95 px-6 backdrop-blur-sm md:flex">
+      {pageTitle && <p className="text-sm font-semibold text-stone-200">{pageTitle}</p>}
       <div className="ml-auto flex items-center gap-2">
-        <span className="rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 text-xs text-indigo-200">
-          {user ? (typeof score === 'number' ? `${Math.round(score)}% ready` : 'Analysis pending') : 'Preview Mode'}
+        <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-200">
+          {user ? (typeof score === 'number' ? `${Math.round(score)}% ready` : 'Analysis pending') : 'Preview mode'}
         </span>
-        <span className="rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs text-violet-200">
+        <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-300">
           {user ? `${remainingInterviews} interviews left` : '3 free interviews'}
         </span>
         <NotificationBell />

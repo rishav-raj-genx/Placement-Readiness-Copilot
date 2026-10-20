@@ -23,8 +23,8 @@ const SEGMENTS = Array.from({ length: 5 }, (_, i) => {
   const x2 = cx + r * Math.cos(endAngle);
   const y2 = cy + r * Math.sin(endAngle);
 
-  // Alternating Electric Indigo (#6366F1) and Cyan (#06B6D4)
-  const colors = ['#6366F1', '#06B6D4', '#6366F1', '#06B6D4', '#818CF8'];
+  // Warm Lava palette: Lava Red and stone accents
+  const colors = ['#D93829', '#A8A29E', '#78716C', '#D93829', '#57534E'];
   return {
     d: `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
     stroke: colors[i],
@@ -32,35 +32,18 @@ const SEGMENTS = Array.from({ length: 5 }, (_, i) => {
 });
 
 export function SegmentedLoader({
-  message = 'Building your Copilot...',
-  subtitle = 'Syncing Candidate Profile...',
+  message = 'Loading workspace…',
+  subtitle = 'Syncing profile details…',
   fullScreen = true,
 }: SegmentedLoaderProps) {
   const content = (
-    <div className="relative flex flex-col items-center justify-center p-6 text-center select-none">
-      {/* Ambient Pulsing Glow Background */}
-      <motion.div
-        animate={{
-          scale: [0.95, 1.15, 0.95],
-          opacity: [0.15, 0.35, 0.15],
-        }}
-        transition={{
-          repeat: Infinity,
-          duration: 3,
-          ease: 'easeInOut',
-        }}
-        className="pointer-events-none absolute h-52 w-52 rounded-full bg-gradient-to-tr from-indigo-500 via-cyan-500 to-indigo-600 blur-3xl"
-      />
-
+    <div className="relative flex select-none flex-col items-center justify-center p-6 text-center">
       {/* The 5-Segment Broken Circle SVG Container */}
-      <div className="relative flex h-32 w-32 items-center justify-center">
+      <div className="relative flex h-28 w-28 items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
-          className="relative h-28 w-28"
-          style={{
-            filter: 'drop-shadow(0 0 12px rgba(6,182,212,0.65)) drop-shadow(0 0 22px rgba(99,102,241,0.5))',
-          }}
+          transition={{ repeat: Infinity, duration: 1.8, ease: 'linear' }}
+          className="relative h-24 w-24"
         >
           <svg
             viewBox="0 0 120 120"
@@ -73,57 +56,65 @@ export function SegmentedLoader({
                 key={idx}
                 d={seg.d}
                 stroke={seg.stroke}
-                strokeWidth="4.5"
+                strokeWidth="4"
                 strokeLinecap="round"
               />
             ))}
           </svg>
         </motion.div>
 
-        {/* Center glowing reticle core */}
+        {/* Center Lava Red core dot */}
         <motion.div
           animate={{
-            scale: [0.8, 1.2, 0.8],
-            opacity: [0.5, 1, 0.5],
+            scale: [0.85, 1.15, 0.85],
+            opacity: [0.6, 1, 0.6],
           }}
           transition={{
             repeat: Infinity,
-            duration: 1.5,
+            duration: 1.4,
             ease: 'easeInOut',
           }}
-          className="pointer-events-none absolute h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#06B6D4]"
+          className="pointer-events-none absolute h-2.5 w-2.5 rounded-full bg-[#D93829]"
         />
       </div>
 
-      {/* Typography: Pulsing Status Text */}
+      {/* Typography: Status Text */}
       <motion.div
-        animate={{ opacity: [0.45, 1, 0.45] }}
-        transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
-        className="mt-6 flex flex-col items-center gap-1.5"
+        animate={{ opacity: [0.6, 1, 0.6] }}
+        transition={{
+          repeat: Infinity,
+          duration: 2,
+          ease: 'easeInOut',
+        }}
+        className="mt-6 flex flex-col items-center"
       >
-        <p className="font-[var(--font-display)] text-base font-bold tracking-wider text-white sm:text-lg">
+        <span className="font-[var(--font-display)] text-base font-bold tracking-tight text-stone-100 sm:text-lg">
           {message}
-        </p>
+        </span>
         {subtitle && (
-          <p className="font-mono text-xs text-cyan-300/80 tracking-wide">
+          <span className="mt-1 text-xs text-stone-400">
             {subtitle}
-          </p>
+          </span>
         )}
       </motion.div>
+
+      {/* Telemetry Indicator */}
+      <div className="mt-4 flex items-center gap-1.5 rounded-md border border-stone-800 bg-stone-900 px-3 py-1 font-mono text-xs uppercase tracking-wider text-stone-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#D93829]" />
+        Secure sync
+      </div>
     </div>
   );
 
-  if (!fullScreen) return content;
+  if (fullScreen) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#1a1310] text-stone-200">
+        {content}
+      </div>
+    );
+  }
 
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="fixed inset-0 z-50 flex min-h-screen w-screen items-center justify-center bg-[#0B0F17]"
-    >
-      {content}
-    </div>
-  );
+  return content;
 }
 
 export default SegmentedLoader;

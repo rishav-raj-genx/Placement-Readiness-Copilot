@@ -2,12 +2,11 @@
 
 import { useId, useRef, useState } from 'react';
 import { FileCheck2, FileUp } from 'lucide-react';
-import { validatePdf } from '@/lib/onboarding';
 
 interface SignupPdfDropzoneProps {
   label: string;
   description: string;
-  accent: 'indigo' | 'cyan';
+  accent?: 'indigo' | 'cyan' | 'lava';
   file: File | null;
   existingDocument?: boolean;
   error: string | null;
@@ -15,15 +14,9 @@ interface SignupPdfDropzoneProps {
   onChange: (file: File) => void;
 }
 
-const accentClasses = {
-  indigo: 'border-indigo-400 bg-indigo-500/10 focus-visible:ring-indigo-400',
-  cyan: 'border-cyan-400 bg-cyan-500/10 focus-visible:ring-cyan-400',
-} as const;
-
 export function SignupPdfDropzone({
   label,
   description,
-  accent,
   file,
   existingDocument = false,
   error,
@@ -41,50 +34,63 @@ export function SignupPdfDropzone({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label htmlFor={inputId} className="text-xs font-semibold text-white/70">
-          {label} <span className="text-rose-400">*</span>
+        <label htmlFor={inputId} className="text-xs font-medium text-stone-300">
+          {label} <span className="text-[#D93829]">*</span>
         </label>
-        <span className="font-mono text-[10px] text-white/40">PDF ≤ 10 MB</span>
+        <span className="font-mono text-xs text-stone-500">PDF ≤ 10 MB</span>
       </div>
       <button
         type="button"
-        className={`group relative flex w-full flex-col items-center justify-center rounded-2xl border border-dashed p-4 text-left outline-none transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101827] ${
+        className={`group relative flex w-full flex-col items-center justify-center rounded-xl border border-dashed p-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#D93829] focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 ${
           hasDocument || dragging
-            ? accentClasses[accent]
-            : 'border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04] focus-visible:ring-white/60'
+            ? 'border-[#D93829] bg-[#D93829]/10'
+            : 'border-stone-800 bg-stone-900/60 hover:border-stone-700 hover:bg-stone-900'
         }`}
         onClick={() => inputRef.current?.click()}
-        onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => {
           event.preventDefault();
           setDragging(false);
-          const file = event.dataTransfer.files[0];
-          if (file) onChange(file);
+          const droppedFile = event.dataTransfer.files[0];
+          if (droppedFile) onChange(droppedFile);
         }}
         aria-describedby={`${helpId}${error ? ` ${errorId}` : ''}`}
       >
         {hasDocument ? (
           <span className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
-              <FileCheck2 className="h-5 w-5" aria-hidden="true" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-700 bg-stone-800 text-[#D93829]">
+              <FileCheck2 className="h-4 w-4" aria-hidden="true" />
             </span>
             <span>
-              <span className="block max-w-[18rem] truncate text-xs font-bold text-white">
+              <span className="block max-w-[18rem] truncate text-xs font-semibold text-stone-100">
                 {file?.name ?? 'Stored securely'}
               </span>
-              <span id={helpId} className="block text-[10px] text-white/45">
+              <span id={helpId} className="block text-xs text-stone-400">
                 {file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB · Click to replace` : 'Click to replace this PDF'}
               </span>
             </span>
           </span>
         ) : (
           <span className="flex flex-col items-center gap-1.5 py-1 text-center">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-white/70">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-800 bg-stone-900 text-stone-400">
               <FileUp className="h-4 w-4" aria-hidden="true" />
             </span>
-            <span id={helpId} className="text-xs font-medium text-white/80">{description}</span>
+            <span id={helpId} className="text-xs text-stone-300">{description}</span>
           </span>
+        )}
+
+        {/* Progress Bar */}
+        {progress > 0 && progress < 100 && (
+          <div className="absolute inset-x-2 bottom-1.5 h-1 overflow-hidden rounded-full bg-stone-800">
+            <div
+              className="h-full rounded-full bg-[#D93829] transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         )}
       </button>
       <input
@@ -96,16 +102,17 @@ export function SignupPdfDropzone({
         aria-invalid={Boolean(error)}
         aria-describedby={`${helpId}${error ? ` ${errorId}` : ''}`}
         onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onChange(file);
+          const selectedFile = event.target.files?.[0];
+          if (selectedFile) onChange(selectedFile);
         }}
       />
-      {progress > 0 && (
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10" aria-label={`${label} upload progress`}>
-          <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-[width]" style={{ width: `${progress}%` }} />
-        </div>
+      {error && (
+        <p id={errorId} role="alert" className="mt-1 text-xs text-red-400">
+          {error}
+        </p>
       )}
-      {error && <p id={errorId} role="alert" className="mt-1 text-xs text-rose-400">{error}</p>}
     </div>
   );
 }
+
+export default SignupPdfDropzone;

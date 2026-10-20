@@ -9,7 +9,6 @@ import {
   GitBranch,
   Linkedin,
   Mic2,
-  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 import { motion, useReducedMotion, useScroll, useMotionValueEvent, type MotionValue } from 'framer-motion';
@@ -30,16 +29,16 @@ interface CategoryPresentation {
 }
 
 const CATEGORY_PRESENTATION: Record<string, CategoryPresentation> = {
-  resume: { icon: FileText, color: '#818CF8' },
-  'Document Intelligence': { icon: FileText, color: '#818CF8' },
-  github: { icon: GitBranch, color: '#22D3EE' },
-  'Engineering Evidence': { icon: GitBranch, color: '#22D3EE' },
-  projects: { icon: FolderGit2, color: '#A78BFA' },
-  'Proof of Work': { icon: FolderGit2, color: '#A78BFA' },
-  linkedin: { icon: Linkedin, color: '#60A5FA' },
-  'Professional Network': { icon: Linkedin, color: '#60A5FA' },
-  mock_interview: { icon: Mic2, color: '#34D399' },
-  '15-Minute AI Viva': { icon: Mic2, color: '#34D399' },
+  resume: { icon: FileText, color: '#A8A29E' },
+  'Document Intelligence': { icon: FileText, color: '#A8A29E' },
+  github: { icon: GitBranch, color: '#A8A29E' },
+  'Engineering Evidence': { icon: GitBranch, color: '#A8A29E' },
+  projects: { icon: FolderGit2, color: '#D93829' },
+  'Proof of Work': { icon: FolderGit2, color: '#D93829' },
+  linkedin: { icon: Linkedin, color: '#D93829' },
+  'Professional Network': { icon: Linkedin, color: '#D93829' },
+  mock_interview: { icon: Mic2, color: '#D93829' },
+  '15-Minute AI Viva': { icon: Mic2, color: '#D93829' },
 };
 
 const BASE_TIMELINE_STEPS = [
@@ -154,15 +153,14 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
   return (
     <section ref={containerRef} aria-labelledby="roadmap-heading" className="relative mx-auto w-full max-w-6xl py-10 sm:py-14">
       <header className="mx-auto mb-14 max-w-2xl text-center sm:mb-20">
-        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/25 bg-indigo-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-200">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+        <div className="inline-flex items-center rounded-full border border-stone-800 bg-stone-900 px-4 py-1 text-xs font-semibold text-stone-300">
           Readiness roadmap
         </div>
         <h2 id="roadmap-heading" className="mt-4 font-[var(--font-display)] text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
           Trace the evidence behind your score
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/55 sm:text-base">
-          The glowing route follows your scroll. Every station mirrors its fetched category score, with missing evidence held at zero until it is added.
+          Follow each category score from the source evidence. Missing evidence stays at zero until it is added.
         </p>
       </header>
 
@@ -183,10 +181,10 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                 <motion.button
                   type="button"
                   onClick={() => setActiveNode(node.id)}
-                  className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-2xl border bg-[#0B0F17] outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:col-start-2 md:justify-self-center"
+                  className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-xl border bg-stone-950 outline-none focus-visible:ring-2 focus-visible:ring-red-600 md:col-start-2 md:justify-self-center"
                   style={{
                     borderColor: reached ? presentation.color : 'rgba(255,255,255,0.16)',
-                    boxShadow: reached ? `0 0 28px ${presentation.color}55` : 'none',
+                    boxShadow: 'none',
                   }}
                   whileHover={reduceMotion ? undefined : { scale: 1.08, rotate: 2 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.96 }}
@@ -195,14 +193,14 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                 >
                   {reached && !reduceMotion && (
                     <motion.span
-                      className="absolute inset-[-8px] rounded-[1.25rem] border"
+                      className="absolute inset-[-4px] rounded-xl border border-stone-800 opacity-60"
                       style={{ borderColor: presentation.color }}
-                      animate={{ scale: [0.9, 1.15, 0.9], opacity: [0.55, 0.08, 0.55] }}
-                      transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                      animate={{ opacity: 0.6 }}
+                      transition={{ duration: 0 }}
                     />
                   )}
                   <Icon className="h-6 w-6" style={{ color: presentation.color }} aria-hidden="true" />
-                  <span className="absolute -bottom-3 rounded-full bg-slate-900 px-2 py-0.5 font-mono text-[9px] font-bold text-white/70">{node.id}</span>
+                  <span className="absolute -bottom-3 rounded-full bg-stone-800 px-2 py-0.5 text-xs font-bold text-stone-300">{node.id}</span>
                 </motion.button>
 
                 <motion.article
@@ -210,24 +208,23 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                   whileInView={{ opacity: 1, y: 0, rotateY: 0 }}
                   viewport={{ once: true, amount: 0.25 }}
                   transition={{ type: 'spring', stiffness: 110, damping: 20 }}
-                  className={`col-start-2 row-start-1 rounded-3xl border bg-[#101827]/90 p-5 shadow-2xl backdrop-blur-2xl sm:p-7 ${node.side === 'left' ? 'md:col-start-1' : 'md:col-start-3'} ${selected ? 'border-indigo-300/45' : 'border-white/10'}`}
-                  style={{ boxShadow: selected ? `0 18px 55px ${presentation.color}18` : undefined }}
+                  className={`col-start-2 row-start-1 rounded-2xl border bg-stone-900 p-5 shadow-md shadow-black/40 sm:p-7 ${node.side === 'left' ? 'md:col-start-1' : 'md:col-start-3'} ${selected ? 'border-red-600' : 'border-stone-800'}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: presentation.color }}>{node.eyebrow}</p>
-                      <h3 className="mt-1 font-[var(--font-display)] text-xl font-bold text-white sm:text-2xl">{node.title}</h3>
+                      <p className="text-xs font-semibold text-stone-400" style={{ color: presentation.color }}>{node.eyebrow}</p>
+                      <h3 className="mt-1 font-display text-xl font-bold text-stone-100 sm:text-2xl">{node.title}</h3>
                     </div>
                     <div className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-                      <p className="font-mono text-lg font-black text-white">{formatPoints(node.weightedPoints)} <span className="text-xs text-white/40">/ {node.maxPoints}</span></p>
-                      <p className="font-mono text-[9px] uppercase tracking-wider text-white/35">weighted points</p>
+                      <p className="text-lg font-bold text-stone-100">{formatPoints(node.weightedPoints)} <span className="text-xs text-stone-500">/ {node.maxPoints}</span></p>
+                      <p className="text-xs text-stone-500">Weighted points</p>
                     </div>
                   </div>
 
                   <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]" aria-label={`${node.title} weighted progress`}>
                     <motion.div
                       className="h-full rounded-full"
-                      style={{ background: `linear-gradient(90deg, ${presentation.color}, #22D3EE)` }}
+                      style={{ backgroundColor: presentation.color }}
                       initial={reduceMotion ? false : { width: 0 }}
                       whileInView={{ width: `${meterWidth}%` }}
                       viewport={{ once: true }}
@@ -241,11 +238,11 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                   </div>
 
                   <footer className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                    <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[10px] font-semibold" style={{ color: presentation.color, backgroundColor: `${presentation.color}15` }}>
+                    <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold" style={{ color: presentation.color, backgroundColor: `${presentation.color}15` }}>
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: presentation.color }} />
                       {node.status}
                     </span>
-                    <Link href={node.actionHref} className="group inline-flex items-center gap-1.5 text-xs font-bold text-white hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+                    <Link href={node.actionHref} className="group inline-flex items-center gap-1.5 text-xs font-bold text-stone-200 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
                       {node.actionLabel}<ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </Link>
                   </footer>
@@ -273,17 +270,12 @@ function RoadPath({ id, path, progress, reduceMotion, className, viewBox }: Road
     <svg aria-hidden="true" className={className} viewBox={viewBox} fill="none" preserveAspectRatio="none">
       <defs>
         <linearGradient id={`road-gradient-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop stopColor="#818CF8" />
-          <stop offset="0.5" stopColor="#22D3EE" />
-          <stop offset="1" stopColor="#34D399" />
+          <stop stopColor="#78716C" />
+          <stop offset="1" stopColor="#D93829" />
         </linearGradient>
-        <filter id={`road-glow-${id}`} x="-80%" y="-20%" width="260%" height="140%">
-          <feGaussianBlur stdDeviation="9" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
       </defs>
       <path d={path} stroke="rgba(255,255,255,0.08)" strokeWidth="5" strokeDasharray="10 12" strokeLinecap="round" />
-      <motion.path d={path} stroke={`url(#road-gradient-${id})`} strokeWidth="6" strokeLinecap="round" filter={`url(#road-glow-${id})`} style={{ pathLength: reduceMotion ? 1 : progress }} />
+      <motion.path d={path} stroke={`url(#road-gradient-${id})`} strokeWidth="5" strokeLinecap="round" style={{ pathLength: reduceMotion ? 1 : progress }} />
     </svg>
   );
 }

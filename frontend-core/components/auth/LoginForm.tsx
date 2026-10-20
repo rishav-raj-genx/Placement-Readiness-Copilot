@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Loader2, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff, Mail, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import { getAuthenticatedDestination } from '@/lib/auth-routing';
@@ -34,7 +34,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
     clearError();
     setEmail(DEMO_ADMIN_EMAIL);
     setPassword(DEMO_ADMIN_PASSWORD);
-    toast.success('MSOT Admin credentials are ready. Select Sign In to continue.');
+    toast.success('MSOT Admin credentials ready. Select Sign in to continue.');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,7 +53,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
 
       if (state.user) {
         setIsRedirecting(true);
-        toast.success('Welcome back to Hireable!');
+        toast.success('Welcome back to Hireable');
         const destination = getAuthenticatedDestination({
           role: state.user.role,
           onboardingCompleted: Boolean(state.user.onboardingCompletedAt),
@@ -74,8 +74,8 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   if (isRedirecting) {
     return (
       <SegmentedLoader
-        message="Building your Copilot..."
-        subtitle="Loading candidate workspace..."
+        message="Loading candidate workspace…"
+        subtitle="Verifying credentials…"
         fullScreen
       />
     );
@@ -84,30 +84,32 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   return (
     <motion.div
       key="login-module"
-      initial={{ y: '-100vh', rotateX: 15, opacity: 0 }}
-      animate={{ y: 0, rotateX: 0, opacity: 1 }}
-      exit={{ y: '100vh', opacity: 0, transition: { duration: 0.35, ease: 'easeIn' } }}
-      transition={{ type: 'spring', stiffness: 120, damping: 14 }}
-      style={{ transformStyle: 'preserve-3d', perspective: 1000 }}
-      className="w-full max-w-md rounded-3xl border border-white/10 bg-[#101827]/80 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl sm:p-10"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="w-full max-w-md rounded-2xl border border-stone-800 bg-[#28201E] p-7 text-stone-200 shadow-lg shadow-black/50 sm:p-9"
     >
       {/* Header */}
-      <div className="mb-8">
-        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400">
-          <Sparkles className="h-3 w-3" />
-          <span>PLACEMENT COPILOT</span>
+      <div className="mb-7">
+        <div className="inline-flex items-center gap-1.5 rounded border border-stone-700 bg-stone-800 px-2.5 py-0.5 font-mono text-xs uppercase tracking-wider text-stone-300">
+          <ShieldCheck className="h-3.5 w-3.5 text-[#D93829]" />
+          <span>Placement Copilot</span>
         </div>
-        <h2 className="mt-3 font-[var(--font-display)] text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+        <h2 className="mt-3 font-[var(--font-display)] text-2xl font-bold tracking-tight text-stone-100 sm:text-3xl">
           Welcome back
         </h2>
-        <p className="mt-2 text-sm text-white/50">
-          Sign in to review your readiness scores and practice AI mock vivas.
+        <p className="mt-1.5 text-xs text-stone-400 sm:text-sm">
+          Sign in to review your readiness scores and practice mock viva sessions.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Floating Label Email Input */}
-        <div className="relative">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Email Input */}
+        <div>
+          <label htmlFor="login-email" className="block text-xs font-medium text-stone-300 mb-1.5">
+            Email address
+          </label>
           <div className="relative">
             <input
               id="login-email"
@@ -121,25 +123,27 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
               autoComplete="email"
               autoCapitalize="none"
               spellCheck={false}
-              className="peer w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 pb-2.5 pt-6 text-sm text-white outline-none transition-all placeholder:text-transparent focus:border-indigo-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-indigo-500/50"
-              placeholder="name@example.com"
+              className="h-11 w-full rounded-lg border border-stone-800 bg-stone-900/90 px-3.5 text-sm text-stone-100 outline-none transition-colors placeholder:text-stone-500 focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
+              placeholder="name@college.edu"
             />
-            <label
-              htmlFor="login-email"
-              className={`pointer-events-none absolute left-4 transition-all duration-200 ${
-                isFocusedEmail || email
-                  ? 'top-2 text-[10px] font-semibold text-indigo-400'
-                  : 'top-4 text-sm text-white/40'
-              }`}
-            >
-              Email address
-            </label>
-            <Mail className="pointer-events-none absolute right-4 top-4 h-4 w-4 text-white/30" />
+            <Mail className="pointer-events-none absolute right-3.5 top-3.5 h-4 w-4 text-stone-500" />
           </div>
         </div>
 
-        {/* Floating Label Password Input */}
-        <div className="relative">
+        {/* Password Input */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="login-password" className="text-xs font-medium text-stone-300">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={() => toast.info('Password recovery link can be sent to your verified email.')}
+              className="text-xs text-stone-400 transition-colors hover:text-stone-200"
+            >
+              Forgot password?
+            </button>
+          </div>
           <div className="relative">
             <input
               id="login-password"
@@ -151,43 +155,22 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
               onBlur={() => setIsFocusedPassword(false)}
               required
               autoComplete="current-password"
-              className="peer w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 pb-2.5 pt-6 text-sm text-white outline-none transition-all placeholder:text-transparent focus:border-indigo-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-indigo-500/50"
+              className="h-11 w-full rounded-lg border border-stone-800 bg-stone-900/90 px-3.5 pr-10 text-sm text-stone-100 outline-none transition-colors placeholder:text-stone-500 focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
               placeholder="••••••••"
             />
-            <label
-              htmlFor="login-password"
-              className={`pointer-events-none absolute left-4 transition-all duration-200 ${
-                isFocusedPassword || password
-                  ? 'top-2 text-[10px] font-semibold text-indigo-400'
-                  : 'top-4 text-sm text-white/40'
-              }`}
-            >
-              Password
-            </label>
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-4 text-white/40 hover:text-white"
+              className="absolute right-3.5 top-3.5 text-stone-500 hover:text-stone-300"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
-        {/* Forgot password */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => toast.info('Password recovery link can be sent to your verified email.')}
-            className="text-xs font-medium text-white/40 transition-colors hover:text-white/80"
-          >
-            Forgot Password?
-          </button>
-        </div>
-
         {/* Error message */}
         {error && (
-          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-xs text-rose-400">
+          <div className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-2.5 text-xs text-red-300">
             {error}
           </div>
         )}
@@ -197,47 +180,49 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
           type="submit"
           disabled={isLoading}
           aria-busy={isLoading}
-          className="group relative flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 py-3.5 font-[var(--font-display)] text-sm font-bold text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all hover:scale-[1.01] hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 font-[var(--font-display)] text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Authenticating...</span>
+              <span>Authenticating…</span>
             </>
           ) : (
             <>
-              <span>Sign In</span>
-              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+              <span>Sign in</span>
+              <ArrowRight className="h-4 w-4" />
             </>
           )}
         </button>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center">
-          <span className="text-xs text-white/40">Evaluating the platform?</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center pt-1">
+          <span className="text-xs text-stone-400">Staff access?</span>
           <button
             type="button"
             onClick={fillAdminCredentials}
             disabled={isLoading}
-            className="text-xs font-semibold text-indigo-300 transition-colors hover:text-indigo-200 disabled:pointer-events-none disabled:opacity-50"
+            className="text-xs font-medium text-stone-300 underline decoration-stone-600 transition-colors hover:text-stone-100 disabled:opacity-50"
           >
-            Auto-fill Admin Credentials
+            Fill admin credentials
           </button>
         </div>
       </form>
 
-      {/* Subtle Toggle: New here? Build your profile */}
-      <div className="mt-8 text-center border-t border-white/10 pt-6">
-        <p className="text-xs text-white/50">
-          New here?{' '}
+      {/* Toggle to Signup */}
+      <div className="mt-7 border-t border-stone-800 pt-5 text-center">
+        <p className="text-xs text-stone-400">
+          New candidate?{' '}
           <button
             type="button"
             onClick={onToggleSignUp}
-            className="font-semibold text-cyan-400 transition-colors hover:text-cyan-300 hover:underline"
+            className="font-medium text-[#D93829] transition-colors hover:underline"
           >
-            Build your profile &rarr;
+            Create your account &rarr;
           </button>
         </p>
       </div>
     </motion.div>
   );
 }
+
+export default LoginForm;

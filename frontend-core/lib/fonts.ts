@@ -1,8 +1,8 @@
-import { Space_Grotesk } from 'next/font/google';
+import { Manrope } from 'next/font/google';
 
-export const displayFont = Space_Grotesk({
+export const displayFont = Manrope({
   subsets: ['latin'],
-  variable: '--font-display',
+  variable: '--font-manrope',
   weight: ['400', '500', '600', '700'],
   display: 'swap',
 });

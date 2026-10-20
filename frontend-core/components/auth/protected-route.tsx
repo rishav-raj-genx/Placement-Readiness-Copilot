@@ -81,18 +81,20 @@ export function ProtectedRoute({
 
   if (!hasAccess) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 bg-background">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-muted">
-          <ShieldAlert className="h-6 w-6 text-destructive" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#1a1310] px-4 text-stone-200">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-stone-800 bg-[#28201E]">
+          <ShieldAlert className="h-6 w-6 text-[#D93829]" />
         </div>
-        <div className="text-center space-y-1">
-          <h1 className="text-xl font-semibold">Access Denied</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-1 text-center">
+          <h1 className="text-lg font-bold text-stone-100">Access denied</h1>
+          <p className="max-w-sm text-xs text-stone-400">
             You do not have administrative permissions to view this protected page.
           </p>
         </div>
         <Link href="/dashboard">
-          <Button variant="outline">Go to Student Dashboard</Button>
+          <Button variant="outline" className="rounded-lg border-stone-800 bg-stone-900 text-xs text-stone-300 hover:bg-stone-800 hover:text-stone-100">
+            Return to student dashboard
+          </Button>
         </Link>
       </div>
     );

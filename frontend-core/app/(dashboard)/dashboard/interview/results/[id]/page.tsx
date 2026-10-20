@@ -119,15 +119,25 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   }
 
   if (!isHydrated) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="font-mono text-xs text-stone-500">Loading results...</div>
+      </div>
+    );
   }
 
   if (!session || !session.feedback) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <AlertCircle className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Results not available.</p>
-        <Button variant="outline" onClick={() => router.push('/dashboard/interviews')}>View History</Button>
+        <AlertCircle className="h-8 w-8 text-stone-500" />
+        <p className="text-sm text-stone-400">Results not available.</p>
+        <Button
+          variant="outline"
+          onClick={() => router.push('/dashboard/interviews')}
+          className="border-stone-800 bg-stone-900 text-xs text-stone-200"
+        >
+          View history
+        </Button>
       </div>
     );
   }
@@ -154,10 +164,10 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <h1 className="text-2xl font-semibold">Interview Complete</h1>
+            <CheckCircle2 className="h-5 w-5 text-[#D93829]" />
+            <h1 className="text-2xl font-bold text-stone-100">Interview complete</h1>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-stone-400">
             {session.config.targetRole} &middot; {session.config.type.replace('_', ' ')} &middot;{' '}
             {session.completedAt && format(new Date(session.completedAt), 'MMM d, yyyy')}
           </p>
@@ -165,53 +175,70 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         <DemoLabel />
       </div>
 
-      <Card>
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col items-center">
               <div className="relative flex h-32 w-32 items-center justify-center">
                 <svg className="h-32 w-32 -rotate-90">
-                  <circle cx="64" cy="64" r="56" stroke="hsl(var(--muted))" strokeWidth="8" fill="none" />
-                  <circle cx="64" cy="64" r="56" stroke="hsl(var(--brand))" strokeWidth="8" fill="none" strokeDasharray={`${(feedback.overallScore / 100) * 351.7} 351.7`} strokeLinecap="round" />
+                  <circle cx="64" cy="64" r="56" stroke="#1c1917" strokeWidth="8" fill="none" />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#D93829"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${(feedback.overallScore / 100) * 351.7} 351.7`}
+                    strokeLinecap="round"
+                  />
                 </svg>
-                <span className="absolute text-3xl font-semibold">{feedback.overallScore}</span>
+                <span className="absolute font-mono text-3xl font-bold text-stone-100">{feedback.overallScore}</span>
               </div>
-              <span className="mt-2 text-xs text-muted-foreground uppercase tracking-wide">Overall Score</span>
+              <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-stone-500">Overall score</span>
             </div>
             <div className="flex-1 md:ml-8">
-              <div className="text-xs font-medium text-brand uppercase tracking-wide mb-2">Interview Evaluation &amp; Feedback</div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{feedback.summary}</p>
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-400 mb-2">
+                Interview evaluation &amp; feedback
+              </div>
+              <p className="text-xs leading-relaxed text-stone-300">{feedback.summary}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Topic Performance</CardTitle><CardDescription>Score by interview topic</CardDescription></CardHeader>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-stone-200">Topic performance</CardTitle>
+            <CardDescription className="text-xs text-stone-400">Score by interview topic</CardDescription>
+          </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis dataKey="topic" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                <Radar dataKey="score" stroke="hsl(var(--brand))" fill="hsl(var(--brand))" fillOpacity={0.3} />
+                <PolarGrid stroke="#292524" />
+                <PolarAngleAxis dataKey="topic" tick={{ fontSize: 11, fill: '#a8a29e' }} />
+                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78716c' }} />
+                <Radar dataKey="score" stroke="#D93829" fill="#D93829" fillOpacity={0.25} />
               </RadarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Evaluation Breakdown</CardTitle><CardDescription>Per-question scores by category</CardDescription></CardHeader>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-stone-200">Evaluation breakdown</CardTitle>
+            <CardDescription className="text-xs text-stone-400">Per-question scores by category</CardDescription>
+          </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px' }} />
-                <Bar dataKey="Technical" fill="hsl(var(--brand))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Clarity" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Communication" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#292524" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#a8a29e' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78716c' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: '1px solid #292524', borderRadius: '8px', fontSize: '11px', color: '#e7e5e4' }} />
+                <Bar dataKey="Technical" fill="#D93829" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Clarity" fill="#78716c" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Communication" fill="#a8a29e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -219,33 +246,110 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card><CardHeader><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-success" /><CardTitle className="text-base">Strengths</CardTitle></div></CardHeader><CardContent><div className="flex flex-wrap gap-2">{feedback.strongestTopics.map((topic) => (<Badge key={topic} variant="secondary" className="bg-success/10 text-success">{topic}</Badge>))}</div></CardContent></Card>
-        <Card><CardHeader><div className="flex items-center gap-2"><Target className="h-4 w-4 text-brand" /><CardTitle className="text-base">Areas to Improve</CardTitle></div></CardHeader><CardContent><div className="flex flex-wrap gap-2">{feedback.weakAreas.map((topic) => (<Badge key={topic} variant="secondary" className="bg-brand/10 text-brand">{topic}</Badge>))}</div></CardContent></Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-emerald-400" />
+              <CardTitle className="text-sm font-semibold text-stone-200">Strengths</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-1.5">
+              {feedback.strongestTopics.map((topic) => (
+                <Badge key={topic} variant="secondary" className="border border-emerald-900/40 bg-emerald-950/30 text-xs text-emerald-300">
+                  {topic}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-[#D93829]" />
+              <CardTitle className="text-sm font-semibold text-stone-200">Areas to improve</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-1.5">
+              {feedback.weakAreas.map((topic) => (
+                <Badge key={topic} variant="secondary" className="border border-stone-700 bg-stone-800 text-xs text-stone-300">
+                  {topic}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card><CardHeader><div className="flex items-center gap-2"><Lightbulb className="h-4 w-4 text-muted-foreground" /><CardTitle className="text-base">Recommended Practice Topics</CardTitle></div></CardHeader><CardContent><div className="flex flex-wrap gap-2">{feedback.recommendedPracticeTopics.map((topic) => (<Badge key={topic} variant="outline">{topic}</Badge>))}</div></CardContent></Card>
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-stone-400" />
+            <CardTitle className="text-sm font-semibold text-stone-200">Recommended practice topics</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-1.5">
+            {feedback.recommendedPracticeTopics.map((topic) => (
+              <Badge key={topic} variant="outline" className="border-stone-800 bg-stone-900 text-xs text-stone-400">
+                {topic}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      <Card>
-        <CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">Question-by-Question Feedback</CardTitle><Button variant="ghost" size="sm" onClick={() => setShowAnswers(!showAnswers)}><Eye className="mr-1.5 h-3.5 w-3.5" />{showAnswers ? 'Hide Answers' : 'Review Answers'}</Button></div></CardHeader>
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-stone-200">Question-by-question feedback</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setShowAnswers(!showAnswers)} className="text-xs text-stone-400 hover:text-stone-200">
+              <Eye className="mr-1.5 h-3.5 w-3.5" />
+              {showAnswers ? 'Hide answers' : 'Review answers'}
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent className="space-y-4">
           {feedback.questionFeedback.map((qf, i) => {
             const question = session.questions.find((q) => q.id === qf.questionId);
             const answer = session.answers.find((a) => a.questionId === qf.questionId);
             return (
-              <div key={qf.questionId} className="rounded-md border border-border p-4 space-y-3">
+              <div key={qf.questionId} className="rounded-xl border border-stone-800 bg-stone-900/60 p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">Q{i + 1}</span>{question && <Badge variant="outline" className="text-xs">{question.topic}</Badge>}</div>
-                    <p className="text-sm font-medium">{question?.questionText}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-stone-400">Q{i + 1}</span>
+                      {question && (
+                        <Badge variant="outline" className="border-stone-800 bg-stone-900 text-[10px] text-stone-400">
+                          {question.topic}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs font-medium text-stone-200">{question?.questionText}</p>
                   </div>
-                  <div className="flex flex-col items-end shrink-0"><span className={`text-lg font-semibold ${qf.score >= 70 ? 'text-success' : qf.score >= 50 ? 'text-warning' : 'text-destructive'}`}>{qf.score}</span><span className="text-xs text-muted-foreground">score</span></div>
+                  <div className="flex flex-col items-end shrink-0">
+                    <span className={`font-mono text-base font-bold ${qf.score >= 70 ? 'text-emerald-400' : qf.score >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {qf.score}
+                    </span>
+                    <span className="font-mono text-[10px] text-stone-500">score</span>
+                  </div>
                 </div>
-                {showAnswers && (<div className="space-y-1 rounded-md bg-muted/50 p-3"><div className="text-xs font-medium text-muted-foreground">Your Answer</div><p className="text-sm text-muted-foreground">{answer?.answerText || 'No answer submitted'}</p></div>)}
-                <div className="grid gap-2 text-xs sm:grid-cols-3"><div><span className="text-muted-foreground">Technical:</span> <span className="font-medium">{qf.technicalCorrectness}</span></div><div><span className="text-muted-foreground">Clarity:</span> <span className="font-medium">{qf.answerClarity}</span></div><div><span className="text-muted-foreground">Communication:</span> <span className="font-medium">{qf.communicationQuality}</span></div></div>
-                {qf.strengths.length > 0 && <div className="text-xs"><span className="text-success font-medium">Strengths: </span><span className="text-muted-foreground">{qf.strengths.join(', ')}</span></div>}
-                {qf.weaknesses.length > 0 && <div className="text-xs"><span className="text-brand font-medium">Weaknesses: </span><span className="text-muted-foreground">{qf.weaknesses.join(', ')}</span></div>}
-                {qf.missingConcepts.length > 0 && <div className="text-xs"><span className="text-destructive font-medium">Missing: </span><span className="text-muted-foreground">{qf.missingConcepts.join(', ')}</span></div>}
-                {qf.suggestedImprovements.length > 0 && <div className="text-xs"><span className="text-muted-foreground font-medium">Suggested: </span><span className="text-muted-foreground">{qf.suggestedImprovements.join(', ')}</span></div>}
+                {showAnswers && (
+                  <div className="space-y-1 rounded-lg border border-stone-800 bg-stone-950 p-3">
+                    <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">Your answer</div>
+                    <p className="text-xs text-stone-300">{answer?.answerText || 'No answer submitted'}</p>
+                  </div>
+                )}
+                <div className="grid gap-2 text-xs text-stone-400 sm:grid-cols-3">
+                  <div>Technical: <span className="font-mono font-medium text-stone-200">{qf.technicalCorrectness}</span></div>
+                  <div>Clarity: <span className="font-mono font-medium text-stone-200">{qf.answerClarity}</span></div>
+                  <div>Communication: <span className="font-mono font-medium text-stone-200">{qf.communicationQuality}</span></div>
+                </div>
+                {qf.strengths.length > 0 && <div className="text-xs"><span className="text-emerald-400 font-medium">Strengths: </span><span className="text-stone-400">{qf.strengths.join(', ')}</span></div>}
+                {qf.weaknesses.length > 0 && <div className="text-xs"><span className="text-amber-400 font-medium">Weaknesses: </span><span className="text-stone-400">{qf.weaknesses.join(', ')}</span></div>}
+                {qf.missingConcepts.length > 0 && <div className="text-xs"><span className="text-red-400 font-medium">Missing: </span><span className="text-stone-400">{qf.missingConcepts.join(', ')}</span></div>}
+                {qf.suggestedImprovements.length > 0 && <div className="text-xs"><span className="text-stone-400 font-medium">Suggested: </span><span className="text-stone-400">{qf.suggestedImprovements.join(', ')}</span></div>}
               </div>
             );
           })}
@@ -253,10 +357,25 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       </Card>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-        <Link href="/dashboard"><Button variant="ghost"><LayoutDashboard className="mr-1.5 h-4 w-4" />Return to Dashboard</Button></Link>
+        <Link href="/dashboard">
+          <Button variant="ghost" className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200">
+            <LayoutDashboard className="mr-1.5 h-4 w-4" />
+            Return to dashboard
+          </Button>
+        </Link>
         <div className="flex gap-2">
-          <Link href="/dashboard/interviews"><Button variant="outline"><ArrowLeft className="mr-1.5 h-4 w-4" />View History</Button></Link>
-          <Link href="/dashboard/interview"><Button variant="brand"><RotateCcw className="mr-1.5 h-4 w-4" />Try Another Interview</Button></Link>
+          <Link href="/dashboard/interviews">
+            <Button variant="outline" className="rounded-lg border-stone-800 bg-stone-900 text-xs text-stone-200 hover:bg-stone-800">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              View history
+            </Button>
+          </Link>
+          <Link href="/dashboard/interview">
+            <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]">
+              <RotateCcw className="mr-1.5 h-4 w-4" />
+              Try another interview
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
@@ -281,7 +400,7 @@ function LiveKitResultsView({
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading results...</div>
+        <div className="font-mono text-xs text-stone-500">Loading results...</div>
       </div>
     );
   }
@@ -289,15 +408,26 @@ function LiveKitResultsView({
   if (!results) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <AlertCircle className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Results not yet available.</p>
-        <p className="text-xs text-muted-foreground max-w-md text-center">
+        <AlertCircle className="h-8 w-8 text-stone-500" />
+        <p className="text-sm font-semibold text-stone-200">Results not yet available</p>
+        <p className="text-xs text-stone-400 max-w-md text-center">
           The interview worker is still processing your session. Please check back shortly,
           or your results will appear here once scoring is complete.
         </p>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push('/dashboard/interviews')}>View History</Button>
-          <Button variant="brand" onClick={() => router.push('/dashboard/interview')}>New Interview</Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/dashboard/interviews')}
+            className="rounded-lg border-stone-800 bg-stone-900 text-xs text-stone-200 hover:bg-stone-800"
+          >
+            View history
+          </Button>
+          <Button
+            onClick={() => router.push('/dashboard/interview')}
+            className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white hover:bg-[#C22F21]"
+          >
+            New interview
+          </Button>
         </div>
       </div>
     );
@@ -321,50 +451,55 @@ function LiveKitResultsView({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <h1 className="text-2xl font-semibold">Interview Complete</h1>
+            <CheckCircle2 className="h-5 w-5 text-[#D93829]" />
+            <h1 className="text-2xl font-bold text-stone-100">Interview complete</h1>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Live AI Interview &middot; Interview ID: {id}
+          <p className="font-mono text-xs text-stone-400">
+            Live AI interview &middot; Interview ID: {id}
           </p>
         </div>
       </div>
 
       {/* Overall Score */}
-      <Card>
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col items-center">
               <div className="relative flex h-32 w-32 items-center justify-center">
                 <svg className="h-32 w-32 -rotate-90">
-                  <circle cx="64" cy="64" r="56" stroke="hsl(var(--muted))" strokeWidth="8" fill="none" />
+                  <circle cx="64" cy="64" r="56" stroke="#1c1917" strokeWidth="8" fill="none" />
                   <circle
-                    cx="64" cy="64" r="56" stroke="hsl(var(--brand))" strokeWidth="8" fill="none"
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#D93829"
+                    strokeWidth="8"
+                    fill="none"
                     strokeDasharray={`${(results.finalScore / 100) * 351.7} 351.7`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute text-3xl font-semibold">{results.finalScore}</span>
+                <span className="absolute font-mono text-3xl font-bold text-stone-100">{results.finalScore}</span>
               </div>
-              <span className="mt-2 text-xs text-muted-foreground uppercase tracking-wide">Final Score</span>
+              <span className="mt-2 font-mono text-[10px] uppercase tracking-wider text-stone-500">Final score</span>
             </div>
             <div className="flex-1 md:ml-8 space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Award className="h-4 w-4 text-brand" />
-                <span className="font-medium">Readiness Delta: </span>
-                <span className={results.overallReadinessDelta >= 0 ? 'text-success' : 'text-destructive'}>
+              <div className="flex items-center gap-2 text-xs">
+                <Award className="h-4 w-4 text-[#D93829]" />
+                <span className="font-medium text-stone-300">Readiness delta: </span>
+                <span className={`font-mono font-bold ${results.overallReadinessDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {results.overallReadinessDelta >= 0 ? '+' : ''}{results.overallReadinessDelta}
                 </span>
               </div>
               {(results.isProvisional || results.isFallback) && (
-                <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-500">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
+                <div className="flex items-center gap-2 rounded-lg bg-amber-950/30 border border-amber-900/40 px-3 py-2 text-xs text-amber-300">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
                   <span>
-                    <strong>Provisional Assessment:</strong> This score was generated using fallback mode ({results.evaluationMode || 'heuristic_fallback'}). Results are provisional.
+                    <strong>Provisional assessment:</strong> This score was generated using fallback mode ({results.evaluationMode || 'heuristic_fallback'}).
                   </span>
                 </div>
               )}
-              <p className="text-sm text-muted-foreground leading-relaxed">{results.summary}</p>
+              <p className="text-xs leading-relaxed text-stone-300">{results.summary}</p>
             </div>
           </div>
         </CardContent>
@@ -372,37 +507,37 @@ function LiveKitResultsView({
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">Category Performance</CardTitle>
-            <CardDescription>Score vs benchmark by category</CardDescription>
+            <CardTitle className="text-sm font-semibold text-stone-200">Category performance</CardTitle>
+            <CardDescription className="text-xs text-stone-400">Score vs benchmark by category</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis dataKey="topic" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                <Radar dataKey="score" stroke="hsl(var(--brand))" fill="hsl(var(--brand))" fillOpacity={0.3} />
-                <Radar dataKey="benchmark" stroke="hsl(var(--muted-foreground))" fill="none" strokeDasharray="4 4" />
+                <PolarGrid stroke="#292524" />
+                <PolarAngleAxis dataKey="topic" tick={{ fontSize: 11, fill: '#a8a29e' }} />
+                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78716c' }} />
+                <Radar dataKey="score" stroke="#D93829" fill="#D93829" fillOpacity={0.25} />
+                <Radar dataKey="benchmark" stroke="#52525b" fill="none" strokeDasharray="4 4" />
               </RadarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">Score vs Benchmark</CardTitle>
-            <CardDescription>Category scores compared to the benchmark</CardDescription>
+            <CardTitle className="text-sm font-semibold text-stone-200">Score vs benchmark</CardTitle>
+            <CardDescription className="text-xs text-stone-400">Category scores compared to the benchmark</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px' }} />
-                <Bar dataKey="Score" fill="hsl(var(--brand))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Benchmark" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#292524" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#a8a29e' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#78716c' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: '1px solid #292524', borderRadius: '8px', fontSize: '11px', color: '#e7e5e4' }} />
+                <Bar dataKey="Score" fill="#D93829" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Benchmark" fill="#52525b" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -410,31 +545,31 @@ function LiveKitResultsView({
       </div>
 
       {/* Category Scores Detail */}
-      <Card>
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">Category Breakdown</CardTitle>
-          <CardDescription>Detailed scores, strengths, and critiques per category</CardDescription>
+          <CardTitle className="text-sm font-semibold text-stone-200">Category breakdown</CardTitle>
+          <CardDescription className="text-xs text-stone-400">Detailed scores, strengths, and critiques per category</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {results.categoryScores.map((cs, i) => (
-            <div key={i} className="rounded-md border border-border p-4 space-y-3">
+            <div key={i} className="rounded-xl border border-stone-800 bg-stone-900/60 p-4 space-y-2.5">
               <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Category {i + 1}</span>
-                  <p className="text-sm font-medium">{cs.category}</p>
+                <div className="space-y-0.5">
+                  <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">Category {i + 1}</span>
+                  <p className="text-xs font-semibold text-stone-200">{cs.category}</p>
                 </div>
                 <div className="flex flex-col items-end shrink-0">
-                  <span className={`text-lg font-semibold ${cs.score >= cs.benchmark ? 'text-success' : 'text-warning'}`}>
+                  <span className={`font-mono text-base font-bold ${cs.score >= cs.benchmark ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {cs.score}
                   </span>
-                  <span className="text-xs text-muted-foreground">benchmark: {cs.benchmark}</span>
+                  <span className="font-mono text-[10px] text-stone-500">benchmark: {cs.benchmark}</span>
                 </div>
               </div>
               {cs.strengths.length > 0 && (
-                <div className="text-xs"><span className="text-success font-medium">Strengths: </span><span className="text-muted-foreground">{cs.strengths.join(', ')}</span></div>
+                <div className="text-xs"><span className="text-emerald-400 font-medium">Strengths: </span><span className="text-stone-400">{cs.strengths.join(', ')}</span></div>
               )}
               {cs.critiques.length > 0 && (
-                <div className="text-xs"><span className="text-brand font-medium">Critiques: </span><span className="text-muted-foreground">{cs.critiques.join(', ')}</span></div>
+                <div className="text-xs"><span className="text-amber-400 font-medium">Critiques: </span><span className="text-stone-400">{cs.critiques.join(', ')}</span></div>
               )}
             </div>
           ))}
@@ -443,22 +578,24 @@ function LiveKitResultsView({
 
       {/* Suggested Fixes */}
       {results.suggestedFixes.length > 0 && (
-        <Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-brand" />
-              <CardTitle className="text-base">Suggested Improvements</CardTitle>
+              <Wrench className="h-4 w-4 text-[#D93829]" />
+              <CardTitle className="text-sm font-semibold text-stone-200">Suggested improvements</CardTitle>
             </div>
-            <CardDescription>Specific changes to improve your resume and responses</CardDescription>
+            <CardDescription className="text-xs text-stone-400">Specific changes to improve your readiness</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {results.suggestedFixes.map((fix, i) => (
-              <div key={i} className="rounded-md border border-border p-4 space-y-2">
+              <div key={i} className="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{fix.title}</p>
-                  <Badge variant="outline" className="text-xs">{fix.location}</Badge>
+                  <p className="text-xs font-semibold text-stone-200">{fix.title}</p>
+                  <Badge variant="outline" className="border-stone-800 bg-stone-900 font-mono text-[10px] text-stone-400">
+                    {fix.location}
+                  </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">{fix.recommendedChange}</p>
+                <p className="text-xs text-stone-400 leading-relaxed">{fix.recommendedChange}</p>
               </div>
             ))}
           </CardContent>
@@ -467,10 +604,25 @@ function LiveKitResultsView({
 
       {/* Actions */}
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-        <Link href="/dashboard"><Button variant="ghost"><LayoutDashboard className="mr-1.5 h-4 w-4" />Return to Dashboard</Button></Link>
+        <Link href="/dashboard">
+          <Button variant="ghost" className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200">
+            <LayoutDashboard className="mr-1.5 h-4 w-4" />
+            Return to dashboard
+          </Button>
+        </Link>
         <div className="flex gap-2">
-          <Link href="/dashboard/interviews"><Button variant="outline"><ArrowLeft className="mr-1.5 h-4 w-4" />View History</Button></Link>
-          <Link href="/dashboard/interview"><Button variant="brand"><RotateCcw className="mr-1.5 h-4 w-4" />Try Another Interview</Button></Link>
+          <Link href="/dashboard/interviews">
+            <Button variant="outline" className="rounded-lg border-stone-800 bg-stone-900 text-xs text-stone-200 hover:bg-stone-800">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              View history
+            </Button>
+          </Link>
+          <Link href="/dashboard/interview">
+            <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]">
+              <RotateCcw className="mr-1.5 h-4 w-4" />
+              Try another interview
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

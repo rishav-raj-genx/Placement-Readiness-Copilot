@@ -5,37 +5,42 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --background: 229 47% 6%;
-    --foreground: 220 33% 97%;
-    --card: 226 33% 10%;
-    --card-foreground: 220 33% 97%;
-    --popover: 226 33% 10%;
-    --popover-foreground: 220 33% 97%;
-    --primary: 239 84% 67%;
+    /* Base: Warm near-black (#1a1310) */
+    --background: 18 24% 8%;
+    /* Text: Muted warm grey (stone-200 / #e7e5e4) */
+    --foreground: 24 6% 90%;
+    /* Surfaces: Flat warm dark grey (#28201E) */
+    --card: 12 14% 14%;
+    --card-foreground: 24 6% 90%;
+    --popover: 12 14% 14%;
+    --popover-foreground: 24 6% 90%;
+    /* Accent: Lava Red (#D93829) */
+    --primary: 5 70% 51%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 226 25% 15%;
-    --secondary-foreground: 220 33% 97%;
-    --muted: 226 25% 15%;
-    --muted-foreground: 218 15% 65%;
-    --accent: 255 48% 18%;
-    --accent-foreground: 240 100% 90%;
-    --destructive: 0 72% 56%;
+    --secondary: 15 12% 20%;
+    --secondary-foreground: 24 6% 90%;
+    --muted: 15 12% 18%;
+    /* Secondary text / labels: stone-400 (#a8a29e) */
+    --muted-foreground: 25 5% 64%;
+    --accent: 5 40% 18%;
+    --accent-foreground: 24 6% 95%;
+    --destructive: 5 70% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 226 24% 20%;
-    --input: 226 24% 20%;
-    --ring: 239 84% 67%;
-    --brand: 249 85% 67%;
+    --border: 15 8% 22%;
+    --input: 15 8% 22%;
+    --ring: 5 70% 51%;
+    --brand: 5 70% 51%;
     --brand-foreground: 0 0% 100%;
-    --success: 153 71% 48%;
+    --success: 24 55% 48%;
     --success-foreground: 0 0% 100%;
-    --warning: 42 96% 57%;
+    --warning: 38 85% 50%;
     --warning-foreground: 0 0% 100%;
-    --chart-1: 20 85% 55%;
-    --chart-2: 142 60% 45%;
-    --chart-3: 197 37% 40%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 0 72% 51%;
-    --radius: 0.875rem;
+    --chart-1: 5 70% 51%;
+    --chart-2: 24 55% 48%;
+    --chart-3: 25 5% 64%;
+    --chart-4: 15 8% 22%;
+    --chart-5: 12 14% 14%;
+    --radius: 0.75rem;
   }
 }
 
@@ -44,35 +49,42 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
-    background-image:
-      radial-gradient(circle at 15% 10%, hsl(249 85% 60% / 0.15), transparent 28rem),
-      radial-gradient(circle at 85% 0%, hsl(275 80% 58% / 0.1), transparent 24rem),
-      linear-gradient(hsl(226 30% 15% / 0.2) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(226 30% 15% / 0.2) 1px, transparent 1px);
-    background-size: auto, auto, 48px 48px, 48px 48px;
+    @apply bg-background text-foreground font-sans;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
     background-attachment: fixed;
   }
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
-    outline-offset: 3px;
+    outline-offset: 2px;
   }
 }
 
-/* Hide default OS cursor only on devices with a fine pointer (mouse/trackpad), preserving touch fallback */
 @media (pointer: fine) {
-  *, *::before, *::after {
+  * {
     cursor: none !important;
   }
 }
 
 @layer components {
-  .glass-panel {
-    @apply border border-white/10 bg-slate-950/60 shadow-2xl shadow-indigo-950/20 backdrop-blur-xl;
+  .surface-card {
+    @apply rounded-xl border border-stone-800 bg-stone-900 shadow-none;
   }
 
-  .auth-input {
-    @apply w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-11 text-sm text-white outline-none transition-all placeholder:text-white/20 focus:border-indigo-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-indigo-500/50;
+  .surface-modal {
+    @apply rounded-2xl border border-stone-800 bg-stone-900 shadow-lg shadow-black/50;
+  }
+
+  .lava-btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-[#D93829] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .lava-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-stone-800 bg-stone-900 px-4 py-2 text-sm font-medium text-stone-200 transition-colors hover:bg-stone-800 hover:text-stone-100 active:bg-stone-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .lava-input {
+    @apply w-full rounded-lg border border-stone-800 bg-stone-900 px-3.5 py-2.5 text-sm text-stone-200 outline-none transition-colors placeholder:text-stone-500 focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50;
   }
 }
 

@@ -10,17 +10,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['var(--font-display)', 'sans-serif'],
-        sans: ['var(--font-geist-sans)', 'sans-serif'],
-      },
-      boxShadow: {
-        glass: '0 24px 80px hsl(239 84% 20% / 0.24)',
-        glow: '0 0 40px hsl(var(--brand) / 0.2)',
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        sans: ['var(--font-manrope)', 'sans-serif'],
+        display: ['var(--font-manrope)', 'sans-serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -80,6 +71,21 @@ const config: Config = {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        lava: {
+          DEFAULT: '#D93829',
+          hover: '#C22F21',
+          active: '#AB281B',
+        },
+        surface: {
+          base: '#1a1310',
+          card: '#28201E',
+          modal: '#28201E',
+          border: '#382D2A',
+        },
+      },
+      boxShadow: {
+        elevation: '0 10px 30px -10px rgba(0, 0, 0, 0.5)',
+        modal: '0 20px 40px -15px rgba(0, 0, 0, 0.7)',
       },
       keyframes: {
         'accordion-down': {

@@ -23,9 +23,9 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 
 export const ADMIN_NAV_ITEMS = [
-  { href: '/admin-dashboard', label: 'Command Center', icon: Building2 },
-  { href: '/admin-jobs', label: 'Post Jobs', icon: BriefcaseBusiness },
-  { href: '/admin-interviews', label: 'Review Vivas', icon: Mic2 },
+  { href: '/admin-dashboard', label: 'Command center', icon: Building2 },
+  { href: '/admin-jobs', label: 'Post jobs', icon: BriefcaseBusiness },
+  { href: '/admin-interviews', label: 'Review vivas', icon: Mic2 },
 ] as const;
 
 interface AdminShellProps {
@@ -50,7 +50,7 @@ function AdminNavigation({ collapsed = false, onNavigate }: AdminNavigationProps
   const reduceMotion = useReducedMotion();
 
   return (
-    <nav aria-label="MSOT staff navigation" className="space-y-2">
+    <nav aria-label="MSOT staff navigation" className="space-y-1.5">
       {ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
 
@@ -62,22 +62,22 @@ function AdminNavigation({ collapsed = false, onNavigate }: AdminNavigationProps
             title={collapsed ? label : undefined}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'group relative flex min-h-12 items-center rounded-2xl text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-300',
-              collapsed ? 'justify-center px-2' : 'gap-3.5 px-4',
-              active ? 'text-white' : 'text-white/55 hover:bg-white/[0.06] hover:text-white',
+              'group relative flex min-h-11 items-center rounded-xl text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#D93829]',
+              collapsed ? 'justify-center px-2' : 'gap-3 px-3.5',
+              active ? 'text-stone-100' : 'text-stone-400 hover:bg-stone-800/60 hover:text-stone-200',
             )}
           >
             {active && (
               <motion.span
                 layoutId="admin-active-route"
-                className="absolute inset-0 rounded-2xl border border-violet-300/30 bg-gradient-to-r from-violet-500/25 via-amber-400/10 to-transparent shadow-[0_0_24px_rgba(139,92,246,0.16)]"
+                className="absolute inset-0 rounded-xl border border-stone-700 bg-stone-800/80 shadow-none"
                 transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 25 }}
               />
             )}
             <Icon
               className={cn(
-                'relative z-10 h-[22px] w-[22px] shrink-0 transition-colors',
-                active ? 'text-amber-300' : 'text-white/35 group-hover:text-violet-200',
+                'relative z-10 h-5 w-5 shrink-0 transition-colors',
+                active ? 'text-[#D93829]' : 'text-stone-400 group-hover:text-stone-200',
               )}
               aria-hidden="true"
             />
@@ -97,18 +97,18 @@ function AdminAccount({
   onSignOut,
 }: AdminAccountProps) {
   return (
-    <div className="border-t border-white/10 p-3">
+    <div className="border-t border-stone-800 p-3">
       <div className={cn(
-        'flex items-center rounded-2xl border border-white/[0.08] bg-white/[0.035] p-2.5',
+        'flex items-center rounded-xl border border-stone-800 bg-stone-900/60 p-2.5',
         collapsed ? 'justify-center' : 'gap-2.5',
       )}>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-amber-400 font-mono text-xs font-black text-white shadow-[0_8px_24px_rgba(139,92,246,0.25)]">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-stone-700 bg-stone-800 font-mono text-xs font-semibold text-stone-200">
           {initials}
         </span>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-white">{displayName}</p>
-            <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-amber-200/65">Administrator</p>
+            <p className="truncate text-xs font-medium text-stone-200">{displayName}</p>
+            <p className="mt-0.5 font-mono text-xs uppercase tracking-wider text-stone-400">Administrator</p>
           </div>
         )}
         {!collapsed && (
@@ -118,11 +118,11 @@ function AdminAccount({
             disabled={isSigningOut}
             aria-label="Sign out"
             title="Sign out"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-800 hover:text-[#D93829] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSigningOut
-              ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-              : <LogOut className="h-5 w-5" aria-hidden="true" />}
+              ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              : <LogOut className="h-4 w-4" aria-hidden="true" />}
           </button>
         )}
       </div>
@@ -133,11 +133,11 @@ function AdminAccount({
           disabled={isSigningOut}
           aria-label="Sign out"
           title="Sign out"
-          className="mx-auto mt-2 grid h-9 w-9 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mx-auto mt-2 grid h-8 w-8 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-800 hover:text-[#D93829] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSigningOut
-            ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            : <LogOut className="h-5 w-5" aria-hidden="true" />}
+            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            : <LogOut className="h-4 w-4" aria-hidden="true" />}
         </button>
       )}
     </div>
@@ -178,28 +178,25 @@ export function AdminShell({ children }: AdminShellProps) {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#0B0F17] text-white">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_8%_4%,rgba(139,92,246,0.12),transparent_30%),radial-gradient(circle_at_92%_8%,rgba(251,191,36,0.07),transparent_26%)]" />
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 opacity-[0.025] [background-image:linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.18)_1px,transparent_1px)] [background-size:48px_48px]" />
-
+    <div className="relative min-h-screen overflow-x-hidden bg-[#1a1310] text-stone-200">
       <aside className={cn(
-        'fixed bottom-4 left-4 top-4 z-40 hidden flex-col rounded-3xl border border-violet-300/15 bg-[#111522]/88 shadow-[0_28px_90px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[width] duration-300 lg:flex',
-        collapsed ? 'w-[76px]' : 'w-64',
+        'fixed bottom-4 left-4 top-4 z-40 hidden flex-col rounded-2xl border border-stone-800 bg-[#28201E] shadow-lg shadow-black/50 transition-[width] duration-200 lg:flex',
+        collapsed ? 'w-[72px]' : 'w-64',
       )}>
         <div className={cn(
-          'flex min-h-24 items-center border-b border-white/10 px-4',
+          'flex min-h-20 items-center border-b border-stone-800 px-4',
           collapsed ? 'justify-center' : 'justify-between gap-3',
         )}>
           <Link
             href="/admin-dashboard"
-            className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            className="flex min-w-0 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
           >
-            <HireableLogo size={38} withGlow priority />
+            <HireableLogo size={32} priority />
             {!collapsed && (
               <div className="min-w-0">
-                <p className="font-[var(--font-display)] text-lg font-black tracking-tight text-white">Hireable</p>
-                <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/20 bg-amber-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-amber-200">
-                  <ShieldCheck className="h-3 w-3" aria-hidden="true" /> MSOT Staff
+                <p className="font-[var(--font-display)] text-base font-bold tracking-tight text-stone-100">Hireable</p>
+                <span className="mt-0.5 inline-flex items-center gap-1 rounded border border-stone-700 bg-stone-800/80 px-1.5 py-0.5 font-mono text-xs uppercase tracking-wider text-stone-300">
+                  <ShieldCheck className="h-3 w-3 text-[#D93829]" aria-hidden="true" /> MSOT staff
                 </span>
               </div>
             )}
@@ -209,9 +206,9 @@ export function AdminShell({ children }: AdminShellProps) {
               type="button"
               onClick={() => setCollapsed(true)}
               aria-label="Collapse admin sidebar"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/35 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
             >
-              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -221,13 +218,13 @@ export function AdminShell({ children }: AdminShellProps) {
             type="button"
             onClick={() => setCollapsed(false)}
             aria-label="Expand admin sidebar"
-            className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-white/35 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            className="mx-auto mt-3 grid h-7 w-7 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
           >
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
 
-        <div className="flex-1 overflow-y-auto px-3 py-5">
+        <div className="flex-1 overflow-y-auto px-3 py-4">
           <AdminNavigation collapsed={collapsed} />
         </div>
         <AdminAccount
@@ -240,32 +237,32 @@ export function AdminShell({ children }: AdminShellProps) {
       </aside>
 
       <div className={cn(
-        'relative z-10 min-h-screen transition-[padding] duration-300 lg:pl-72',
-        collapsed && 'lg:pl-[92px]',
+        'relative z-10 min-h-screen transition-[padding] duration-200 lg:pl-72',
+        collapsed && 'lg:pl-24',
       )}>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[#0B0F17]/88 px-4 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-stone-800 bg-[#28201E]/95 px-4 backdrop-blur-sm lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <button
                 type="button"
                 aria-label="Open MSOT staff navigation"
-                className="grid h-10 w-10 place-items-center rounded-xl border border-violet-300/20 bg-violet-400/10 text-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
               >
                 <Menu className="h-5 w-5" aria-hidden="true" />
               </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[19rem] border-violet-300/15 bg-[#0B0F17] p-0 text-white">
+            <SheetContent side="left" className="w-72 border-stone-800 bg-[#28201E] p-0 text-stone-200">
               <div className="flex h-full flex-col">
-                <SheetHeader className="border-b border-white/10 p-5 text-left">
-                  <SheetTitle className="flex items-center gap-3 text-white">
-                    <HireableLogo size={32} withGlow />
+                <SheetHeader className="border-b border-stone-800 p-4 text-left">
+                  <SheetTitle className="flex items-center gap-3 text-stone-100">
+                    <HireableLogo size={28} />
                     <span>
-                      <span className="block font-[var(--font-display)] font-black">Hireable</span>
-                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-amber-200">MSOT Staff</span>
+                      <span className="block font-[var(--font-display)] font-bold">Hireable</span>
+                      <span className="font-mono text-xs uppercase tracking-wider text-stone-400">MSOT staff</span>
                     </span>
                   </SheetTitle>
                 </SheetHeader>
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto p-3">
                   <AdminNavigation onNavigate={() => setMobileOpen(false)} />
                 </div>
                 <AdminAccount
@@ -278,11 +275,11 @@ export function AdminShell({ children }: AdminShellProps) {
             </SheetContent>
           </Sheet>
 
-          <Link href="/admin-dashboard" className="flex items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
-            <HireableLogo size={27} />
-            <span className="text-sm font-bold">MSOT Command Center</span>
+          <Link href="/admin-dashboard" className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]">
+            <HireableLogo size={24} />
+            <span className="text-sm font-semibold text-stone-200">MSOT command center</span>
           </Link>
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-amber-400 font-mono text-[10px] font-black">
+          <span className="grid h-8 w-8 place-items-center rounded-lg border border-stone-700 bg-stone-800 font-mono text-xs font-semibold text-stone-200">
             {initials}
           </span>
         </header>

@@ -2,11 +2,11 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   Building2,
+  CheckCircle2,
   Clock3,
   MapPin,
   Radar,
   ShieldCheck,
-  Sparkles,
   Wifi,
 } from 'lucide-react';
 import { TrackedApplyLink } from '@/components/jobs/TrackedApplyLink';
@@ -40,8 +40,8 @@ interface JobCardProps {
 }
 
 const EMPLOYMENT_LABELS: Record<DiscoveredJob['employment_type'], string> = {
-  full_time: 'Full Time',
-  part_time: 'Part Time',
+  full_time: 'Full time',
+  part_time: 'Part time',
   contract: 'Contract',
   internship: 'Internship',
 };
@@ -138,12 +138,12 @@ function formatPostedAt(value: string): string {
 
 function matchBadgeClass(score: number): string {
   if (score >= 80) {
-    return 'border-cyan-300/35 bg-cyan-400/15 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.14)]';
+    return 'border-[#D93829]/30 bg-[#D93829]/10 text-stone-200';
   }
   if (score >= 60) {
-    return 'border-indigo-300/35 bg-indigo-400/15 text-indigo-100 shadow-[0_0_24px_rgba(129,140,248,0.12)]';
+    return 'border-stone-700 bg-stone-800 text-stone-300';
   }
-  return 'border-white/15 bg-white/[0.06] text-white/70';
+  return 'border-stone-800 bg-stone-900 text-stone-400';
 }
 
 function JobCard({ job }: JobCardProps) {
@@ -155,81 +155,76 @@ function JobCard({ job }: JobCardProps) {
 
   return (
     <article className={cn(
-      'group relative flex min-h-[390px] flex-col overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#121D31]/90 via-[#0D1728]/90 to-[#0A1321]/95 p-6 backdrop-blur-xl transition duration-300 hover:-translate-y-1',
+      'flex min-h-[360px] flex-col rounded-2xl border bg-[#28201E] p-6 transition-colors',
       job.is_msot_post
-        ? 'border border-amber-300/35 shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_28px_85px_rgba(139,92,246,0.16)] hover:border-amber-200/55'
-        : 'border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.28)] hover:border-cyan-300/25 hover:shadow-[0_28px_80px_rgba(6,182,212,0.10)]',
+        ? 'border-stone-700 hover:border-stone-600'
+        : 'border-stone-800 hover:border-stone-700',
     )}>
-      <div aria-hidden="true" className={cn(
-        'absolute -right-20 -top-24 h-56 w-56 rounded-full blur-3xl transition',
-        job.is_msot_post ? 'bg-violet-500/20 group-hover:bg-amber-400/15' : 'bg-indigo-500/10 group-hover:bg-cyan-400/10',
-      )} />
-
-      <div className="relative flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-indigo-200">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-stone-800 bg-stone-900 text-stone-300">
             <Building2 className="h-5 w-5" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{job.company}</p>
-            <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">
-              {job.is_msot_post ? 'MSOT Placement Office' : job.source || 'Verified ATS'}
+            <p className="truncate text-sm font-semibold text-stone-100">{job.company}</p>
+            <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-wider text-stone-500">
+              {job.is_msot_post ? 'MSOT placement office' : job.source || 'Verified ATS'}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           {job.is_msot_post && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/30 bg-gradient-to-r from-violet-500/20 to-amber-400/15 px-3 py-1.5 text-[11px] font-black text-amber-100 shadow-[0_0_22px_rgba(251,191,36,0.12)]">
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> MSOT Official
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-900/40 bg-amber-950/30 px-2.5 py-1 text-[11px] font-medium text-amber-300">
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> MSOT official
             </span>
           )}
-          <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-semibold text-white/65">
+          <span className="rounded-full border border-stone-800 bg-stone-900 px-2.5 py-1 text-[11px] font-medium text-stone-400">
             {EMPLOYMENT_LABELS[job.employment_type]}
           </span>
-          <span className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${matchBadgeClass(matchScore)}`}>
-            Match: {matchScore}%
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-mono font-medium ${matchBadgeClass(matchScore)}`}>
+            {matchScore}% match
           </span>
         </div>
       </div>
 
-      <div className="relative mt-6">
-        <h2 className="font-[var(--font-display)] text-2xl font-bold leading-tight text-white">{job.title}</h2>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-white/50">
+      <div className="mt-5">
+        <h2 className="text-xl font-bold leading-snug text-stone-100">{job.title}</h2>
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-stone-400">
           <span className="inline-flex items-center gap-1.5">
             {job.is_remote
-              ? <Wifi className="h-3.5 w-3.5 text-cyan-300" aria-hidden="true" />
-              : <MapPin className="h-3.5 w-3.5" aria-hidden="true" />}
+              ? <Wifi className="h-3.5 w-3.5 text-stone-400" aria-hidden="true" />
+              : <MapPin className="h-3.5 w-3.5 text-stone-400" aria-hidden="true" />}
             {location}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+            <Clock3 className="h-3.5 w-3.5 text-stone-400" aria-hidden="true" />
             {formatPostedAt(job.posted_at)}
           </span>
         </div>
       </div>
 
-      <div className="relative mt-6 flex flex-wrap gap-2" aria-label="Required skills">
+      <div className="mt-5 flex flex-wrap gap-1.5" aria-label="Required skills">
         {job.required_skills.length > 0 ? job.required_skills.slice(0, 8).map((skill) => {
           const isMatched = matchedSkills.has(normalizeSkill(skill));
           return (
             <span
               key={skill}
               className={isMatched
-                ? 'rounded-lg border border-cyan-300/25 bg-gradient-to-r from-cyan-400/15 to-indigo-400/15 px-2.5 py-1 text-[11px] font-medium text-cyan-100'
-                : 'rounded-lg border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[11px] text-white/45'}
+                ? 'rounded-md border border-[#D93829]/30 bg-[#D93829]/10 px-2.5 py-1 text-[11px] font-medium text-stone-200'
+                : 'rounded-md border border-stone-800 bg-stone-900/80 px-2.5 py-1 text-[11px] text-stone-400'}
             >
               {skill}
             </span>
           );
         }) : (
-          <span className="text-xs text-white/35">Skills supplied after opening the role</span>
+          <span className="text-xs text-stone-500">Skills supplied after opening the role</span>
         )}
       </div>
 
-      <div className="relative mt-auto border-t border-white/[0.07] pt-5">
-        <div className="flex items-start gap-2.5">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-indigo-300" aria-hidden="true" />
-          <p className="line-clamp-2 text-xs leading-relaxed text-white/50">
+      <div className="mt-auto border-t border-stone-800/80 pt-4">
+        <div className="flex items-start gap-2">
+          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#D93829]" aria-hidden="true" />
+          <p className="line-clamp-2 text-xs leading-relaxed text-stone-400">
             {job.match_reason || 'Recommended from your target role, skills, and candidate profile.'}
           </p>
         </div>
@@ -238,14 +233,9 @@ function JobCard({ job }: JobCardProps) {
           company={job.company}
           jobTitle={job.title}
           url={job.url}
-          className={cn(
-            'mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1321]',
-            job.is_msot_post
-              ? 'bg-gradient-to-r from-violet-600 to-amber-500 shadow-[0_10px_30px_rgba(139,92,246,0.22)] focus-visible:ring-amber-300'
-              : 'bg-gradient-to-r from-indigo-500 to-cyan-500 shadow-[0_10px_30px_rgba(79,70,229,0.2)] focus-visible:ring-cyan-300',
-          )}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
         >
-          Apply Now <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          Apply now <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
         </TrackedApplyLink>
       </div>
     </article>
@@ -257,54 +247,52 @@ export default async function JobsPage() {
 
   return (
     <div className="relative min-h-screen pb-24">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.14),transparent_38%),radial-gradient(circle_at_85%_10%,rgba(34,211,238,0.10),transparent_34%)]" />
-
-      <header className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#0E1728]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.32)] backdrop-blur-2xl sm:p-9">
-        <div className="flex flex-col justify-between gap-7 lg:flex-row lg:items-end">
+      <header className="overflow-hidden rounded-2xl border border-stone-800 bg-[#28201E] p-6 sm:p-8">
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.17em] text-cyan-200">
-              <Radar className="h-3.5 w-3.5" aria-hidden="true" /> Live discovery feed
+            <div className="inline-flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-stone-400">
+              <Radar className="h-3.5 w-3.5 text-stone-400" aria-hidden="true" /> Live discovery feed
             </div>
-            <h1 className="mt-5 font-[var(--font-display)] text-4xl font-black tracking-tight text-white sm:text-5xl">
-              AI Job Matches
+            <h1 className="mt-4 text-3xl font-bold tracking-tight text-stone-100 sm:text-4xl">
+              Job matches
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/55 sm:text-base">
-              Sourced from verified ATS endpoints (Greenhouse, Lever) based on your candidate profile.
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-400">
+              Sourced from verified ATS endpoints based on your candidate profile.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/15 px-5 py-4 lg:min-w-64">
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">Calibrated for</p>
-            <p className="mt-1.5 font-semibold text-white">{profile?.targetRole || 'Your target role'}</p>
-            <p className="mt-1 text-xs text-white/40">{profile?.skills.length ?? 0} profile skills considered</p>
+          <div className="rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3 lg:min-w-56">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-stone-500">Calibrated for</p>
+            <p className="mt-1 font-semibold text-stone-200">{profile?.targetRole || 'Your target role'}</p>
+            <p className="mt-0.5 text-xs text-stone-400">{profile?.skills.length ?? 0} profile skills considered</p>
           </div>
         </div>
       </header>
 
       {error ? (
-        <section className="mt-8 rounded-3xl border border-rose-400/20 bg-rose-500/[0.08] p-8 text-center" role="alert">
-          <BriefcaseBusiness className="mx-auto h-7 w-7 text-rose-200" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-bold text-white">Job matches are unavailable</h2>
-          <p className="mt-2 text-sm text-rose-100/70">{error} Refresh the page to try again.</p>
+        <section className="mt-6 rounded-2xl border border-red-900/40 bg-red-950/30 p-8 text-center" role="alert">
+          <BriefcaseBusiness className="mx-auto h-7 w-7 text-red-400" aria-hidden="true" />
+          <h2 className="mt-3 text-base font-bold text-stone-100">Job matches are unavailable</h2>
+          <p className="mt-1.5 text-xs text-stone-400">{error} Refresh the page to try again.</p>
         </section>
       ) : jobs.length > 0 ? (
-        <section className="mt-8" aria-labelledby="matches-heading">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <section className="mt-6" aria-labelledby="matches-heading">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-indigo-300">Ranked by relevance</p>
-              <h2 id="matches-heading" className="mt-1 text-xl font-bold text-white">Best opportunities for you</h2>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-stone-500">Ranked by relevance</p>
+              <h2 id="matches-heading" className="mt-0.5 text-lg font-bold text-stone-100">Best opportunities for you</h2>
             </div>
-            <p className="text-xs text-white/40">{jobs.length} published {jobs.length === 1 ? 'role' : 'roles'}</p>
+            <p className="font-mono text-xs text-stone-500">{jobs.length} published {jobs.length === 1 ? 'role' : 'roles'}</p>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
             {jobs.map((job) => <JobCard key={job.id} job={job} />)}
           </div>
         </section>
       ) : (
-        <section className="mt-8 rounded-3xl border border-dashed border-white/10 bg-white/[0.025] px-6 py-16 text-center">
-          <BriefcaseBusiness className="mx-auto h-9 w-9 text-white/25" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-bold text-white">No published matches yet</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/45">
+        <section className="mt-6 rounded-2xl border border-dashed border-stone-800 bg-stone-900/30 px-6 py-16 text-center">
+          <BriefcaseBusiness className="mx-auto h-8 w-8 text-stone-500" aria-hidden="true" />
+          <h2 className="mt-3 text-base font-bold text-stone-200">No published matches yet</h2>
+          <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-stone-400">
             The discovery engine is scanning verified ATS feeds. New roles will appear here as they match your profile.
           </p>
         </section>

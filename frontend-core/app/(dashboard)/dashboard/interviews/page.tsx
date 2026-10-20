@@ -135,36 +135,51 @@ export default function InterviewHistoryPage() {
     .filter((session) => statusFilter === 'all' || session.status === statusFilter);
 
   if (isLoading) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading interview history...</div></div>;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="font-mono text-xs text-stone-500">Loading interview history...</div>
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="Interview History" description="Review your completed mock interviews and recorded results." />
+      <PageHeader title="Interview history" description="Review your completed mock interviews and recorded results." />
 
-      {error && <p role="alert" className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</p>}
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-900/40 bg-red-950/30 px-4 py-3 text-xs text-red-300">
+          {error}
+        </p>
+      )}
 
       {entries.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Filter className="h-4 w-4" />Filter:</div>
+          <div className="flex items-center gap-1.5 text-xs text-stone-400">
+            <Filter className="h-3.5 w-3.5 text-stone-500" />
+            Filter:
+          </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="live_audio">Live Audio</SelectItem>
+            <SelectTrigger className="h-8 w-40 border-stone-800 bg-stone-900 text-xs text-stone-200 focus:ring-[#D93829]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent className="border-stone-800 bg-[#28201E] text-stone-200">
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="live_audio">Live audio</SelectItem>
               <SelectItem value="technical">Technical</SelectItem>
               <SelectItem value="coding">Coding</SelectItem>
               <SelectItem value="hr">HR</SelectItem>
               <SelectItem value="behavioral">Behavioral</SelectItem>
-              <SelectItem value="system_design">System Design</SelectItem>
-              <SelectItem value="role_specific">Role-Specific</SelectItem>
+              <SelectItem value="system_design">System design</SelectItem>
+              <SelectItem value="role_specific">Role-specific</SelectItem>
               <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
+            <SelectTrigger className="h-8 w-36 border-stone-800 bg-stone-900 text-xs text-stone-200 focus:ring-[#D93829]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="border-stone-800 bg-[#28201E] text-stone-200">
+              <SelectItem value="all">All status</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="abandoned">Abandoned</SelectItem>
             </SelectContent>
@@ -173,14 +188,19 @@ export default function InterviewHistoryPage() {
       )}
 
       {filteredEntries.length === 0 ? (
-        <Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="py-12">
             <EmptyState
-              icon={<History className="h-6 w-6 text-muted-foreground" />}
+              icon={<History className="h-6 w-6 text-stone-500" />}
               title={entries.length ? 'No interviews match these filters' : 'No mock interviews yet'}
               description={entries.length ? 'Change the filters to view another interview.' : 'Completed and abandoned mock interviews will appear here.'}
               action={entries.length ? undefined : (
-                <Link href="/dashboard/interview"><Button variant="brand"><Brain className="mr-1.5 h-4 w-4" />Start Interview</Button></Link>
+                <Link href="/dashboard/interview">
+                  <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]">
+                    <Brain className="mr-1.5 h-3.5 w-3.5" />
+                    Start interview
+                  </Button>
+                </Link>
               )}
             />
           </CardContent>
@@ -188,26 +208,63 @@ export default function InterviewHistoryPage() {
       ) : (
         <div className="space-y-3">
           {filteredEntries.map((entry) => (
-            <Card key={entry.id} className="transition-shadow hover:shadow-md">
+            <Card key={entry.id} className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none transition-colors hover:border-stone-700">
               <CardContent className="flex items-center justify-between p-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{entry.targetRole}</span>
-                    <Badge variant="outline" className="gap-1 text-xs"><Radio className="h-3 w-3" />{entry.type.replaceAll('_', ' ')}</Badge>
-                    <Badge variant="secondary" className={entry.status === 'completed' ? 'bg-success/10 text-success' : 'text-muted-foreground'}>{entry.status}</Badge>
+                    <span className="text-sm font-medium text-stone-100">{entry.targetRole}</span>
+                    <Badge variant="outline" className="gap-1 border-stone-700 bg-stone-800 font-mono text-[11px] text-stone-300">
+                      <Radio className="h-3 w-3 text-stone-400" />
+                      {entry.type.replaceAll('_', ' ')}
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className={
+                        entry.status === 'completed'
+                          ? 'border border-stone-700 bg-stone-800 text-stone-200'
+                          : 'border border-stone-800 bg-stone-900 text-stone-500'
+                      }
+                    >
+                      {entry.status}
+                    </Badge>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{format(new Date(entry.completedAt || entry.createdAt), 'MMM d, yyyy')}</span>
-                    {entry.difficulty && <span>{entry.difficulty}</span>}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
+                    <span className="flex items-center gap-1 font-mono text-[11px]">
+                      <Clock className="h-3 w-3 text-stone-500" />
+                      {format(new Date(entry.completedAt || entry.createdAt), 'MMM d, yyyy')}
+                    </span>
+                    {entry.difficulty && <span className="capitalize">{entry.difficulty}</span>}
                     {entry.durationMinutes !== null && <span>{entry.durationMinutes} min</span>}
-                    {entry.overallScore !== undefined && <span className="flex items-center gap-1"><Award className="h-3 w-3" />Score: {entry.overallScore}</span>}
+                    {entry.overallScore !== undefined && (
+                      <span className="flex items-center gap-1 font-mono font-medium text-stone-200">
+                        <Award className="h-3 w-3 text-[#D93829]" />
+                        Score: {entry.overallScore}
+                      </span>
+                    )}
                   </div>
-                  {entry.topics.length > 0 && <div className="flex flex-wrap gap-1 pt-1">{entry.topics.slice(0, 3).map((topic) => <Badge key={topic} variant="secondary" className="text-xs">{topic}</Badge>)}</div>}
+                  {entry.topics.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {entry.topics.slice(0, 3).map((topic) => (
+                        <Badge key={topic} variant="secondary" className="border border-stone-800 bg-stone-900 text-[10px] text-stone-400">
+                          {topic}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {entry.status === 'completed' ? (
-                  <Link href={`/dashboard/interview/results/${entry.id}`}><Button variant="outline" size="sm">Review<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button></Link>
+                  <Link href={`/dashboard/interview/results/${entry.id}`}>
+                    <Button variant="outline" size="sm" className="rounded-lg border-stone-700 bg-stone-800 text-xs font-medium text-stone-200 hover:bg-stone-700 hover:text-white">
+                      Review
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
                 ) : (
-                  <Link href="/dashboard/interview"><Button variant="ghost" size="sm">Retry</Button></Link>
+                  <Link href="/dashboard/interview">
+                    <Button variant="ghost" size="sm" className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200">
+                      Retry
+                    </Button>
+                  </Link>
                 )}
               </CardContent>
             </Card>

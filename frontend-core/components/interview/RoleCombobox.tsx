@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Check, ChevronDown, PenLine, Search, Sparkles, X } from 'lucide-react';
+import { Check, ChevronDown, PenLine, Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { filterRoles, OTHER_OPTION, STANDARD_ROLES } from '@/lib/roles';
 
@@ -87,12 +87,12 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
-        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 w-full items-center justify-between rounded-lg border border-stone-800 bg-stone-900 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-[#D93829] focus:ring-offset-2 focus:ring-offset-[#1a1310] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span className={`truncate ${value ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+        <span className={`truncate ${value ? 'text-stone-100 font-medium' : 'text-stone-500'}`}>
           {value || 'Select target role...'}
         </span>
-        <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+        <div className="flex items-center gap-1.5 shrink-0 text-stone-500">
           {value && (
             <span
               role="button"
@@ -104,7 +104,7 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
                   handleClear(e as unknown as React.MouseEvent);
                 }
               }}
-              className="rounded-full p-0.5 hover:bg-white/10 hover:text-foreground"
+              className="rounded-full p-0.5 hover:bg-stone-800 hover:text-stone-200"
               aria-label="Clear role"
             >
               <X className="h-3.5 w-3.5" />
@@ -116,22 +116,22 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
 
       {/* Dropdown Popover */}
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 w-full rounded-xl border border-white/10 bg-[#0E1524] p-2 shadow-2xl backdrop-blur-xl animate-in fade-in-0 zoom-in-95">
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-full rounded-xl border border-stone-800 bg-[#28201E] p-2 shadow-lg shadow-black/50 animate-in fade-in-0 zoom-in-95">
           {/* Search Input */}
           <div className="relative mb-2">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-stone-500 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search roles..."
-              className="h-8 w-full rounded-lg border border-white/10 bg-white/[0.04] pl-8 pr-3 text-xs text-white placeholder:text-muted-foreground focus:border-indigo-400/50 focus:outline-none focus:ring-1 focus:ring-indigo-400/50"
+              className="h-8 w-full rounded-lg border border-stone-800 bg-stone-900 pl-8 pr-3 text-xs text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829]"
             />
           </div>
 
           <div className="max-h-60 overflow-y-auto space-y-1 pr-1" role="listbox">
-            {/* The "Other" Rule (CRITICAL): Pinned to the absolute top of the dropdown list AT ALL TIMES */}
+            {/* The "Other" Rule: Pinned to the absolute top of the dropdown list AT ALL TIMES */}
             <button
               type="button"
               role="option"
@@ -139,15 +139,15 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
               onClick={handleSelectOther}
               className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
                 isCustomMode
-                  ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/40'
-                  : 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20'
+                  ? 'bg-[#D93829]/15 text-stone-100 border border-[#D93829]/40'
+                  : 'bg-stone-900 text-stone-300 border border-stone-800 hover:bg-stone-800'
               }`}
             >
               <span className="flex items-center gap-2">
-                <PenLine className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                <PenLine className="h-3.5 w-3.5 text-[#D93829] shrink-0" />
                 <span>{OTHER_OPTION}</span>
               </span>
-              {isCustomMode && <Check className="h-3.5 w-3.5 text-cyan-400 shrink-0" />}
+              {isCustomMode && <Check className="h-3.5 w-3.5 text-[#D93829] shrink-0" />}
             </button>
 
             {/* Standard Filtered Roles */}
@@ -163,18 +163,18 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
                     onClick={() => handleSelectStandard(role)}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
                       isSelected
-                        ? 'bg-white/10 font-medium text-white'
-                        : 'text-white/80 hover:bg-white/[0.06] hover:text-white'
+                        ? 'bg-stone-800 font-medium text-stone-100'
+                        : 'text-stone-300 hover:bg-stone-800/60 hover:text-stone-100'
                     }`}
                   >
                     <span>{role}</span>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
+                    {isSelected && <Check className="h-3.5 w-3.5 text-[#D93829] shrink-0" />}
                   </button>
                 );
               })
             ) : (
-              <div className="px-3 py-3 text-center text-xs text-muted-foreground">
-                No standard match. Choose <span className="text-indigo-300 font-medium">&quot;Other&quot;</span> above to specify your custom role.
+              <div className="px-3 py-3 text-center text-xs text-stone-400">
+                No standard match. Choose <span className="text-[#D93829] font-medium">&quot;Other&quot;</span> above to specify your custom role.
               </div>
             )}
           </div>
@@ -185,8 +185,8 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
       {isCustomMode && (
         <div className="relative pt-1 animate-in fade-in-50 slide-in-from-top-1">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-medium text-indigo-300 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-cyan-400" />
+            <span className="text-[11px] font-medium text-stone-300 flex items-center gap-1">
+              <PenLine className="h-3 w-3 text-[#D93829]" />
               Custom role name:
             </span>
             <button
@@ -196,7 +196,7 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
                 onChange('');
                 setIsOpen(true);
               }}
-              className="text-[11px] text-muted-foreground hover:text-white transition-colors"
+              className="text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
             >
               Choose standard role
             </button>
@@ -207,7 +207,7 @@ export function RoleCombobox({ value, onChange }: RoleComboboxProps) {
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="e.g. Distributed Systems Engineer"
-            className="border-indigo-500/40 bg-indigo-500/[0.05] focus-visible:ring-indigo-500"
+            className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus-visible:border-[#D93829] focus-visible:ring-[#D93829]"
           />
         </div>
       )}

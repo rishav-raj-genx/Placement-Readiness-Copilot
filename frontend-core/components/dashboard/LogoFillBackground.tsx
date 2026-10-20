@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { motion, useMotionTemplate, useReducedMotion, useScroll, useTransform } from 'framer-motion';
@@ -20,7 +21,7 @@ export function LogoFillBackground() {
       <div className="relative -z-10 flex items-center justify-center pointer-events-none">
         {/* Layer 1 (The Faded Base): subtle muted watermark before scrolling */}
         <img
-          src="/brand-mark.png"
+          src="/image.png"
           alt=""
           aria-hidden="true"
           className="h-[460px] w-auto max-w-[85vw] object-contain opacity-5 grayscale blur-[2px] sm:h-[580px] xl:h-[680px]"
@@ -32,7 +33,7 @@ export function LogoFillBackground() {
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
           <img
-            src="/brand-mark.png"
+            src="/image.png"
             alt=""
             aria-hidden="true"
             className="h-[460px] w-auto max-w-[85vw] object-contain opacity-[0.18] mix-blend-screen sm:h-[580px] xl:h-[680px]"

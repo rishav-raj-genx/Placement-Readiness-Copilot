@@ -19,9 +19,9 @@ export default function SignOutPage() {
   }, [signOut, router]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
-      <Loader2 className="h-6 w-6 animate-spin text-brand" />
-      <p className="text-sm text-muted-foreground">Signing you out...</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#1a1310]">
+      <Loader2 className="h-6 w-6 animate-spin text-[#D93829]" />
+      <p className="text-sm text-stone-400">Signing you out...</p>
     </div>
   );
 }

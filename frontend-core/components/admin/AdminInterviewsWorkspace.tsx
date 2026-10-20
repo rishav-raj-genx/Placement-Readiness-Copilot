@@ -152,56 +152,55 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
   };
 
   return (
-    <div className="space-y-8 pb-20">
-      <section className="relative overflow-hidden rounded-[2rem] border border-violet-300/15 bg-white/[0.035] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-9">
-        <div aria-hidden="true" className="absolute -right-28 -top-32 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl" />
-        <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+    <div className="space-y-6 pb-16">
+      <section className="rounded-2xl border border-stone-800 bg-[#28201E] p-6 sm:p-8">
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200">Faculty audit queue</p>
-            <h1 className="mt-2 font-[var(--font-display)] text-3xl font-black tracking-tight text-white sm:text-5xl">Faculty Viva Reviews</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/50">Audit AI-scored interviews, replay timestamped evidence, and record accountable faculty overrides.</p>
+            <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Faculty audit queue</p>
+            <h1 className="mt-2 font-[var(--font-display)] text-3xl font-bold tracking-tight text-stone-100 sm:text-4xl">Faculty viva reviews</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-400">Audit scored interviews, replay timestamped recordings, and record faculty overrides.</p>
           </div>
           <div className="flex gap-3">
-            <div className="rounded-2xl border border-violet-300/15 bg-violet-400/[0.07] px-5 py-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Completed</p>
-              <p className="mt-1 text-2xl font-black text-violet-100">{interviews.length}</p>
+            <div className="rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3">
+              <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Completed</p>
+              <p className="mt-1 text-2xl font-bold text-stone-100">{interviews.length}</p>
             </div>
-            <div className="rounded-2xl border border-amber-300/15 bg-amber-400/[0.07] px-5 py-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Needs review</p>
-              <p className="mt-1 text-2xl font-black text-amber-100">{interviews.filter((interview) => interview.needsReview).length}</p>
+            <div className="rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3">
+              <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Needs review</p>
+              <p className="mt-1 text-2xl font-bold text-[#D93829]">{interviews.filter((interview) => interview.needsReview).length}</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-white/10 bg-[#111522]/82 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-7" aria-labelledby="recent-vivas-heading">
-        <div className="flex items-end justify-between gap-3">
+      <section className="rounded-2xl border border-stone-800 bg-[#28201E] p-5 sm:p-7" aria-labelledby="recent-vivas-heading">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-violet-300">Recent activity</p>
-            <h2 id="recent-vivas-heading" className="mt-1 text-xl font-bold text-white">Student mock interviews</h2>
+            <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Recent activity</p>
+            <h2 id="recent-vivas-heading" className="mt-1 text-lg font-bold text-stone-100">Student mock interviews</h2>
           </div>
-          <SlidersHorizontal className="h-5 w-5 text-amber-200" aria-hidden="true" />
+          <SlidersHorizontal className="h-5 w-5 text-stone-400" aria-hidden="true" />
         </div>
 
-        {loadError && <div className="mt-6 rounded-2xl border border-rose-300/20 bg-rose-400/[0.08] p-5 text-sm text-rose-100" role="alert">{loadError}</div>}
+        {loadError && <div className="mt-5 rounded-xl border border-red-900/50 bg-red-950/40 p-4 text-sm text-red-300" role="alert">{loadError}</div>}
 
         {interviews.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-white/10 px-5 py-14 text-center">
-            <MessageSquareText className="mx-auto h-8 w-8 text-white/25" aria-hidden="true" />
-            <p className="mt-3 text-sm font-semibold text-white">No completed mock interviews</p>
-            <p className="mt-1 text-xs text-white/35">Completed AI viva sessions will appear here for faculty review.</p>
+          <div className="mt-6 rounded-xl border border-dashed border-stone-800 px-5 py-14 text-center">
+            <MessageSquareText className="mx-auto h-8 w-8 text-stone-500" aria-hidden="true" />
+            <p className="mt-3 text-sm font-medium text-stone-200">No completed mock interviews</p>
+            <p className="mt-1 text-xs text-stone-400">Completed viva sessions will appear here for faculty review.</p>
           </div>
         ) : (
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[820px] border-separate border-spacing-y-2 text-left">
+            <table className="w-full min-w-[780px] border-collapse text-left">
               <thead>
-                <tr className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/30">
-                  <th className="px-4 pb-2 font-medium">Student Name</th>
-                  <th className="px-4 pb-2 font-medium">Target Role</th>
-                  <th className="px-4 pb-2 font-medium">AI Score</th>
-                  <th className="px-4 pb-2 font-medium">Date</th>
-                  <th className="px-4 pb-2 font-medium">Review Status</th>
-                  <th className="px-4 pb-2"><span className="sr-only">Open audit</span></th>
+                <tr className="border-b border-stone-800 font-mono text-xs uppercase tracking-wider text-stone-400">
+                  <th className="px-4 pb-3 font-medium">Student name</th>
+                  <th className="px-4 pb-3 font-medium">Target role</th>
+                  <th className="px-4 pb-3 font-medium text-right">Score</th>
+                  <th className="px-4 pb-3 font-medium">Date</th>
+                  <th className="px-4 pb-3 font-medium">Review status</th>
+                  <th className="px-4 pb-3"><span className="sr-only">Open audit</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -213,30 +212,48 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                     aria-label={`Review ${interview.studentName}'s interview for ${interview.targetRole}`}
                     onClick={() => openAudit(interview)}
                     onKeyDown={(event) => handleRowKeyDown(event, interview)}
-                    className="group cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                    className="group cursor-pointer border-b border-stone-800/80 outline-none transition-colors hover:bg-stone-900/40 focus-visible:bg-stone-900/60"
                   >
-                    <td className="rounded-l-2xl border-y border-l border-white/[0.07] bg-white/[0.025] px-4 py-4 transition group-hover:bg-violet-400/[0.06]">
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-amber-400 text-[10px] font-black text-white">{initials(interview.studentName)}</span>
-                        <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white">{interview.studentName}</span><span className="block truncate text-[10px] text-white/35">{interview.studentEmail || interview.studentId}</span></span>
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-stone-700 bg-stone-800 font-mono text-xs font-semibold text-stone-200">
+                          {initials(interview.studentName)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-stone-100">{interview.studentName}</span>
+                          <span className="block truncate text-xs text-stone-400">{interview.studentEmail || interview.studentId}</span>
+                        </span>
                       </div>
                     </td>
-                    <td className="border-y border-white/[0.07] bg-white/[0.025] px-4 py-4 text-sm text-white/60 transition group-hover:bg-violet-400/[0.06]">{interview.targetRole}</td>
-                    <td className="border-y border-white/[0.07] bg-white/[0.025] px-4 py-4 transition group-hover:bg-violet-400/[0.06]">
-                      <span className="font-mono text-lg font-black text-white">{Math.round(interview.aiScore)}</span><span className="text-xs text-white/30">/100</span>
-                      {interview.override && <span className="ml-2 rounded-full bg-violet-400/10 px-2 py-1 text-[9px] font-bold uppercase text-violet-200">→ {Math.round(interview.effectiveScore)} override</span>}
-                    </td>
-                    <td className="border-y border-white/[0.07] bg-white/[0.025] px-4 py-4 text-xs text-white/45 transition group-hover:bg-violet-400/[0.06]">{formatDate(interview.completedAt)}</td>
-                    <td className="border-y border-white/[0.07] bg-white/[0.025] px-4 py-4 transition group-hover:bg-violet-400/[0.06]">
-                      {interview.needsReview ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold text-amber-100"><AlertTriangle className="h-3.5 w-3.5" />Needs Review</span>
-                      ) : interview.aiConfidence === null ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-white/45">Confidence unavailable</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/[0.08] px-2.5 py-1 text-[10px] font-bold text-emerald-100"><CheckCircle2 className="h-3.5 w-3.5" />Standard</span>
+                    <td className="px-4 py-3.5 text-sm text-stone-300">{interview.targetRole}</td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="font-mono text-base font-bold text-stone-100">{Math.round(interview.aiScore)}</span>
+                      <span className="text-xs text-stone-500">/100</span>
+                      {interview.override && (
+                        <span className="ml-2 rounded border border-stone-700 bg-stone-800 px-1.5 py-0.5 text-xs text-[#D93829]">
+                          → {Math.round(interview.effectiveScore)}
+                        </span>
                       )}
                     </td>
-                    <td className="rounded-r-2xl border-y border-r border-white/[0.07] bg-white/[0.025] px-4 py-4 text-right transition group-hover:bg-violet-400/[0.06]"><ChevronRight className="ml-auto h-5 w-5 text-white/25 transition group-hover:translate-x-1 group-hover:text-amber-200" /></td>
+                    <td className="px-4 py-3.5 text-xs text-stone-400">{formatDate(interview.completedAt)}</td>
+                    <td className="px-4 py-3.5">
+                      {interview.needsReview ? (
+                        <span className="inline-flex items-center gap-1.5 rounded border border-amber-900/60 bg-amber-950/40 px-2 py-0.5 text-xs font-medium text-amber-300">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />Needs review
+                        </span>
+                      ) : interview.aiConfidence === null ? (
+                        <span className="inline-flex items-center gap-1.5 rounded border border-stone-700 bg-stone-800 px-2 py-0.5 text-xs text-stone-400">
+                          Uncalibrated
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded border border-stone-700 bg-stone-800 px-2 py-0.5 text-xs font-medium text-stone-300">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-stone-400" />Standard
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <ChevronRight className="ml-auto h-4 w-4 text-stone-500 transition-transform group-hover:translate-x-0.5 group-hover:text-stone-300" />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -248,7 +265,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
       <AnimatePresence>
         {selected && (
           <motion.div
-            className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm"
             initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -264,96 +281,238 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 250, damping: 30 }}
-              className="absolute inset-y-0 right-0 w-full max-w-6xl overflow-y-auto border-l border-violet-300/15 bg-[#0B0F17] shadow-[-30px_0_90px_rgba(0,0,0,0.55)]"
+              className="absolute inset-y-0 right-0 w-full max-w-5xl overflow-y-auto border-l border-stone-800 bg-[#28201E] shadow-lg shadow-black/50"
             >
-              <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#0B0F17]/92 px-5 py-4 backdrop-blur-xl sm:px-7">
+              <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-800 bg-[#28201E]/95 px-5 py-4 backdrop-blur-sm sm:px-7">
                 <div className="min-w-0">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-amber-200">Faculty audit</p>
-                  <h2 id="viva-audit-title" className="mt-1 truncate text-lg font-black text-white">{selected.studentName} · {selected.targetRole}</h2>
+                  <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Faculty audit</p>
+                  <h2 id="viva-audit-title" className="mt-0.5 truncate text-lg font-bold text-stone-100">
+                    {selected.studentName} · {selected.targetRole}
+                  </h2>
                 </div>
-                <button type="button" onClick={closeAudit} disabled={isSaving} aria-label="Close audit drawer" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/50 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:opacity-50"><X className="h-5 w-5" /></button>
+                <button
+                  type="button"
+                  onClick={closeAudit}
+                  disabled={isSaving}
+                  aria-label="Close audit drawer"
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-stone-800 text-stone-400 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </header>
 
               <div className="grid gap-6 p-5 sm:p-7 xl:grid-cols-[1.15fr_0.85fr]">
                 <div className="space-y-6">
-                  <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+                  <section className="rounded-xl border border-stone-800 bg-stone-900/60 p-5 sm:p-6">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div><p className="font-mono text-[9px] uppercase tracking-[0.16em] text-violet-300">Evidence playback</p><h3 className="mt-1 text-lg font-bold text-white">Transcript &amp; audio</h3></div>
-                      {selected.aiConfidence !== null && <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold text-white/55">AI confidence {Math.round(selected.aiConfidence * 100)}%</span>}
+                      <div>
+                        <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Evidence playback</p>
+                        <h3 className="mt-0.5 text-base font-bold text-stone-100">Transcript &amp; audio</h3>
+                      </div>
+                      {selected.aiConfidence !== null && (
+                        <span className="rounded border border-stone-700 bg-stone-800 px-2 py-1 text-xs font-medium text-stone-300">
+                          Confidence {Math.round(selected.aiConfidence * 100)}%
+                        </span>
+                      )}
                     </div>
 
-                    <div className="mt-5 rounded-2xl border border-white/[0.08] bg-black/20 p-3">
-                      <audio ref={audioRef} controls preload="metadata" src={selected.audioUrl ?? undefined} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} className="w-full" aria-label="Interview audio recording">Your browser does not support audio playback.</audio>
-                      {!selected.audioUrl && <p className="mt-2 flex items-center gap-2 px-1 text-[11px] text-white/35"><AudioLines className="h-3.5 w-3.5" />No recording URL was attached to this session. Timestamped transcript evidence remains available.</p>}
+                    <div className="mt-4 rounded-lg border border-stone-800 bg-stone-950/60 p-3">
+                      <audio
+                        ref={audioRef}
+                        controls
+                        preload="metadata"
+                        src={selected.audioUrl ?? undefined}
+                        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+                        className="w-full"
+                        aria-label="Interview audio recording"
+                      >
+                        Your browser does not support audio playback.
+                      </audio>
+                      {!selected.audioUrl && (
+                        <p className="mt-2 flex items-center gap-2 px-1 text-xs text-stone-400">
+                          <AudioLines className="h-3.5 w-3.5" />
+                          No recording attached. Timestamped transcript evidence remains available below.
+                        </p>
+                      )}
                     </div>
 
-                    <div className="mt-4 max-h-[30rem] space-y-3 overflow-y-auto pr-2" aria-label="Interview transcript">
-                      {selected.transcript.length > 0 ? selected.transcript.map((turn, index) => {
-                        const active = index === activeTranscriptIndex(selected.transcript, currentTime);
-                        return (
-                          <button key={turn.id} type="button" onClick={() => seekToTurn(turn)} disabled={!selected.audioUrl} className={`block w-full rounded-2xl border p-4 text-left transition ${turn.speaker === 'student' ? 'ml-auto max-w-[92%]' : 'mr-auto max-w-[92%]'} ${active ? 'border-amber-300/35 bg-amber-400/10' : 'border-white/[0.07] bg-white/[0.025] hover:border-violet-300/20'} disabled:cursor-default`}>
-                            <span className="flex items-center justify-between gap-3"><span className={`text-[10px] font-bold uppercase tracking-[0.12em] ${turn.speaker === 'student' ? 'text-cyan-200' : 'text-violet-200'}`}>{turn.speaker === 'student' ? 'Student' : 'AI interviewer'}</span><span className="inline-flex items-center gap-1 font-mono text-[9px] text-white/30"><Clock3 className="h-3 w-3" />{formatTimestamp(turn.timestampSeconds)}</span></span>
-                            <span className="mt-2 block text-sm leading-relaxed text-white/65">{turn.text}</span>
-                          </button>
-                        );
-                      }) : <p className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/35">No transcript was retained for this session.</p>}
+                    <div className="mt-4 max-h-[26rem] space-y-2.5 overflow-y-auto pr-2" aria-label="Interview transcript">
+                      {selected.transcript.length > 0 ? (
+                        selected.transcript.map((turn, index) => {
+                          const active = index === activeTranscriptIndex(selected.transcript, currentTime);
+                          return (
+                            <button
+                              key={turn.id}
+                              type="button"
+                              onClick={() => seekToTurn(turn)}
+                              disabled={!selected.audioUrl}
+                              className={`block w-full rounded-lg border p-3.5 text-left transition-colors ${
+                                turn.speaker === 'student' ? 'ml-auto max-w-[92%]' : 'mr-auto max-w-[92%]'
+                              } ${
+                                active
+                                  ? 'border-[#D93829] bg-[#D93829]/10'
+                                  : 'border-stone-800 bg-stone-950/40 hover:border-stone-700'
+                              } disabled:cursor-default`}
+                            >
+                              <span className="flex items-center justify-between gap-3">
+                                <span className={`text-xs font-semibold ${
+                                  turn.speaker === 'student' ? 'text-stone-200' : 'text-[#D93829]'
+                                }`}>
+                                  {turn.speaker === 'student' ? 'Student' : 'Interviewer'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 font-mono text-xs text-stone-500">
+                                  <Clock3 className="h-3 w-3" />
+                                  {formatTimestamp(turn.timestampSeconds)}
+                                </span>
+                              </span>
+                              <span className="mt-1.5 block text-xs leading-relaxed text-stone-300">
+                                {turn.text}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <p className="rounded-lg border border-dashed border-stone-800 px-4 py-8 text-center text-xs text-stone-400">
+                          No transcript retained for this session.
+                        </p>
+                      )}
                     </div>
                   </section>
 
-                  <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-violet-300">AI evaluation</p>
-                    <h3 className="mt-1 text-lg font-bold text-white">Rubric scores</h3>
-                    {selected.summary && <p className="mt-3 text-sm leading-relaxed text-white/45">{selected.summary}</p>}
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      {selected.rubric.length > 0 ? selected.rubric.map((rubric) => (
-                        <div key={rubric.key} className="rounded-2xl border border-white/[0.07] bg-black/15 p-4">
-                          <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-white">{rubric.label}</p><span className="font-mono text-sm font-black text-amber-200">{Math.round(rubric.score)}/100</span></div>
-                          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-amber-400" style={{ width: `${rubric.score}%` }} /></div>
-                          {rubric.feedback && <p className="mt-3 text-xs leading-relaxed text-white/40">{rubric.feedback}</p>}
-                        </div>
-                      )) : <p className="text-sm text-white/35">No category rubric was included in this result.</p>}
+                  <section className="rounded-xl border border-stone-800 bg-stone-900/60 p-5 sm:p-6">
+                    <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Evaluation</p>
+                    <h3 className="mt-0.5 text-base font-bold text-stone-100">Rubric breakdown</h3>
+                    {selected.summary && (
+                      <p className="mt-2 text-xs leading-relaxed text-stone-400">{selected.summary}</p>
+                    )}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {selected.rubric.length > 0 ? (
+                        selected.rubric.map((rubric) => (
+                          <div key={rubric.key} className="rounded-lg border border-stone-800 bg-stone-950/60 p-3.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-xs font-medium text-stone-200">{rubric.label}</p>
+                              <span className="font-mono text-xs font-bold text-stone-100">
+                                {Math.round(rubric.score)}/100
+                              </span>
+                            </div>
+                            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone-800">
+                              <div
+                                className="h-full rounded-full bg-[#D93829]"
+                                style={{ width: `${rubric.score}%` }}
+                              />
+                            </div>
+                            {rubric.feedback && (
+                              <p className="mt-2 text-xs leading-relaxed text-stone-400">{rubric.feedback}</p>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-stone-500">No category rubric included.</p>
+                      )}
                     </div>
                   </section>
                 </div>
 
                 <div className="space-y-6">
-                  <section className="rounded-3xl border border-amber-300/15 bg-gradient-to-br from-violet-500/[0.09] to-amber-400/[0.04] p-5 sm:p-6">
+                  <section className="rounded-xl border border-stone-800 bg-stone-900/70 p-5 sm:p-6">
                     <div className="flex items-start justify-between gap-4">
-                      <div><p className="font-mono text-[9px] uppercase tracking-[0.16em] text-amber-200">Score control</p><h3 className="mt-1 text-lg font-bold text-white">Faculty override</h3></div>
-                      <ShieldCheck className="h-6 w-6 text-amber-200" />
+                      <div>
+                        <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Score control</p>
+                        <h3 className="mt-0.5 text-base font-bold text-stone-100">Faculty override</h3>
+                      </div>
+                      <ShieldCheck className="h-5 w-5 text-[#D93829]" />
                     </div>
 
-                    <div className="mt-5 grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-white/[0.08] bg-black/15 p-4"><p className="font-mono text-[9px] uppercase tracking-[0.13em] text-white/30">Original AI</p><p className="mt-1 text-2xl font-black text-white">{Math.round(selected.aiScore)}<span className="text-xs text-white/30">/100</span></p></div>
-                      <div className="rounded-2xl border border-violet-300/15 bg-violet-400/[0.07] p-4"><p className="font-mono text-[9px] uppercase tracking-[0.13em] text-white/30">Effective</p><p className="mt-1 text-2xl font-black text-violet-100">{Math.round(selected.effectiveScore)}<span className="text-xs text-white/30">/100</span></p></div>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/60 p-3">
+                        <p className="font-mono text-xs uppercase tracking-wider text-stone-500">Original AI</p>
+                        <p className="mt-1 text-xl font-bold text-stone-100">
+                          {Math.round(selected.aiScore)}
+                          <span className="text-xs text-stone-500">/100</span>
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/60 p-3">
+                        <p className="font-mono text-xs uppercase tracking-wider text-stone-500">Effective</p>
+                        <p className="mt-1 text-xl font-bold text-[#D93829]">
+                          {Math.round(selected.effectiveScore)}
+                          <span className="text-xs text-stone-500">/100</span>
+                        </p>
+                      </div>
                     </div>
 
                     {selected.override && (
-                      <div className="mt-4 rounded-2xl border border-violet-300/15 bg-violet-400/[0.06] p-4">
-                        <p className="text-xs font-semibold text-violet-100">Last overridden by {selected.override.facultyName}</p>
-                        <p className="mt-1 text-[10px] text-white/35">{formatDate(selected.override.overriddenAt)}</p>
-                        <p className="mt-2 text-xs leading-relaxed text-white/50">{selected.override.reason}</p>
+                      <div className="mt-3.5 rounded-lg border border-stone-800 bg-stone-950/40 p-3">
+                        <p className="text-xs font-medium text-stone-200">
+                          Last overridden by {selected.override.facultyName}
+                        </p>
+                        <p className="mt-0.5 text-xs text-stone-500">{formatDate(selected.override.overriddenAt)}</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-stone-400">{selected.override.reason}</p>
                       </div>
                     )}
 
-                    <form onSubmit={(event) => void handleOverride(event)} className="mt-5 space-y-4">
+                    <form onSubmit={(event) => void handleOverride(event)} className="mt-4 space-y-3.5">
                       <div>
-                        <label htmlFor="override-score" className="text-xs font-semibold text-white/65">Override score</label>
-                        <input id="override-score" type="number" min="0" max="100" step="0.1" value={overrideScore} onChange={(event) => setOverrideScore(event.target.value)} disabled={isSaving} className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-black/20 px-3.5 text-sm text-white outline-none focus:border-violet-300/45 focus:ring-2 focus:ring-violet-400/15" />
+                        <label htmlFor="override-score" className="text-xs font-medium text-stone-300">
+                          Override score
+                        </label>
+                        <input
+                          id="override-score"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={overrideScore}
+                          onChange={(event) => setOverrideScore(event.target.value)}
+                          disabled={isSaving}
+                          className="mt-1.5 h-10 w-full rounded-lg border border-stone-800 bg-stone-950/80 px-3 text-sm text-stone-200 outline-none focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
+                        />
                       </div>
                       <div>
-                        <label htmlFor="override-reason" className="text-xs font-semibold text-white/65">Reason for override <span className="text-amber-200">*</span></label>
-                        <textarea id="override-reason" required rows={5} value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} disabled={isSaving} placeholder="Explain the evidence and rubric basis for changing this score…" className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-black/20 px-3.5 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25 focus:border-violet-300/45 focus:ring-2 focus:ring-violet-400/15" />
+                        <label htmlFor="override-reason" className="text-xs font-medium text-stone-300">
+                          Reason for override <span className="text-[#D93829]">*</span>
+                        </label>
+                        <textarea
+                          id="override-reason"
+                          required
+                          rows={4}
+                          value={overrideReason}
+                          onChange={(event) => setOverrideReason(event.target.value)}
+                          disabled={isSaving}
+                          placeholder="Explain the evidence and rubric basis for changing this score…"
+                          className="mt-1.5 w-full resize-y rounded-lg border border-stone-800 bg-stone-950/80 px-3 py-2 text-xs leading-relaxed text-stone-200 outline-none placeholder:text-stone-500 focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
+                        />
                       </div>
-                      <button type="submit" disabled={isSaving} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-amber-500 px-5 text-sm font-black text-white shadow-[0_12px_32px_rgba(139,92,246,0.22)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60">
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{isSaving ? 'Saving audit…' : 'Confirm score override'}
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                        {isSaving ? 'Saving audit…' : 'Confirm score override'}
                       </button>
                     </form>
                   </section>
 
-                  <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-violet-300">Session metadata</p>
-                    <dl className="mt-4 space-y-3 text-xs"><div className="flex items-center justify-between gap-4"><dt className="inline-flex items-center gap-1.5 text-white/35"><UserRound className="h-3.5 w-3.5" />Candidate</dt><dd className="text-right font-medium text-white/65">{selected.studentName}</dd></div><div className="flex items-center justify-between gap-4"><dt className="inline-flex items-center gap-1.5 text-white/35"><CalendarDays className="h-3.5 w-3.5" />Completed</dt><dd className="text-right font-medium text-white/65">{formatDate(selected.completedAt)}</dd></div><div className="flex items-center justify-between gap-4"><dt className="text-white/35">Session ID</dt><dd className="max-w-[14rem] truncate font-mono text-[10px] text-white/50">{selected.id}</dd></div></dl>
+                  <section className="rounded-xl border border-stone-800 bg-stone-900/60 p-5">
+                    <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Session metadata</p>
+                    <dl className="mt-3 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="inline-flex items-center gap-1.5 text-stone-400">
+                          <UserRound className="h-3.5 w-3.5" />Candidate
+                        </dt>
+                        <dd className="text-right font-medium text-stone-200">{selected.studentName}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="inline-flex items-center gap-1.5 text-stone-400">
+                          <CalendarDays className="h-3.5 w-3.5" />Completed
+                        </dt>
+                        <dd className="text-right font-medium text-stone-200">{formatDate(selected.completedAt)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-stone-400">Session ID</dt>
+                        <dd className="max-w-[12rem] truncate font-mono text-xs text-stone-400">{selected.id}</dd>
+                      </div>
+                    </dl>
                   </section>
                 </div>
               </div>

@@ -49,22 +49,22 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
             title={collapsed ? label : undefined}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'group relative flex min-h-11 items-center rounded-2xl text-sm font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-cyan-300',
+              'group relative flex min-h-11 items-center rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-600',
               collapsed ? 'justify-center px-2' : 'gap-3.5 px-4',
-              active ? 'text-white' : 'text-white/60 hover:bg-white/[0.06] hover:text-white',
+              active ? 'border-l-2 border-red-600 bg-stone-800 pl-[calc(1rem-2px)] text-stone-100' : 'text-stone-400 hover:bg-stone-800/70 hover:text-stone-200',
             )}
           >
             {active && (
               <motion.span
                 layoutId="dashboard-active-route"
-                className="absolute inset-0 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-indigo-500/25 via-cyan-500/15 to-transparent shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+                className="absolute inset-y-0 left-0 w-0.5 rounded-full bg-red-600"
                 transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 25 }}
               />
             )}
             <Icon
               className={cn(
                 'relative z-10 h-5 w-5 shrink-0 transition-colors',
-                active ? 'text-cyan-300' : 'text-white/40 group-hover:text-white'
+                active ? 'text-red-500' : 'text-stone-500 group-hover:text-stone-200'
               )}
               aria-hidden="true"
             />
@@ -107,7 +107,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
   return (
     <aside
       className={cn(
-        'fixed bottom-4 left-4 top-4 z-40 hidden flex-col rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_24px_70px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-[width] duration-300 lg:flex',
+        'fixed bottom-4 left-4 top-4 z-40 hidden flex-col rounded-2xl border border-stone-800 bg-stone-950 shadow-md shadow-black/40 transition-[width] duration-300 lg:flex',
         collapsed ? 'w-[76px]' : 'w-64'
       )}
     >
@@ -120,16 +120,16 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
       >
         <Link
           href="/dashboard"
-          className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+          className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-red-600"
         >
           <HireableLogo size={36} withGlow priority />
           {!collapsed && (
             <div className="min-w-0">
-              <p className="font-[var(--font-display)] text-lg font-bold tracking-tight text-white">
+              <p className="font-display text-lg font-bold text-stone-100">
                 Hireable
               </p>
-              <p className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-cyan-300">
-                Copilot Studio
+              <p className="truncate text-xs text-stone-500">
+                Placement workspace
               </p>
             </div>
           )}
@@ -139,7 +139,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
             type="button"
             onClick={onToggle}
             aria-label="Collapse sidebar"
-            className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -151,7 +151,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           type="button"
           onClick={onToggle}
           aria-label="Expand sidebar"
-          className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+          className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
@@ -166,23 +166,23 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
       <div className="border-t border-white/10 p-3">
         <div
           className={cn(
-            'rounded-2xl border border-white/[0.08] bg-gradient-to-br from-indigo-500/15 via-cyan-500/5 to-transparent',
+            'rounded-xl border border-stone-800 bg-stone-900',
             collapsed ? 'p-2' : 'p-3.5'
           )}
         >
           {collapsed ? (
-            <p className="text-center font-mono text-xs font-bold text-cyan-200">
+            <p className="text-center text-xs font-bold text-red-500">
               {score}%
             </p>
           ) : (
             <>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="font-mono uppercase tracking-wider text-white/50">Readiness Score</span>
-                <span className="font-mono font-bold text-cyan-300">{score}%</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-500">Readiness score</span>
+                <span className="font-bold text-red-500">{score}%</span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-cyan-400"
+                  className="h-full rounded-full bg-red-600"
                   style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
                 />
               </div>
@@ -195,7 +195,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
       <div className="border-t border-white/10 p-3">
         <div
           className={cn(
-            'flex items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2.5 backdrop-blur-xl',
+            'flex items-center rounded-xl border border-stone-800 bg-stone-900 p-2.5',
             collapsed ? 'justify-center' : 'justify-between gap-3'
           )}
         >
@@ -203,11 +203,11 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
             href={profileHref}
             title="View Profile Settings"
             className={cn(
-              'flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+              'flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-red-600',
               collapsed ? '' : 'flex-1 gap-2.5'
             )}
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 font-mono text-xs font-bold text-white shadow-md shadow-indigo-500/30">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-600 text-xs font-bold text-white">
               {initials}
             </span>
             {!collapsed && (
@@ -215,7 +215,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                 <span className="block truncate text-xs font-semibold text-white">
                   {displayName}
                 </span>
-                <span className="block truncate text-[10px] text-white/40">
+                <span className="block truncate text-xs text-stone-500">
                   {user?.targetRole ?? 'Preview Mode'}
                 </span>
               </span>
@@ -228,7 +228,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                 href={profileHref}
                 aria-label="Settings"
                 title={user ? 'Profile Settings' : 'Create account'}
-                className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
               >
                 {user ? <Settings className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
               </Link>

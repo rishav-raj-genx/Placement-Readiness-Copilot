@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Radio, Sparkles, Terminal, X } from 'lucide-react';
+import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,10 +30,10 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <Label>
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-stone-300">
         {label}
-        {hint && <span className="ml-2 text-xs font-normal text-muted-foreground">{hint}</span>}
+        {hint && <span className="ml-2 font-normal text-stone-500">{hint}</span>}
       </Label>
       {children}
     </div>
@@ -138,7 +138,7 @@ export default function ConfigureInterviewPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
-        title="Interview Studio"
+        title="Interview studio"
         description="Choose your interview track. Practice theoretical system design viva or live coding with IDE."
       />
 
@@ -147,57 +147,57 @@ export default function ConfigureInterviewPage() {
         <button
           type="button"
           onClick={() => setRoundType('round1')}
-          className={`flex flex-col rounded-2xl border p-5 text-left transition-all ${
+          className={`flex flex-col rounded-2xl border p-5 text-left transition-colors ${
             roundType === 'round1'
-              ? 'border-indigo-400/50 bg-gradient-to-br from-indigo-950/60 to-slate-900 shadow-lg ring-1 ring-indigo-400/30'
-              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
+              ? 'border-[#D93829] bg-[#28201E]'
+              : 'border-stone-800 bg-[#28201E]/60 hover:border-stone-700'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/20 text-indigo-300">
+              <span className="grid h-8 w-8 place-items-center rounded-lg border border-stone-800 bg-stone-900 text-stone-200">
                 <Mic2 className="h-4 w-4" />
               </span>
               <div>
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-indigo-300">Round 1</span>
-                <h3 className="text-sm font-bold text-white">Technical Viva</h3>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">Round 1</span>
+                <h3 className="text-sm font-bold text-stone-100">Technical viva</h3>
               </div>
             </div>
-            {roundType === 'round1' && <Check className="h-4 w-4 text-indigo-400" />}
+            {roundType === 'round1' && <Check className="h-4 w-4 text-[#D93829]" />}
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-white/60">
-            15–20 min voice/text technical viva covering fundamentals, system architecture, trade-offs, and HR.
+          <p className="mt-3 text-xs leading-relaxed text-stone-400">
+            15–20 min voice technical viva covering fundamentals, system architecture, trade-offs, and HR.
           </p>
         </button>
 
         <button
           type="button"
           onClick={() => setRoundType('round2')}
-          className={`flex flex-col rounded-2xl border p-5 text-left transition-all ${
+          className={`flex flex-col rounded-2xl border p-5 text-left transition-colors ${
             roundType === 'round2'
-              ? 'border-cyan-400/50 bg-gradient-to-br from-cyan-950/60 to-slate-900 shadow-lg ring-1 ring-cyan-400/30'
-              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
+              ? 'border-[#D93829] bg-[#28201E]'
+              : 'border-stone-800 bg-[#28201E]/60 hover:border-stone-700'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500/20 text-cyan-300">
+              <span className="grid h-8 w-8 place-items-center rounded-lg border border-stone-800 bg-stone-900 text-stone-200">
                 <Code2 className="h-4 w-4" />
               </span>
               <div>
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">Round 2</span>
-                <h3 className="text-sm font-bold text-white">DSA + Web Dev IDE</h3>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">Round 2</span>
+                <h3 className="text-sm font-bold text-stone-100">DSA + web dev IDE</h3>
               </div>
             </div>
-            {roundType === 'round2' && <Check className="h-4 w-4 text-cyan-400" />}
+            {roundType === 'round2' && <Check className="h-4 w-4 text-[#D93829]" />}
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-white/60">
-            Interactive in-browser Monaco IDE testing algorithm efficiency (O(N) vs O(N²)) and web architecture.
+          <p className="mt-3 text-xs leading-relaxed text-stone-400">
+            Interactive in-browser code editor testing algorithm efficiency (O(N) vs O(N²)) and architecture.
           </p>
         </button>
       </div>
 
-      <section className="glass-panel rounded-2xl p-5 md:p-7">
+      <section className="rounded-2xl border border-stone-800 bg-[#28201E] p-5 md:p-7">
         <div className="grid gap-6 md:grid-cols-2">
           {/* Target Role with Searchable Combobox */}
           <Field label="Target role">
@@ -210,13 +210,14 @@ export default function ConfigureInterviewPage() {
               value={targetCompany}
               onChange={(event) => setTargetCompany(event.target.value)}
               placeholder="e.g. Stripe, Google, Startup"
+              className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus-visible:border-[#D93829] focus-visible:ring-[#D93829]"
             />
           </Field>
 
           {/* Experience Level */}
           <Field label="Experience level">
             <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              className="h-10 w-full rounded-lg border border-stone-800 bg-stone-900 px-3 text-sm text-stone-200 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829]"
               value={experienceLevel}
               onChange={(event) => setExperienceLevel(event.target.value as ExperienceLevel)}
             >
@@ -230,7 +231,7 @@ export default function ConfigureInterviewPage() {
           {/* Company Type */}
           <Field label="Company type">
             <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              className="h-10 w-full rounded-lg border border-stone-800 bg-stone-900 px-3 text-sm text-stone-200 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829]"
               value={companyType}
               onChange={(event) => setCompanyType(event.target.value as CompanyType)}
             >
@@ -244,7 +245,7 @@ export default function ConfigureInterviewPage() {
 
         {/* Focus Topics */}
         <div className="mt-6">
-          <Label>Focus topics</Label>
+          <Label className="text-xs font-medium text-stone-300">Focus topics</Label>
           <div className="mt-2 flex gap-2">
             <Input
               value={topicInput}
@@ -255,23 +256,29 @@ export default function ConfigureInterviewPage() {
                   addTopic();
                 }
               }}
-              placeholder="Add a topic (e.g. Distributed Systems, React, LeetCode Hard)"
+              placeholder="Add a topic (e.g. Distributed Systems, React, Algorithms)"
+              className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus-visible:border-[#D93829] focus-visible:ring-[#D93829]"
             />
-            <Button variant="outline" type="button" onClick={addTopic}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={addTopic}
+              className="border-stone-800 bg-stone-900 text-stone-200 hover:bg-stone-800"
+            >
               <Plus className="h-4 w-4" />
               <span className="sr-only">Add topic</span>
             </Button>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {topics.map((topic) => (
               <button
                 key={topic}
                 type="button"
                 onClick={() => removeTopic(topic)}
-                className="inline-flex items-center rounded-full bg-indigo-500/15 px-3 py-1.5 text-xs text-indigo-100 hover:bg-indigo-500/25 transition-colors"
+                className="inline-flex items-center rounded-md border border-[#D93829]/30 bg-[#D93829]/10 px-2.5 py-1 text-xs text-stone-200 hover:bg-[#D93829]/20 transition-colors"
               >
                 {topic}
-                <X className="ml-1.5 h-3 w-3" />
+                <X className="ml-1.5 h-3 w-3 text-stone-400" />
               </button>
             ))}
           </div>
@@ -288,11 +295,11 @@ export default function ConfigureInterviewPage() {
                   onClick={() => setDifficulty(item)}
                   className={`rounded-lg border px-2 py-2 text-xs capitalize transition-colors ${
                     difficulty === item
-                      ? 'border-indigo-400/40 bg-indigo-500/15 text-indigo-100 font-semibold'
-                      : 'border-white/10 text-muted-foreground hover:border-white/20'
+                      ? 'border-stone-700 bg-stone-800 text-stone-100 font-semibold'
+                      : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
                   }`}
                 >
-                  {difficulty === item && <Check className="mr-1 inline h-3 w-3" />}
+                  {difficulty === item && <Check className="mr-1 inline h-3 w-3 text-[#D93829]" />}
                   {item}
                 </button>
               ))}
@@ -306,10 +313,10 @@ export default function ConfigureInterviewPage() {
                   key={minutes}
                   type="button"
                   onClick={() => setDurationMinutes(minutes)}
-                  className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  className={`rounded-lg border px-3 py-2 text-xs font-mono transition-colors ${
                     durationMinutes === minutes
-                      ? 'border-violet-400/40 bg-violet-500/15 text-violet-100 font-semibold'
-                      : 'border-white/10 text-muted-foreground hover:border-white/20'
+                      ? 'border-stone-700 bg-stone-800 text-stone-100 font-semibold'
+                      : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
                   }`}
                 >
                   {minutes} min
@@ -326,20 +333,21 @@ export default function ConfigureInterviewPage() {
               rows={4}
               value={customInstructions}
               onChange={(event) => setCustomInstructions(event.target.value)}
-              placeholder="e.g. Focus on concurrency tradeoffs, ask challenging follow-up questions, and evaluate system scalability."
+              placeholder="e.g. Focus on concurrency tradeoffs, ask challenging follow-up questions, and evaluate scalability."
+              className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus-visible:border-[#D93829] focus-visible:ring-[#D93829]"
             />
           </Field>
         </div>
 
         {createError && (
-          <p role="alert" className="mt-5 text-sm text-red-300">
+          <p role="alert" className="mt-5 rounded-xl border border-red-900/40 bg-red-950/30 px-3.5 py-2.5 text-xs text-red-300">
             {createError}
           </p>
         )}
 
         {roundType !== 'round2' && livekitConfiguration.status !== 'ready' && (
-          <div role="status" className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3.5 py-3 text-xs text-amber-100/80">
-            <Radio className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <div role="status" className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-900/40 bg-amber-950/30 px-3.5 py-3 text-xs text-amber-300">
+            <Radio className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
             <p>
               The LiveKit server stream is initializing. Your interview selections are safe;
               retry shortly if the session does not begin after deployment finishes.
@@ -348,20 +356,24 @@ export default function ConfigureInterviewPage() {
         )}
 
         {/* Action Controls */}
-        <div className="mt-7 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Resume, LinkedIn PDF, GitHub, and skills come from your unified profile.
+        <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-stone-800/80 pt-5">
+          <p className="text-xs text-stone-500">
+            Profile skills, target role, and past evidence are automatically applied.
           </p>
-          <Button onClick={() => void begin()} disabled={isCreating}>
+          <Button
+            onClick={() => void begin()}
+            disabled={isCreating}
+            className="rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]"
+          >
             {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {roundType === 'round2' ? (
               <>
                 <Code2 className="mr-2 h-4 w-4" />
-                Launch Coding IDE (Round 2)
+                Launch coding IDE (Round 2)
               </>
             ) : (
               <>
-                Begin Technical Viva (Round 1)
+                Begin technical viva (Round 1)
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}

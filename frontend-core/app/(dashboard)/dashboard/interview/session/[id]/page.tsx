@@ -221,14 +221,14 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   if (isFinishing) {
     return (
       <div className="mx-auto max-w-2xl">
-        <Card className="border-brand/30">
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
-              <Loader2 className="h-8 w-8 text-brand animate-spin" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-800 bg-stone-900">
+              <Loader2 className="h-7 w-7 text-[#D93829] animate-spin" />
             </div>
             <div className="text-center space-y-1">
-              <h2 className="text-lg font-semibold">Generating Your Interview Results</h2>
-              <p className="text-sm text-muted-foreground max-w-md">
+              <h2 className="text-base font-semibold text-stone-100">Generating your interview results</h2>
+              <p className="text-xs text-stone-400 max-w-md">
                 The AI interviewer is analyzing your performance, transcript, and answers to compile your readiness score...
               </p>
             </div>
@@ -242,14 +242,14 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   if (status === 'connecting' || status === 'idle') {
     return (
       <div className="mx-auto max-w-2xl">
-        <Card>
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
-              <Loader2 className="h-8 w-8 text-brand animate-spin" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-stone-800 bg-stone-900">
+              <Loader2 className="h-7 w-7 text-[#D93829] animate-spin" />
             </div>
             <div className="text-center space-y-1">
-              <h2 className="text-lg font-semibold">Connecting to your interview</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="text-base font-semibold text-stone-100">Connecting to your interview</h2>
+              <p className="text-xs text-stone-400">
                 Establishing real-time audio connection with the AI interviewer...
               </p>
             </div>
@@ -262,23 +262,30 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   if (status === 'error') {
     return (
       <div className="mx-auto max-w-2xl">
-        <Card className="border-destructive/30">
+        <Card className="rounded-2xl border border-red-900/40 bg-red-950/20 shadow-none">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-              <AlertCircle className="h-8 w-8 text-destructive" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-red-900/40 bg-red-950/40">
+              <AlertCircle className="h-7 w-7 text-red-400" />
             </div>
             <div className="text-center space-y-1">
-              <h2 className="text-lg font-semibold">Connection failed</h2>
-              <p className="text-sm text-muted-foreground max-w-md">
+              <h2 className="text-base font-semibold text-stone-100">Connection failed</h2>
+              <p className="text-xs text-stone-400 max-w-md">
                 {livekit.error || 'Could not connect to the interview room. Please check your internet connection and try again.'}
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => router.push('/dashboard/interview')}>
-                Back to Configure
+              <Button
+                variant="outline"
+                onClick={() => router.push('/dashboard/interview')}
+                className="border-stone-800 bg-stone-900 text-xs text-stone-200 hover:bg-stone-800"
+              >
+                Back to configure
               </Button>
-              <Button variant="brand" onClick={() => router.push('/dashboard')}>
-                Return to Dashboard
+              <Button
+                onClick={() => router.push('/dashboard')}
+                className="bg-[#D93829] text-xs font-semibold text-white hover:bg-[#C22F21]"
+              >
+                Return to dashboard
               </Button>
             </div>
           </CardContent>
@@ -292,21 +299,27 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10">
-            <Brain className="h-5 w-5 text-brand" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-stone-800 bg-stone-900 text-[#D93829]">
+            <Brain className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Live Mock Interview</h1>
-            <p className="text-xs text-muted-foreground">
-              {currentInterview?.targetRole || 'Interview'} &middot; Audio Session
+            <h1 className="text-base font-bold text-stone-100">Live mock interview</h1>
+            <p className="text-xs text-stone-400">
+              {currentInterview?.targetRole || 'Interview'} &middot; Audio session
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {currentInterview?.startedAt && <CountdownTimer startedAt={currentInterview.startedAt} durationMinutes={currentInterview.durationMinutes || 15} onExpire={() => void handleFinishInterview()} />}
+          {currentInterview?.startedAt && (
+            <CountdownTimer
+              startedAt={currentInterview.startedAt}
+              durationMinutes={currentInterview.durationMinutes || 15}
+              onExpire={() => void handleFinishInterview()}
+            />
+          )}
           {(recordingStatus === 'recording' || recordingStatus === 'uploading') && (
-            <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-xs text-rose-300">
-              <span className={`mr-1.5 h-1.5 w-1.5 rounded-full bg-rose-400 ${recordingStatus === 'recording' ? 'animate-pulse' : ''}`} />
+            <Badge variant="outline" className="border-red-900/40 bg-red-950/30 text-xs text-red-300">
+              <span className={`mr-1.5 h-1.5 w-1.5 rounded-full bg-red-400 ${recordingStatus === 'recording' ? 'animate-pulse' : ''}`} />
               {recordingStatus === 'recording' ? 'Recording' : 'Saving audio'}
             </Badge>
           )}
@@ -315,17 +328,21 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       </div>
 
       {/* Interviewer Speaking Indicator */}
-      <Card className={livekit.isInterviewerSpeaking ? 'border-brand/40 bg-brand/5' : ''}>
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
         <CardContent className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${livekit.isInterviewerSpeaking ? 'bg-brand/20' : 'bg-muted'}`}>
-              <Radio className={`h-5 w-5 transition-colors ${livekit.isInterviewerSpeaking ? 'text-brand' : 'text-muted-foreground'}`} />
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border border-stone-800 transition-colors ${
+                livekit.isInterviewerSpeaking ? 'bg-[#D93829]/20 text-[#D93829]' : 'bg-stone-900 text-stone-500'
+              }`}
+            >
+              <Radio className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-medium">
+              <p className="text-sm font-medium text-stone-100">
                 {livekit.isInterviewerSpeaking ? 'Interviewer is speaking' : 'Listening to your response'}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-stone-400">
                 {currentQuestion
                   ? `Question ${currentQuestion.questionNumber} of ${currentQuestion.totalQuestions}`
                   : 'Waiting for the interviewer...'}
@@ -333,7 +350,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
             </div>
           </div>
           {currentQuestion && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="border-stone-700 bg-stone-800 font-mono text-[11px] text-stone-300">
               Q{currentQuestion.questionNumber}
             </Badge>
           )}
@@ -342,12 +359,12 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
       {/* Current Question */}
       {currentQuestion && (
-        <Card>
-          <CardContent className="p-6 space-y-3">
-            <div className="text-xs font-medium text-brand uppercase tracking-wide">
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardContent className="p-6 space-y-2.5">
+            <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">
               Question {currentQuestion.questionNumber} of {currentQuestion.totalQuestions}
             </div>
-            <h2 className="text-lg font-medium leading-snug">
+            <h2 className="text-base font-semibold leading-relaxed text-stone-100">
               {currentQuestion.text}
             </h2>
           </CardContent>
@@ -356,29 +373,35 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
       {/* Greeting */}
       {livekit.currentGreeting && !currentQuestion && (
-        <Card>
-          <CardContent className="p-6 space-y-3">
-            <div className="text-xs font-medium text-brand uppercase tracking-wide">
-              Interviewer Greeting
+        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardContent className="p-6 space-y-2.5">
+            <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+              Interviewer greeting
             </div>
-            <h2 className="text-lg font-medium leading-snug">
+            <h2 className="text-base font-semibold leading-relaxed text-stone-100">
               {livekit.currentGreeting}
             </h2>
           </CardContent>
         </Card>
       )}
 
-      <div className="flex justify-end"><TranscriptDrawer transcripts={transcripts} /></div>
+      <div className="flex justify-end">
+        <TranscriptDrawer transcripts={transcripts} />
+      </div>
 
       {/* Audio Controls */}
-      <Card>
-        <CardContent className="flex items-center justify-between p-4">
+      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div className="flex items-center gap-3">
             <Button
-              variant={livekit.isMicrophoneEnabled ? 'default' : 'outline'}
+              variant="outline"
               size="icon"
               onClick={livekit.toggleMicrophone}
-              className="h-12 w-12 rounded-full"
+              className={`h-11 w-11 rounded-full transition-colors ${
+                livekit.isMicrophoneEnabled
+                  ? 'border-[#D93829] bg-[#D93829] text-white hover:bg-[#C22F21]'
+                  : 'border-stone-800 bg-stone-900 text-stone-400 hover:bg-stone-800 hover:text-stone-200'
+              }`}
             >
               {livekit.isMicrophoneEnabled ? (
                 <Mic className="h-5 w-5" />
@@ -388,10 +411,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
             </Button>
             <AudioWaveform level={livekit.localAudioLevel} label="Microphone input level" />
             <div>
-              <p className="text-sm font-medium">
+              <p className="text-xs font-semibold text-stone-200">
                 {livekit.isMicrophoneEnabled ? 'Microphone on' : 'Microphone muted'}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-stone-400">
                 {livekit.isMicrophoneEnabled ? 'Speak naturally to answer' : 'Unmute to speak'}
               </p>
             </div>
@@ -399,8 +422,14 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
           <div className="flex items-center gap-2">
             <AudioWaveform level={livekit.remoteAudioLevel} label="Interviewer audio level" />
-            <Button variant="ghost" size="sm" onClick={livekit.toggleSpeaker} aria-label={livekit.isSpeakerEnabled ? 'Mute interviewer audio' : 'Enable interviewer audio'}>
-              {livekit.isSpeakerEnabled ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={livekit.toggleSpeaker}
+              aria-label={livekit.isSpeakerEnabled ? 'Mute interviewer audio' : 'Enable interviewer audio'}
+              className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200"
+            >
+              {livekit.isSpeakerEnabled ? <Volume2 className="mr-1.5 h-3.5 w-3.5" /> : <VolumeX className="mr-1.5 h-3.5 w-3.5" />}
               {livekit.isSpeakerEnabled ? 'Speaker on' : 'Speaker off'}
             </Button>
           </div>
@@ -409,29 +438,31 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
       {/* End Interview */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-1.5 text-xs text-stone-400">
+          <Clock className="h-3.5 w-3.5 text-stone-500" />
           <span>Automatic finish at the configured duration</span>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="sm">
-              <PhoneOff className="mr-1.5 h-4 w-4" />
-              End Interview
+            <Button variant="ghost" size="sm" className="text-xs text-stone-400 hover:bg-stone-800 hover:text-red-300">
+              <PhoneOff className="mr-1.5 h-3.5 w-3.5" />
+              End interview
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent>
+          <AlertDialogContent className="rounded-xl border border-stone-800 bg-[#28201E] text-stone-200 shadow-lg shadow-black/50">
             <AlertDialogHeader>
-              <AlertDialogTitle>End this interview?</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogTitle className="text-base font-bold text-stone-100">End this interview?</AlertDialogTitle>
+              <AlertDialogDescription className="text-xs text-stone-400">
                 The interviewer will generate your final results. You can also let the interview
                 complete automatically after all questions are asked.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Continue Interview</AlertDialogCancel>
-              <AlertDialogAction onClick={handleFinishInterview}>
-                Finish & Get Results
+              <AlertDialogCancel className="border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800">
+                Continue interview
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleFinishInterview} className="bg-[#D93829] text-xs font-semibold text-white hover:bg-[#C22F21]">
+                Finish and view results
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -443,218 +474,19 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
 function ConnectionStatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; color: string }> = {
-    connected: { label: 'Connected', color: 'bg-success/10 text-success border-success/20' },
-    active: { label: 'Active', color: 'bg-success/10 text-success border-success/20' },
-    connecting: { label: 'Connecting', color: 'bg-warning/10 text-warning border-warning/20' },
-    disconnected: { label: 'Disconnected', color: 'bg-muted text-muted-foreground' },
-    error: { label: 'Error', color: 'bg-destructive/10 text-destructive border-destructive/20' },
-    idle: { label: 'Idle', color: 'bg-muted text-muted-foreground' },
-    disconnecting: { label: 'Disconnecting', color: 'bg-warning/10 text-warning border-warning/20' },
+    connected: { label: 'Connected', color: 'border-stone-700 bg-stone-800 text-stone-200' },
+    active: { label: 'Active', color: 'border-stone-700 bg-stone-800 text-stone-200' },
+    connecting: { label: 'Connecting', color: 'border-amber-900/40 bg-amber-950/30 text-amber-300' },
+    disconnected: { label: 'Disconnected', color: 'border-stone-800 bg-stone-900 text-stone-500' },
+    error: { label: 'Error', color: 'border-red-900/40 bg-red-950/30 text-red-300' },
+    idle: { label: 'Idle', color: 'border-stone-800 bg-stone-900 text-stone-500' },
+    disconnecting: { label: 'Disconnecting', color: 'border-amber-900/40 bg-amber-950/30 text-amber-300' },
   };
   const c = config[status] || config.idle;
   return (
-    <Badge variant="outline" className={`text-xs ${c.color}`}>
+    <Badge variant="outline" className={`font-mono text-[10px] ${c.color}`}>
       <span className="mr-1 h-1.5 w-1.5 rounded-full bg-current" />
       {c.label}
     </Badge>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Demo interview view (original text-based flow for demo accounts)
-// ---------------------------------------------------------------------------
-
-function DemoInterviewView({ id }: { id: string }) {
-  const router = useRouter();
-  const {
-    getSession,
-    startSession,
-    submitAnswer,
-    completeSession,
-    abandonSession,
-    isHydrated,
-  } = useInterviewStore();
-
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [answerText, setAnswerText] = useState('');
-  const [showEndConfirm, setShowEndConfirm] = useState(false);
-
-  const session = getSession(id);
-
-  useEffect(() => {
-    if (isHydrated && session && session.status === 'configured') {
-      startSession(id);
-    }
-  }, [isHydrated, session, id, startSession]);
-
-  const currentQuestion = session?.questions[currentIdx];
-  const answers = session?.answers || [];
-  const currentAnswer = answers.find((a) => a.questionId === currentQuestion?.id);
-
-  useEffect(() => {
-    if (currentAnswer) {
-      setAnswerText(currentAnswer.answerText);
-    } else {
-      setAnswerText('');
-    }
-  }, [currentIdx, currentAnswer]);
-
-  useEffect(() => {
-    if (session && session.status === 'completed') {
-      router.push(`/dashboard/interview/results/${id}`);
-    }
-  }, [session, router, id]);
-
-  if (!isHydrated) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
-  }
-
-  if (!session) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <AlertCircle className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Interview session not found.</p>
-        <Button variant="outline" onClick={() => router.push('/dashboard')}>Return to Dashboard</Button>
-      </div>
-    );
-  }
-
-  if (session.status === 'completed') return null;
-
-  if (!currentQuestion) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <p className="text-sm text-muted-foreground">No questions available.</p>
-        <Button variant="outline" onClick={() => router.push('/dashboard')}>Return to Dashboard</Button>
-      </div>
-    );
-  }
-
-  const handleSubmitAnswer = () => {
-    if (!answerText.trim()) {
-      toast.error('Please write an answer before submitting');
-      return;
-    }
-    submitAnswer(id, currentQuestion.id, answerText);
-    toast.success('Answer submitted');
-    if (currentIdx < session.questions.length - 1) {
-      setCurrentIdx(currentIdx + 1);
-    } else {
-      completeSession(id);
-      toast.success('Interview completed! Viewing results...');
-      router.push(`/dashboard/interview/results/${id}`);
-    }
-  };
-
-  const handleFinishNow = () => {
-    if (answerText.trim()) submitAnswer(id, currentQuestion.id, answerText);
-    completeSession(id);
-    toast.success('Interview completed');
-    router.push(`/dashboard/interview/results/${id}`);
-  };
-
-  const handleEndInterview = () => {
-    abandonSession(id);
-    toast.info('Interview abandoned');
-    router.push('/dashboard');
-  };
-
-  const answeredCount = answers.length;
-  const totalQuestions = session.questions.length;
-
-  return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10">
-            <Brain className="h-5 w-5 text-brand" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold">Mock Interview</h1>
-            <p className="text-xs text-muted-foreground">
-              {session.config.targetRole} &middot; {session.config.type.replace('_', ' ')}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Question {currentIdx + 1} of {totalQuestions}</span>
-          <span className="text-muted-foreground">{answeredCount} answered</span>
-        </div>
-        <div className="flex gap-1">
-          {session.questions.map((_, i) => (
-            <div key={i} className={`h-1.5 flex-1 rounded-full ${i < currentIdx ? 'bg-brand' : i === currentIdx ? 'bg-brand/50' : 'bg-border'}`} />
-          ))}
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="p-6 md:p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <Badge variant="outline" className="text-xs">{currentQuestion.topic}</Badge>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" />
-              {session.config.durationMinutes} min total
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-brand uppercase tracking-wide">Interview Question</div>
-            <h2 className="text-xl font-medium leading-snug">{currentQuestion.questionText}</h2>
-            {currentQuestion.expectedConcepts && currentQuestion.expectedConcepts.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {currentQuestion.expectedConcepts.map((concept) => (
-                  <Badge key={concept} variant="secondary" className="text-xs">{concept}</Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Your Answer</label>
-            <textarea
-              value={answerText}
-              onChange={(e) => setAnswerText(e.target.value)}
-              placeholder="Type your answer here..."
-              rows={8}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-            />
-            <p className="text-xs text-muted-foreground">{answerText.length} characters</p>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {currentIdx > 0 && (
-                <Button variant="ghost" onClick={() => setCurrentIdx(currentIdx - 1)}>Previous</Button>
-              )}
-              <AlertDialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" className="text-destructive">End Interview</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>End this interview?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      You have answered {answeredCount} of {totalQuestions} questions.
-                      Unanswered questions will be marked as incomplete.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Continue Interview</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleEndInterview} className="text-destructive">Abandon</AlertDialogAction>
-                    <AlertDialogAction onClick={handleFinishNow}>Finish & See Results</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-            <Button variant="brand" onClick={handleSubmitAnswer}>
-              {currentIdx < session.questions.length - 1 ? 'Submit & Next' : 'Submit & Finish'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
   );
 }

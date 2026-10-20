@@ -66,8 +66,8 @@ function isJobStatus(value: string): value is JobStatus {
 }
 
 const employmentTypeLabels: Record<string, string> = {
-  full_time: 'Full-Time',
-  part_time: 'Part-Time',
+  full_time: 'Full time',
+  part_time: 'Part time',
   contract: 'Contract',
   internship: 'Internship',
 };
@@ -191,25 +191,32 @@ export default function AdminJobsPage() {
   };
 
   if (!isHydrated) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="font-mono text-xs text-stone-500">Loading…</div>
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
-        title="Job Management"
+        title="Job management"
         description="Create, edit, publish, and delete job postings."
         action={
-          <Button variant="brand" onClick={openCreateForm}>
+          <Button
+            onClick={openCreateForm}
+            className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:ring-2 focus-visible:ring-[#D93829]"
+          >
             <Plus className="mr-1.5 h-4 w-4" />
-            New Posting
+            New posting
           </Button>
         }
       />
 
       <div className="flex items-center gap-2">
         {!isSupabaseConfigured && <DemoLabel />}
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-stone-400">
           {isSupabaseConfigured
             ? 'Postings are stored in Supabase and published jobs appear on the student job board.'
             : 'Supabase is not configured; postings use the local development fallback.'}
@@ -217,52 +224,55 @@ export default function AdminJobsPage() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground/80">
+        <div className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-2.5 text-xs text-red-300">
           Supabase could not be reached. {error}
         </div>
       )}
 
       {/* Jobs Table */}
       {jobs.length === 0 ? (
-        <Card>
+        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center gap-3 text-center">
-              <Briefcase className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No job postings yet.</p>
-              <Button variant="brand" onClick={openCreateForm}>
+              <Briefcase className="h-8 w-8 text-stone-500" />
+              <p className="text-sm text-stone-400">No job postings yet.</p>
+              <Button
+                onClick={openCreateForm}
+                className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]"
+              >
                 <Plus className="mr-1.5 h-4 w-4" />
-                Create First Posting
+                Create first posting
               </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead className="hidden md:table-cell">Company</TableHead>
-                  <TableHead className="hidden sm:table-cell">Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="border-b border-stone-800 hover:bg-transparent">
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-stone-400">Title</TableHead>
+                  <TableHead className="hidden font-mono text-xs uppercase tracking-wider text-stone-400 md:table-cell">Company</TableHead>
+                  <TableHead className="hidden font-mono text-xs uppercase tracking-wider text-stone-400 sm:table-cell">Type</TableHead>
+                  <TableHead className="font-mono text-xs uppercase tracking-wider text-stone-400">Status</TableHead>
+                  <TableHead className="text-right font-mono text-xs uppercase tracking-wider text-stone-400">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {jobs.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell className="font-medium">{job.title}</TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">{job.company}</TableCell>
+                  <TableRow key={job.id} className="border-b border-stone-800/80 transition-colors hover:bg-stone-900/40">
+                    <TableCell className="font-medium text-stone-100">{job.title}</TableCell>
+                    <TableCell className="hidden text-xs text-stone-400 md:table-cell">{job.company}</TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="border-stone-700 bg-stone-800 text-xs text-stone-300">
                         {employmentTypeLabels[job.employmentType]}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={job.status === 'published' ? 'bg-success/10 text-success' : ''}
+                        className={job.status === 'published' ? 'border border-stone-700 bg-stone-800 text-stone-200' : 'border border-stone-800 bg-stone-900 text-stone-500'}
                       >
                         {job.status}
                       </Badge>
@@ -272,7 +282,7 @@ export default function AdminJobsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-8 w-8 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
                           onClick={() => void handleTogglePublish(job.id)}
                           title={job.status === 'published' ? 'Unpublish' : 'Publish'}
                         >
@@ -285,7 +295,7 @@ export default function AdminJobsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-8 w-8 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
                           onClick={() => openEditForm(job)}
                           title="Edit"
                         >
@@ -294,7 +304,7 @@ export default function AdminJobsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive"
+                          className="h-8 w-8 text-stone-400 hover:bg-[#D93829]/15 hover:text-[#D93829]"
                           onClick={() => setDeleteId(job.id)}
                           title="Delete"
                         >
@@ -312,76 +322,126 @@ export default function AdminJobsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded-xl border border-stone-800 bg-[#28201E] text-stone-200 shadow-lg shadow-black/50">
           <DialogHeader>
-            <DialogTitle>{editingJob ? 'Edit Job Posting' : 'New Job Posting'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base font-bold text-stone-100">
+              {editingJob ? 'Edit job posting' : 'New job posting'}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-stone-400">
               {editingJob ? 'Update the job posting details.' : 'Create a new job posting for students.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Job Title</Label>
-              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Frontend Developer" />
+          <div className="space-y-4 py-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="title" className="text-xs font-medium text-stone-300">Job title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Frontend Developer"
+                className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:ring-[#D93829]"
+              />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
-                <Input id="company" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. TechCorp" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="company" className="text-xs font-medium text-stone-300">Company</Label>
+                <Input
+                  id="company"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="e.g. TechCorp"
+                  className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:ring-[#D93829]"
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. San Francisco, CA" />
+              <div className="space-y-1.5">
+                <Label htmlFor="location" className="text-xs font-medium text-stone-300">Location</Label>
+                <Input
+                  id="location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. San Francisco, CA"
+                  className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:ring-[#D93829]"
+                />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Employment Type</Label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-stone-300">Employment type</Label>
                 <Select value={employmentType} onValueChange={(value) => {
                   if (isEmploymentType(value)) setEmploymentType(value);
                 }}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-stone-800 bg-stone-900 text-stone-200 focus:ring-[#D93829]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full_time">Full-Time</SelectItem>
-                    <SelectItem value="part_time">Part-Time</SelectItem>
+                  <SelectContent className="border-stone-800 bg-[#28201E] text-stone-200">
+                    <SelectItem value="full_time">Full time</SelectItem>
+                    <SelectItem value="part_time">Part time</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
                     <SelectItem value="internship">Internship</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Publication Status</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-stone-300">Publication status</Label>
                 <Select value={status} onValueChange={(value) => {
                   if (isJobStatus(value)) setStatus(value);
                 }}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-stone-800 bg-stone-900 text-stone-200 focus:ring-[#D93829]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="border-stone-800 bg-[#28201E] text-stone-200">
                     <SelectItem value="published">Published</SelectItem>
                     <SelectItem value="unpublished">Unpublished</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Job description..." />
+            <div className="space-y-1.5">
+              <Label htmlFor="description" className="text-xs font-medium text-stone-300">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                placeholder="Job description..."
+                className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:ring-[#D93829]"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="skills">Required Skills (comma-separated)</Label>
-              <Input id="skills" value={requiredSkills} onChange={(e) => setRequiredSkills(e.target.value)} placeholder="React, TypeScript, Tailwind CSS" />
+            <div className="space-y-1.5">
+              <Label htmlFor="skills" className="text-xs font-medium text-stone-300">Required skills (comma-separated)</Label>
+              <Input
+                id="skills"
+                value={requiredSkills}
+                onChange={(e) => setRequiredSkills(e.target.value)}
+                placeholder="React, TypeScript, Tailwind CSS"
+                className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:ring-[#D93829]"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="url">Application URL</Label>
-              <Input id="url" value={applicationUrl} onChange={(e) => setApplicationUrl(e.target.value)} placeholder="https://..." />
+            <div className="space-y-1.5">
+              <Label htmlFor="url" className="text-xs font-medium text-stone-300">Application URL</Label>
+              <Input
+                id="url"
+                value={applicationUrl}
+                onChange={(e) => setApplicationUrl(e.target.value)}
+                placeholder="https://..."
+                className="border-stone-800 bg-stone-900 text-stone-200 placeholder:text-stone-500 focus:border-[#D93829] focus:ring-[#D93829]"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowForm(false)} disabled={isMutating}>Cancel</Button>
-            <Button variant="brand" onClick={handleSave} disabled={isMutating}>
+            <Button
+              variant="ghost"
+              onClick={() => setShowForm(false)}
+              disabled={isMutating}
+              className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isMutating}
+              className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]"
+            >
               {editingJob ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>
@@ -390,16 +450,22 @@ export default function AdminJobsPage() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-stone-800 bg-[#28201E] text-stone-200 shadow-lg shadow-black/50">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this job posting?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-base font-bold text-stone-100">Delete this job posting?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-stone-400">
               This action cannot be undone. The posting will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="text-destructive" disabled={isMutating}>
+            <AlertDialogCancel className="border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800 hover:text-stone-100">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="rounded-lg bg-[#D93829] text-xs font-semibold text-white hover:bg-[#C22F21]"
+              disabled={isMutating}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

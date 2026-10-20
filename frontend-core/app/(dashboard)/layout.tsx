@@ -76,17 +76,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <ProtectedRoute requiredRole="student" allowGuest={allowGuest}>
-      <div className="relative min-h-screen bg-[#0B0F17] text-white">
+      <div className="relative min-h-screen bg-background text-foreground">
         <DashboardSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
 
         <div className={cn('relative z-10 min-h-screen transition-[padding] duration-300 lg:pl-72', collapsed && 'lg:pl-[92px]')}>
-          <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[#0B0F17]/85 px-4 backdrop-blur-xl md:hidden">
+          <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-stone-800 bg-stone-950 px-4 md:hidden">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <button type="button" aria-label="Open dashboard navigation" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><Menu className="h-5 w-5" /></button>
+              <button type="button" aria-label="Open dashboard navigation" className="grid h-10 w-10 place-items-center rounded-xl border border-stone-800 bg-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"><Menu className="h-5 w-5" /></button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[19rem] border-white/10 bg-[#0B0F17] p-0">
-                <SheetHeader className="border-b border-white/10 p-5 text-left"><SheetTitle className="flex items-center gap-2.5 text-white"><HireableLogo size={28} withGlow />Hireable</SheetTitle></SheetHeader>
+              <SheetContent side="left" className="w-[19rem] border-stone-800 bg-stone-950 p-0">
+                <SheetHeader className="border-b border-stone-800 p-5 text-left"><SheetTitle className="flex items-center gap-2.5 text-stone-100"><HireableLogo size={28} withGlow />Hireable</SheetTitle></SheetHeader>
                 <div className="p-4"><DashboardNavigation onNavigate={() => setMobileOpen(false)} /></div>
               </SheetContent>
             </Sheet>
@@ -108,13 +108,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {!user && allowGuest && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-[#0B0F17]/90 backdrop-blur-md border border-indigo-500/30 px-6 py-4 rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-center gap-4 max-w-[calc(100vw-2rem)]">
+          <div className="fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-4 rounded-2xl border border-stone-800 bg-stone-950 px-6 py-4 shadow-md shadow-black/40">
             <div>
-              <h4 className="text-white font-semibold">You are in Preview Mode</h4>
-              <p className="text-slate-400 text-sm">Create an account to take AI interviews and apply for MSOT jobs.</p>
+              <h4 className="font-semibold text-stone-100">You are in preview mode</h4>
+              <p className="text-sm text-stone-400">Create an account to take interviews and apply for jobs.</p>
             </div>
-            <Link className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap" href="/auth">
-              Sign Up Free
+            <Link className="whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-500" href="/auth">
+              Create account
             </Link>
           </div>
         )}
