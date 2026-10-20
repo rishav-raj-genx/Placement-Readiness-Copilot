@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { LogOut, Menu, PanelLeftClose } from 'lucide-react';
 import { HireableLogo } from '@/components/brand/hireable-logo';
-import { DASHBOARD_NAV_ITEMS } from '@/components/dashboard/Sidebar';
+import { DashboardNavigation } from '@/components/dashboard/Sidebar';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -14,13 +14,7 @@ import { useProfileStore } from '@/stores/profile-store';
 import { DemoBanner } from '@/components/shared/demo-banner';
 import { TopHeader } from '@/components/layout/top-header';
 
-interface NavigationProps {
-  collapsed?: boolean;
-  onNavigate?: () => void;
-}
-
 export function StudentShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
@@ -32,32 +26,6 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (user?.id) void hydrateProfile(user.id);
   }, [hydrateProfile, user?.id]);
-
-  const Navigation = ({ collapsed: compact = false, onNavigate }: NavigationProps) => (
-    <nav aria-label="Student navigation" className="space-y-1">
-      {DASHBOARD_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            title={compact ? label : undefined}
-            className={cn(
-              'flex items-center rounded-lg py-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]',
-              compact ? 'justify-center px-2' : 'gap-3 px-3',
-              active
-                ? 'border-l-2 border-[#D93829] bg-stone-800 text-stone-100 pl-[calc(0.75rem-2px)]'
-                : 'text-stone-400 hover:bg-stone-800/60 hover:text-stone-200'
-            )}
-          >
-            <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-[#D93829]' : 'text-stone-400')} />
-            {!compact && <span>{label}</span>}
-          </Link>
-        );
-      })}
-    </nav>
-  );
 
   const handleSignOut = async () => {
     resetProfile();
@@ -100,8 +68,8 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
             />
           )}
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
-          <Navigation collapsed={collapsed} />
+        <div className="flex-1 flex flex-col justify-center overflow-y-auto p-3">
+          <DashboardNavigation collapsed={collapsed} />
         </div>
         <div className="border-t border-stone-800 p-3">
           <Button
@@ -132,7 +100,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
                 </SheetTitle>
               </SheetHeader>
               <div className="p-3">
-                <Navigation onNavigate={() => setMobileOpen(false)} />
+                <DashboardNavigation onNavigate={() => setMobileOpen(false)} />
               </div>
             </SheetContent>
           </Sheet>

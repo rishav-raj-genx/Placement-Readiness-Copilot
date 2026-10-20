@@ -38,7 +38,7 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
   const reduceMotion = useReducedMotion();
 
   return (
-    <nav aria-label="Dashboard navigation" className="space-y-2">
+    <nav aria-label="Dashboard navigation" className="flex flex-col gap-4">
       {DASHBOARD_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
         const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
         return (
@@ -48,27 +48,41 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
             onClick={onNavigate}
             title={collapsed ? label : undefined}
             aria-current={active ? 'page' : undefined}
-            className={cn(
-              'group relative flex min-h-11 items-center rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-red-600',
-              collapsed ? 'justify-center px-2' : 'gap-3.5 px-4',
-              active ? 'border-l-2 border-red-600 bg-stone-800 pl-[calc(1rem-2px)] text-stone-100' : 'text-stone-400 hover:bg-stone-800/70 hover:text-stone-200',
-            )}
+            className="group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
           >
-            {active && (
-              <motion.span
-                layoutId="dashboard-active-route"
-                className="absolute inset-y-0 left-0 w-0.5 rounded-full bg-red-600"
-                transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 25 }}
-              />
-            )}
-            <Icon
+            <motion.div
+              whileHover={
+                reduceMotion
+                  ? undefined
+                  : {
+                      scale: 1.15,
+                      x: 12,
+                      backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    }
+              }
+              transition={{
+                type: 'spring',
+                stiffness: 300,
+                damping: 15,
+              }}
+              style={{ originX: 0 }}
               className={cn(
-                'relative z-10 h-5 w-5 shrink-0 transition-colors',
-                active ? 'text-red-500' : 'text-stone-500 group-hover:text-stone-200'
+                'flex items-center rounded-xl py-3 text-sm font-medium transition-colors cursor-none',
+                collapsed ? 'justify-center px-2' : 'gap-3 px-4',
+                active
+                  ? 'border-l-4 border-orange-500 bg-gradient-to-r from-orange-500/10 to-transparent text-orange-500'
+                  : 'text-stone-400 hover:text-stone-200'
               )}
-              aria-hidden="true"
-            />
-            {!collapsed && <span className="relative z-10 truncate">{label}</span>}
+            >
+              <Icon
+                className={cn(
+                  'h-5 w-5 shrink-0 transition-colors',
+                  active ? 'text-orange-500' : 'text-stone-500 group-hover:text-stone-200'
+                )}
+                aria-hidden="true"
+              />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </motion.div>
           </Link>
         );
       })}
@@ -107,20 +121,20 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
   return (
     <aside
       className={cn(
-        'fixed bottom-4 left-4 top-4 z-40 hidden flex-col rounded-2xl border border-stone-800 bg-stone-950 shadow-md shadow-black/40 transition-[width] duration-300 lg:flex',
+        'fixed bottom-4 left-4 top-4 z-40 hidden h-[calc(100vh-2rem)] flex-col rounded-2xl border border-stone-800 bg-stone-950 shadow-md shadow-black/40 transition-[width] duration-300 lg:flex',
         collapsed ? 'w-[76px]' : 'w-64'
       )}
     >
       {/* Brand Header */}
       <div
         className={cn(
-          'flex h-20 items-center border-b border-white/10 px-4',
+          'flex h-20 items-center border-b border-stone-800 px-4',
           collapsed ? 'justify-center' : 'justify-between'
         )}
       >
         <Link
           href="/dashboard"
-          className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+          className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
         >
           <HireableLogo size={36} withGlow priority />
           {!collapsed && (
@@ -139,7 +153,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
             type="button"
             onClick={onToggle}
             aria-label="Collapse sidebar"
-            className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+            className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -151,19 +165,20 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           type="button"
           onClick={onToggle}
           aria-label="Expand sidebar"
-          className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+          className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       )}
 
-      {/* Main Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-4">
+      {/* Main Navigation - Vertically Centered */}
+      <div className="flex-1 flex flex-col justify-center overflow-y-auto px-3 py-4">
         <DashboardNavigation collapsed={collapsed} />
       </div>
 
-      {/* Readiness Mini Indicator */}
-      <div className="border-t border-white/10 p-3">
+      {/* Bottom Widgets Container with gap-4 */}
+      <div className="flex flex-col gap-4 border-t border-stone-800 p-3">
+        {/* Readiness Mini Indicator */}
         <div
           className={cn(
             'rounded-xl border border-stone-800 bg-stone-900',
@@ -171,28 +186,26 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           )}
         >
           {collapsed ? (
-            <p className="text-center text-xs font-bold text-red-500">
+            <p className="text-center text-xs font-bold text-orange-500">
               {score}%
             </p>
           ) : (
             <>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-stone-500">Readiness score</span>
-                <span className="font-bold text-red-500">{score}%</span>
+                <span className="text-stone-400">Readiness score</span>
+                <span className="font-bold text-orange-500">{score}%</span>
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-800">
                 <div
-                  className="h-full rounded-full bg-red-600"
+                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-600 transition-all duration-500"
                   style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
                 />
               </div>
             </>
           )}
         </div>
-      </div>
 
-      {/* Component 1 Profile Strip at Absolute Bottom */}
-      <div className="border-t border-white/10 p-3">
+        {/* User Profile Card */}
         <div
           className={cn(
             'flex items-center rounded-xl border border-stone-800 bg-stone-900 p-2.5',
@@ -203,11 +216,11 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
             href={profileHref}
             title="View Profile Settings"
             className={cn(
-              'flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-red-600',
+              'flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-orange-500',
               collapsed ? '' : 'flex-1 gap-2.5'
             )}
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-600 text-xs font-bold text-white">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-xs font-bold text-white">
               {initials}
             </span>
             {!collapsed && (
@@ -228,7 +241,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                 href={profileHref}
                 aria-label="Settings"
                 title={user ? 'Profile Settings' : 'Create account'}
-                className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
+                className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
               >
                 {user ? <Settings className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
               </Link>
