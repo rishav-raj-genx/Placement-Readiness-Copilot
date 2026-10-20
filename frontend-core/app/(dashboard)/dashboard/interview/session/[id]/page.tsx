@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useLiveKitInterview } from '@/hooks/use-livekit-interview';
+import { useInterviewRecorder } from '@/hooks/useInterviewRecorder';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { useInterviewStore } from '@/stores/interview-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -72,15 +73,39 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     });
   }, [liveKitStore]);
 
-  const handleResults = useCallback((p: LiveKitResultsPayload) => {
+  const handleRecordingError = useCallback((message: string) => {
+    toast.error(`Interview audio was not saved: ${message}`);
+  }, []);
+
+  const {
+    status: recordingStatus,
+    startRecording,
+    stopAndUpload,
+    setCaptureEnabled,
+  } = useInterviewRecorder({
+    interviewId: id,
+    userId: user?.id,
+    onError: handleRecordingError,
+  });
+
+  const finalizeRecording = useCallback(async () => {
+    try {
+      await stopAndUpload();
+    } catch {
+      // The recorder reports a user-facing error and must not block result navigation.
+    }
+  }, [stopAndUpload]);
+
+  const handleResults = useCallback(async (p: LiveKitResultsPayload) => {
     if (finishTimeoutRef.current) {
       clearTimeout(finishTimeoutRef.current);
       finishTimeoutRef.current = null;
     }
+    await finalizeRecording();
     liveKitStore.setResults(p);
     toast.success('Interview completed! Viewing results...');
     router.push(`/dashboard/interview/results/${id}`);
-  }, [liveKitStore, router, id]);
+  }, [finalizeRecording, liveKitStore, router, id]);
 
   const handleError = useCallback((p: LiveKitErrorPayload) => {
     toast.error(p.message);
@@ -95,6 +120,20 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   });
 
   useEffect(() => {
+    if (livekit.status === 'connected' || livekit.status === 'active') {
+      void startRecording().catch(() => undefined);
+      return;
+    }
+    if (livekit.status === 'disconnected' || livekit.status === 'error') {
+      void stopAndUpload().catch(() => undefined);
+    }
+  }, [livekit.status, startRecording, stopAndUpload]);
+
+  useEffect(() => {
+    setCaptureEnabled(livekit.isMicrophoneEnabled);
+  }, [livekit.isMicrophoneEnabled, setCaptureEnabled]);
+
+  useEffect(() => {
     if (!isLiveKitId) router.replace('/dashboard/interview');
   }, [isLiveKitId, router]);
 
@@ -104,18 +143,21 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
     // 1. Send interview:finish event to worker via data channel
     livekit.sendFinishMessage();
+    void finalizeRecording();
     toast.info('Finishing interview... Waiting for AI evaluation results.');
 
     // 2. Set bounded timeout (15s) to wait for interview:results
     finishTimeoutRef.current = setTimeout(async () => {
       finishTimeoutRef.current = null;
+      await finalizeRecording();
       // If data event did not arrive in 15s, check database directly
       try {
-        const { data } = await supabase
+        const { data, error: resultError } = await supabase
           .from('interview_sessions')
           .select('result, status')
           .eq('id', id)
           .maybeSingle();
+        if (resultError) throw resultError;
 
         if (data?.result) {
           liveKitStore.setResults(normalizeInterviewResult(data.result));
@@ -124,8 +166,8 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           router.push(`/dashboard/interview/results/${id}`);
           return;
         }
-      } catch (err) {
-        console.error('Database result verification error:', err);
+      } catch {
+        toast.error('Could not verify the interview result yet. Retrying on the results screen.');
       }
 
       // If not yet in DB, disconnect safely and route to results page (where polling continues)
@@ -133,7 +175,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       toast.info('Scoring is being finalized. Redirecting to results screen...');
       router.push(`/dashboard/interview/results/${id}`);
     }, 15000);
-  }, [isFinishing, livekit, id, liveKitStore, router]);
+  }, [finalizeRecording, isFinishing, livekit, id, liveKitStore, router]);
 
   // Connect to LiveKit room using the session data stored by the configure page
   useEffect(() => {
@@ -262,6 +304,12 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         </div>
         <div className="flex items-center gap-2">
           {currentInterview?.startedAt && <CountdownTimer startedAt={currentInterview.startedAt} durationMinutes={currentInterview.durationMinutes || 15} onExpire={() => void handleFinishInterview()} />}
+          {(recordingStatus === 'recording' || recordingStatus === 'uploading') && (
+            <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-xs text-rose-300">
+              <span className={`mr-1.5 h-1.5 w-1.5 rounded-full bg-rose-400 ${recordingStatus === 'recording' ? 'animate-pulse' : ''}`} />
+              {recordingStatus === 'recording' ? 'Recording' : 'Saving audio'}
+            </Badge>
+          )}
           <ConnectionStatusBadge status={status} />
         </div>
       </div>

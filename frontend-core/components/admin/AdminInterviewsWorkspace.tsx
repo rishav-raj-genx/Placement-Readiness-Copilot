@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
@@ -84,11 +84,11 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
     setOverrideReason('');
   };
 
-  const closeAudit = (): void => {
+  const closeAudit = useCallback((): void => {
     if (isSaving) return;
     setSelected(null);
     setCurrentTime(0);
-  };
+  }, [isSaving]);
 
   useEffect(() => {
     if (!selected) return undefined;
@@ -102,7 +102,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [selected, isSaving]);
+  }, [selected, closeAudit]);
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, interview: FacultyVivaRecord): void => {
     if (event.key === 'Enter' || event.key === ' ') {
