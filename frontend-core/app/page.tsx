@@ -84,7 +84,7 @@ export default function HomePage() {
 
           {user ? (
             <Link
-              href={user.role === 'admin' ? '/admin/dashboard' : '/dashboard'}
+              href={user.role === 'admin' ? '/admin-dashboard' : '/dashboard'}
               className="rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 transition-all hover:opacity-95"
             >
               Dashboard

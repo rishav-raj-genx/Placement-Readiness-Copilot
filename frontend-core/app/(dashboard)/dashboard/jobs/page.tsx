@@ -6,11 +6,19 @@ import {
   Clock3,
   MapPin,
   Radar,
+  ShieldCheck,
   Sparkles,
   Wifi,
 } from 'lucide-react';
-import { normalizeDiscoveredJobs, normalizeProfileSkills } from '@/lib/discovered-jobs';
+import { TrackedApplyLink } from '@/components/jobs/TrackedApplyLink';
+import {
+  DISCOVERED_JOB_COLUMNS,
+  normalizeDiscoveredJobs,
+  normalizeProfileSkills,
+  personalizeAndRankDiscoveredJobs,
+} from '@/lib/discovered-jobs';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
+import { cn } from '@/lib/utils';
 import type { DiscoveredJob } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -38,25 +46,6 @@ const EMPLOYMENT_LABELS: Record<DiscoveredJob['employment_type'], string> = {
   contract: 'Contract',
   internship: 'Internship',
 };
-
-const DISCOVERED_JOB_COLUMNS = [
-  'id',
-  'title',
-  'company',
-  'location',
-  'url',
-  'source',
-  'description',
-  'required_skills',
-  'matched_skills',
-  'relevance_score',
-  'match_reason',
-  'is_remote',
-  'job_type',
-  'employment_type',
-  'publication_status',
-  'posted_at',
-].join(',');
 
 function readTargetRole(value: unknown): string {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return '';
@@ -104,6 +93,7 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
       .from('discovered_jobs')
       .select(DISCOVERED_JOB_COLUMNS)
       .eq('publication_status', 'published')
+      .order('is_msot_post', { ascending: false })
       .order('relevance_score', { ascending: false })
       .order('posted_at', { ascending: false });
 
@@ -119,7 +109,7 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
     const jobsValue: unknown = jobData;
     return {
       profile,
-      jobs: normalizeDiscoveredJobs(jobsValue),
+      jobs: personalizeAndRankDiscoveredJobs(normalizeDiscoveredJobs(jobsValue), profile.skills),
       error: null,
       authRequired: false,
     };
@@ -166,8 +156,16 @@ function JobCard({ job }: JobCardProps) {
     : job.location || 'Location not specified';
 
   return (
-    <article className="group relative flex min-h-[390px] flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-[#121D31]/90 via-[#0D1728]/90 to-[#0A1321]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-cyan-300/25 hover:shadow-[0_28px_80px_rgba(6,182,212,0.10)]">
-      <div aria-hidden="true" className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl transition group-hover:bg-cyan-400/10" />
+    <article className={cn(
+      'group relative flex min-h-[390px] flex-col overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#121D31]/90 via-[#0D1728]/90 to-[#0A1321]/95 p-6 backdrop-blur-xl transition duration-300 hover:-translate-y-1',
+      job.is_msot_post
+        ? 'border border-amber-300/35 shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_28px_85px_rgba(139,92,246,0.16)] hover:border-amber-200/55'
+        : 'border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.28)] hover:border-cyan-300/25 hover:shadow-[0_28px_80px_rgba(6,182,212,0.10)]',
+    )}>
+      <div aria-hidden="true" className={cn(
+        'absolute -right-20 -top-24 h-56 w-56 rounded-full blur-3xl transition',
+        job.is_msot_post ? 'bg-violet-500/20 group-hover:bg-amber-400/15' : 'bg-indigo-500/10 group-hover:bg-cyan-400/10',
+      )} />
 
       <div className="relative flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -177,11 +175,16 @@ function JobCard({ job }: JobCardProps) {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{job.company}</p>
             <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">
-              {job.source || 'Verified ATS'}
+              {job.is_msot_post ? 'MSOT Placement Office' : job.source || 'Verified ATS'}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
+          {job.is_msot_post && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/30 bg-gradient-to-r from-violet-500/20 to-amber-400/15 px-3 py-1.5 text-[11px] font-black text-amber-100 shadow-[0_0_22px_rgba(251,191,36,0.12)]">
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> MSOT Official
+            </span>
+          )}
           <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-semibold text-white/65">
             {EMPLOYMENT_LABELS[job.employment_type]}
           </span>
@@ -232,14 +235,20 @@ function JobCard({ job }: JobCardProps) {
             {job.match_reason || 'Recommended from your target role, skills, and candidate profile.'}
           </p>
         </div>
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(79,70,229,0.2)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1321]"
+        <TrackedApplyLink
+          jobId={job.id}
+          company={job.company}
+          jobTitle={job.title}
+          url={job.url}
+          className={cn(
+            'mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1321]',
+            job.is_msot_post
+              ? 'bg-gradient-to-r from-violet-600 to-amber-500 shadow-[0_10px_30px_rgba(139,92,246,0.22)] focus-visible:ring-amber-300'
+              : 'bg-gradient-to-r from-indigo-500 to-cyan-500 shadow-[0_10px_30px_rgba(79,70,229,0.2)] focus-visible:ring-cyan-300',
+          )}
         >
           Apply Now <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-        </a>
+        </TrackedApplyLink>
       </div>
     </article>
   );

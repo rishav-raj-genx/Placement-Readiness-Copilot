@@ -1,6 +1,15 @@
 import type { UserRole } from '@/types';
 
 const STUDENT_PATHS = ['/dashboard', '/interview', '/interviews', '/applications', '/jobs', '/tracker', '/profile', '/resources'];
+const ADMIN_PATHS = ['/admin', '/admin-dashboard', '/admin-jobs', '/admin-interviews'];
+
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+export function isAdminPathname(pathname: string): boolean {
+  return ADMIN_PATHS.some((path) => matchesRoute(pathname, path));
+}
 
 export function safeInternalPath(value: string | null | undefined): string | null {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
@@ -25,7 +34,7 @@ export function getAuthenticatedDestination({
   onboardingCompleted,
   requestedPath,
 }: DestinationInput): string {
-  if (role === 'admin') return '/admin/dashboard';
+  if (role === 'admin') return '/admin-dashboard';
   if (!onboardingCompleted) return '/auth?mode=signup&resume=1';
   const safePath = safeInternalPath(requestedPath);
   if (
@@ -53,8 +62,8 @@ export function resolveAccessRedirect({
   role = 'student',
   onboardingCompleted = false,
 }: AccessRedirectInput): string | null {
-  const isStudentPath = STUDENT_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isStudentPath = STUDENT_PATHS.some((path) => matchesRoute(pathname, path));
+  const isAdminPath = isAdminPathname(pathname);
   const isOnboardingPath = pathname === '/onboarding' || pathname.startsWith('/onboarding/');
   const isAuthPath = ['/auth', '/signin', '/signup', '/login'].some((path) => pathname === path || pathname.startsWith(`${path}/`));
   const isLandingPage = pathname === '/';
@@ -68,15 +77,17 @@ export function resolveAccessRedirect({
   }
 
   if (role === 'admin') {
-    return isStudentPath || isOnboardingPath || isAuthPath || isLandingPage ? '/admin/dashboard' : null;
+    return isStudentPath || isOnboardingPath || isAuthPath || isLandingPage ? '/admin-dashboard' : null;
   }
+
+  if (isAdminPath) return '/dashboard';
 
   const query = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const isResumeSignup = pathname === '/auth' && query.get('mode') === 'signup' && query.get('resume') === '1';
 
   if (!onboardingCompleted) {
     if (isResumeSignup) return null;
-    return isStudentPath || isAdminPath || isOnboardingPath || isAuthPath || isLandingPage
+    return isStudentPath || isOnboardingPath || isAuthPath || isLandingPage
       ? '/auth?mode=signup&resume=1'
       : null;
   }

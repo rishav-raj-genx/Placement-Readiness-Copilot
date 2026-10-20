@@ -3,179 +3,293 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
-  LayoutDashboard,
-  Briefcase,
-  Brain,
+  BriefcaseBusiness,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
   LogOut,
   Menu,
+  Mic2,
+  ShieldCheck,
 } from 'lucide-react';
-import { HireableLogo } from '@/components/brand/hireable-logo';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { useAuthStore } from '@/stores/auth-store';
-import { DemoBanner } from '@/components/shared/demo-banner';
 import { toast } from 'sonner';
+import { HireableLogo } from '@/components/brand/hireable-logo';
+import { PageTransition } from '@/components/motion/page-transition';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
 
-const adminNavItems = [
-  { href: '/admin/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
-  { href: '/admin/jobs', label: 'Job Management', icon: Briefcase },
-];
+export const ADMIN_NAV_ITEMS = [
+  { href: '/admin-dashboard', label: 'Command Center', icon: Building2 },
+  { href: '/admin-jobs', label: 'Post Jobs', icon: BriefcaseBusiness },
+  { href: '/admin-interviews', label: 'Review Vivas', icon: Mic2 },
+] as const;
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+interface AdminShellProps {
+  children: React.ReactNode;
+}
+
+interface AdminNavigationProps {
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}
+
+interface AdminAccountProps {
+  collapsed?: boolean;
+  displayName: string;
+  initials: string;
+  isSigningOut: boolean;
+  onSignOut: () => void;
+}
+
+function AdminNavigation({ collapsed = false, onNavigate }: AdminNavigationProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, signOut } = useAuthStore();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const reduceMotion = useReducedMotion();
 
-  const initials = user?.displayName
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'AD';
+  return (
+    <nav aria-label="MSOT staff navigation" className="space-y-2">
+      {ADMIN_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
 
-  const handleSignOut = async () => {
-    await signOut();
-    toast.success('Signed out successfully');
-    router.push('/signin');
-  };
-
-  const AccountFooter = ({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) => (
-    <div className={cn('border-t border-border', collapsed ? 'p-2' : 'p-4')}>
-      <div
-        className={cn('mb-3 flex items-center gap-2', collapsed ? 'justify-center' : 'px-1')}
-        title={user?.displayName || 'Admin'}
-      >
-        <Avatar className="h-8 w-8 shrink-0">
-          <AvatarFallback className="bg-muted text-xs font-medium">{initials}</AvatarFallback>
-        </Avatar>
-        {!collapsed && (
-          <span className="min-w-0 truncate text-sm font-medium text-foreground">
-            {user?.displayName || 'Admin'}
-          </span>
-        )}
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className={cn(collapsed ? 'mx-auto h-9 w-9 p-0' : 'w-full')}
-        onClick={() => { onNavigate?.(); void handleSignOut(); }}
-        aria-label="Sign out"
-      >
-        <LogOut className={cn('h-4 w-4', !collapsed && 'mr-2')} />
-        {!collapsed && 'Sign out'}
-      </Button>
-    </div>
-  );
-
-  const NavLinks = ({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) => (
-    <nav className="space-y-1">
-      {adminNavItems.map((item) => {
-        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-        const Icon = item.icon;
         return (
           <Link
-            key={item.href}
-            href={item.href}
+            key={href}
+            href={href}
             onClick={onNavigate}
-            title={collapsed ? item.label : undefined}
+            title={collapsed ? label : undefined}
+            aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center rounded-md text-sm font-medium transition-colors',
-              collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
-              isActive
-                ? 'bg-muted text-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              'group relative flex min-h-12 items-center rounded-2xl text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-300',
+              collapsed ? 'justify-center px-2' : 'gap-3.5 px-4',
+              active ? 'text-white' : 'text-white/55 hover:bg-white/[0.06] hover:text-white',
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" />
-            {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+            {active && (
+              <motion.span
+                layoutId="admin-active-route"
+                className="absolute inset-0 rounded-2xl border border-violet-300/30 bg-gradient-to-r from-violet-500/25 via-amber-400/10 to-transparent shadow-[0_0_24px_rgba(139,92,246,0.16)]"
+                transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 25 }}
+              />
+            )}
+            <Icon
+              className={cn(
+                'relative z-10 h-[22px] w-[22px] shrink-0 transition-colors',
+                active ? 'text-amber-300' : 'text-white/35 group-hover:text-violet-200',
+              )}
+              aria-hidden="true"
+            />
+            {!collapsed && <span className="relative z-10 truncate">{label}</span>}
           </Link>
         );
       })}
     </nav>
   );
+}
 
+function AdminAccount({
+  collapsed = false,
+  displayName,
+  initials,
+  isSigningOut,
+  onSignOut,
+}: AdminAccountProps) {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop Fixed Sidebar: stays stationary when the user scrolls */}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border bg-card transition-[width] duration-300 ease-in-out md:flex',
-          sidebarCollapsed ? 'w-[72px]' : 'w-60'
+    <div className="border-t border-white/10 p-3">
+      <div className={cn(
+        'flex items-center rounded-2xl border border-white/[0.08] bg-white/[0.035] p-2.5',
+        collapsed ? 'justify-center' : 'gap-2.5',
+      )}>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-amber-400 font-mono text-xs font-black text-white shadow-[0_8px_24px_rgba(139,92,246,0.25)]">
+          {initials}
+        </span>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-white">{displayName}</p>
+            <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-amber-200/65">Administrator</p>
+          </div>
         )}
-      >
-        <div className="flex h-16 shrink-0 items-center border-b border-border px-3">
+        {!collapsed && (
           <button
             type="button"
-            onClick={() => setSidebarCollapsed((prev) => !prev)}
-            className={cn(
-              'group flex w-full items-center rounded-xl p-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              sidebarCollapsed ? 'justify-center' : 'justify-start'
-            )}
-            aria-label={sidebarCollapsed ? 'Expand navigation bar' : 'Close navigation bar'}
-            title={sidebarCollapsed ? 'Expand navigation bar' : 'Close navigation bar'}
+            onClick={onSignOut}
+            disabled={isSigningOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <HireableLogo size={32} withGlow priority />
-              {!sidebarCollapsed && (
-                <div className="text-left overflow-hidden">
-                  <div className="text-base font-semibold tracking-tight text-foreground whitespace-nowrap">Hireable</div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Admin</div>
-                </div>
-              )}
-            </div>
+            {isSigningOut
+              ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              : <LogOut className="h-5 w-5" aria-hidden="true" />}
           </button>
+        )}
+      </div>
+      {collapsed && (
+        <button
+          type="button"
+          onClick={onSignOut}
+          disabled={isSigningOut}
+          aria-label="Sign out"
+          title="Sign out"
+          className="mx-auto mt-2 grid h-9 w-9 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSigningOut
+            ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            : <LogOut className="h-5 w-5" aria-hidden="true" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function AdminShell({ children }: AdminShellProps) {
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const signOut = useAuthStore((state) => state.signOut);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const displayName = user?.displayName || 'MSOT Administrator';
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'MS';
+
+  const handleSignOut = async (): Promise<void> => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      await signOut();
+      const authError = useAuthStore.getState().error;
+      if (authError) toast.error(authError);
+      else toast.success('Signed out successfully');
+    } finally {
+      setMobileOpen(false);
+      router.replace('/auth');
+      router.refresh();
+      setIsSigningOut(false);
+    }
+  };
+
+  return (
+    <div className="relative min-h-screen overflow-x-hidden bg-[#0B0F17] text-white">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_8%_4%,rgba(139,92,246,0.12),transparent_30%),radial-gradient(circle_at_92%_8%,rgba(251,191,36,0.07),transparent_26%)]" />
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 opacity-[0.025] [background-image:linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.18)_1px,transparent_1px)] [background-size:48px_48px]" />
+
+      <aside className={cn(
+        'fixed bottom-4 left-4 top-4 z-40 hidden flex-col rounded-3xl border border-violet-300/15 bg-[#111522]/88 shadow-[0_28px_90px_rgba(0,0,0,0.62)] backdrop-blur-2xl transition-[width] duration-300 lg:flex',
+        collapsed ? 'w-[76px]' : 'w-64',
+      )}>
+        <div className={cn(
+          'flex min-h-24 items-center border-b border-white/10 px-4',
+          collapsed ? 'justify-center' : 'justify-between gap-3',
+        )}>
+          <Link
+            href="/admin-dashboard"
+            className="flex min-w-0 items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+          >
+            <HireableLogo size={38} withGlow priority />
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="font-[var(--font-display)] text-lg font-black tracking-tight text-white">Hireable</p>
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/20 bg-amber-400/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-amber-200">
+                  <ShieldCheck className="h-3 w-3" aria-hidden="true" /> MSOT Staff
+                </span>
+              </div>
+            )}
+          </Link>
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(true)}
+              aria-label="Collapse admin sidebar"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/35 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
-          <NavLinks collapsed={sidebarCollapsed} />
+
+        {collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            aria-label="Expand admin sidebar"
+            className="mx-auto mt-3 grid h-8 w-8 place-items-center rounded-xl text-white/35 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-3 py-5">
+          <AdminNavigation collapsed={collapsed} />
         </div>
-        <AccountFooter collapsed={sidebarCollapsed} />
+        <AdminAccount
+          collapsed={collapsed}
+          displayName={displayName}
+          initials={initials}
+          isSigningOut={isSigningOut}
+          onSignOut={() => void handleSignOut()}
+        />
       </aside>
 
-      {/* Main Content Area */}
-      <div
-        className={cn(
-          'flex min-h-screen min-w-0 flex-1 flex-col transition-[padding] duration-300 ease-in-out',
-          sidebarCollapsed ? 'md:pl-[72px]' : 'md:pl-60'
-        )}
-      >
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-card px-4 md:hidden">
+      <div className={cn(
+        'relative z-10 min-h-screen transition-[padding] duration-300 lg:pl-72',
+        collapsed && 'lg:pl-[92px]',
+      )}>
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[#0B0F17]/88 px-4 backdrop-blur-xl lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open menu">
-                <Menu className="h-5 w-5" />
-              </Button>
+              <button
+                type="button"
+                aria-label="Open MSOT staff navigation"
+                className="grid h-10 w-10 place-items-center rounded-xl border border-violet-300/20 bg-violet-400/10 text-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              >
+                <Menu className="h-5 w-5" aria-hidden="true" />
+              </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0">
+            <SheetContent side="left" className="w-[19rem] border-violet-300/15 bg-[#0B0F17] p-0 text-white">
               <div className="flex h-full flex-col">
-                <SheetHeader className="border-b border-border px-6 py-4 text-left">
-                  <SheetTitle className="flex items-center gap-2 text-base font-semibold">
-                    <HireableLogo size={24} />
-                    Hireable Admin
+                <SheetHeader className="border-b border-white/10 p-5 text-left">
+                  <SheetTitle className="flex items-center gap-3 text-white">
+                    <HireableLogo size={32} withGlow />
+                    <span>
+                      <span className="block font-[var(--font-display)] font-black">Hireable</span>
+                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-amber-200">MSOT Staff</span>
+                    </span>
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto p-4">
-                  <NavLinks onNavigate={() => setMobileOpen(false)} />
+                  <AdminNavigation onNavigate={() => setMobileOpen(false)} />
                 </div>
-                <AccountFooter onNavigate={() => setMobileOpen(false)} />
+                <AdminAccount
+                  displayName={displayName}
+                  initials={initials}
+                  isSigningOut={isSigningOut}
+                  onSignOut={() => void handleSignOut()}
+                />
               </div>
             </SheetContent>
           </Sheet>
 
-          <Link href="/admin/dashboard" className="flex items-center gap-2">
-            <HireableLogo size={24} />
-            <span className="font-semibold text-foreground">Hireable Admin</span>
+          <Link href="/admin-dashboard" className="flex items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
+            <HireableLogo size={27} />
+            <span className="text-sm font-bold">MSOT Command Center</span>
           </Link>
-          <div className="w-9" />
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-amber-400 font-mono text-[10px] font-black">
+            {initials}
+          </span>
         </header>
 
-        <DemoBanner />
-
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );

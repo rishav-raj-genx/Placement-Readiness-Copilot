@@ -35,6 +35,7 @@ class TestCanonicalV0Contract(unittest.TestCase):
         ]
         self.sample_raw_llm = {
             "interview_score": 78.5,
+            "ai_confidence": 0.82,
             "overallReadinessDelta": 3,
             "summary": "Solid technical depth in full-stack architecture.",
             "dimensions": {
@@ -89,6 +90,9 @@ class TestCanonicalV0Contract(unittest.TestCase):
         self.assertGreaterEqual(canonical["interview_score"], 0)
         self.assertLessEqual(canonical["interview_score"], 100)
 
+        # Scoring confidence drives the faculty review queue.
+        self.assertEqual(canonical["ai_confidence"], 0.82)
+
         # 3. Summary
         self.assertEqual(canonical["summary"], "Solid technical depth in full-stack architecture.")
 
@@ -136,6 +140,12 @@ class TestCanonicalV0Contract(unittest.TestCase):
     def test_missing_score_is_rejected(self):
         raw = dict(self.sample_raw_llm)
         raw.pop("interview_score")
+        with self.assertRaises(ValueError):
+            build_canonical_v0_result(raw, self.sample_transcript)
+
+    def test_confidence_bounds(self):
+        raw = dict(self.sample_raw_llm)
+        raw["ai_confidence"] = 1.2
         with self.assertRaises(ValueError):
             build_canonical_v0_result(raw, self.sample_transcript)
 

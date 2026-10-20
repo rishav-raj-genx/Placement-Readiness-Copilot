@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { resolveAccessRedirect } from '@/lib/auth-routing';
+import { isAdminPathname, resolveAccessRedirect } from '@/lib/auth-routing';
 import { createMiddlewareSessionClient } from '@/lib/supabase-session-server';
 
 interface ProfileAccess {
@@ -61,6 +61,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   if (userId && !profile) {
     profile = { role: 'student', onboardingCompleted: false };
+  }
+
+  if (userId && profile?.role !== 'admin' && isAdminPathname(pathname)) {
+    return redirectWithCookies('/dashboard', request, response);
   }
 
   const destination = resolveAccessRedirect({

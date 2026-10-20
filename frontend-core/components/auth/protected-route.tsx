@@ -51,7 +51,7 @@ export function ProtectedRoute({
       return;
     }
     if (requiredRole === 'student' && user.role === 'admin') {
-      router.replace('/admin/dashboard');
+      router.replace('/admin-dashboard');
     }
   }, [allowGuest, fallbackUrl, isHydrated, pathname, requiredRole, router, user]);
 

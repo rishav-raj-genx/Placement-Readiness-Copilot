@@ -1,5 +1,25 @@
 import type { DiscoveredJob } from '@/types';
 
+export const DISCOVERED_JOB_COLUMNS = [
+  'id',
+  'title',
+  'company',
+  'location',
+  'url',
+  'source',
+  'description',
+  'required_skills',
+  'matched_skills',
+  'relevance_score',
+  'match_reason',
+  'is_remote',
+  'job_type',
+  'employment_type',
+  'publication_status',
+  'is_msot_post',
+  'posted_at',
+].join(',');
+
 type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -75,6 +95,7 @@ export function normalizeDiscoveredJob(value: unknown): DiscoveredJob | null {
     job_type: readString(value.job_type),
     employment_type: value.employment_type,
     publication_status: value.publication_status,
+    is_msot_post: value.is_msot_post === true,
     posted_at: readString(value.posted_at),
   };
 }
@@ -88,4 +109,45 @@ export function normalizeDiscoveredJobs(value: unknown): DiscoveredJob[] {
 
 export function normalizeProfileSkills(value: unknown): string[] {
   return readStringArray(value);
+}
+
+function normalizedSkill(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function timestamp(value: string): number {
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function personalizeAndRankDiscoveredJobs(
+  jobs: DiscoveredJob[],
+  profileSkills: string[],
+): DiscoveredJob[] {
+  const candidateSkills = new Set(profileSkills.map(normalizedSkill));
+  const personalized = jobs.map((job): DiscoveredJob => {
+    if (!job.is_msot_post) return job;
+
+    const matchedSkills = job.required_skills.filter((skill) => candidateSkills.has(normalizedSkill(skill)));
+    const relevanceScore = job.required_skills.length > 0
+      ? Math.round((matchedSkills.length / job.required_skills.length) * 100)
+      : 0;
+
+    return {
+      ...job,
+      matched_skills: matchedSkills,
+      relevance_score: relevanceScore,
+      match_reason: matchedSkills.length > 0
+        ? `Official MSOT opportunity matching ${matchedSkills.length} of your profile skills.`
+        : 'Official opportunity published by the MSOT placement team.',
+    };
+  });
+
+  return personalized.sort((first, second) => {
+    if (first.is_msot_post !== second.is_msot_post) return first.is_msot_post ? -1 : 1;
+    if (first.relevance_score !== second.relevance_score) {
+      return second.relevance_score - first.relevance_score;
+    }
+    return timestamp(second.posted_at) - timestamp(first.posted_at);
+  });
 }

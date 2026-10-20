@@ -78,7 +78,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       finishTimeoutRef.current = null;
     }
     liveKitStore.setResults(p);
-    liveKitStore.persistResults(liveKitStore.currentInterview?.interviewId || id, p).catch(() => {});
     toast.success('Interview completed! Viewing results...');
     router.push(`/dashboard/interview/results/${id}`);
   }, [liveKitStore, router, id]);

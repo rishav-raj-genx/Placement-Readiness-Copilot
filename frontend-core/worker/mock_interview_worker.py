@@ -358,6 +358,7 @@ Transcript:
 Produce a JSON object with EXACTLY this structure (no markdown, no extra explanation — valid JSON only):
 {{
   "interview_score": <number between 0.0 and 100.0, e.g. 78.5>,
+  "ai_confidence": <number between 0.0 and 1.0 indicating scoring confidence>,
   "summary": "<2-3 sentence overall feedback summary>",
   "overallReadinessDelta": <integer between -10 and +10>,
   "dimensions": {{
@@ -465,6 +466,13 @@ def build_canonical_v0_result(
     if not 0.0 <= score_val <= 100.0:
         raise ValueError("interview_score must be between 0 and 100")
 
+    confidence_val = data.get("ai_confidence", 0.5)
+    if isinstance(confidence_val, bool) or not isinstance(confidence_val, (int, float)):
+        raise ValueError("ai_confidence must be numeric")
+    confidence_val = round(float(confidence_val), 3)
+    if not 0.0 <= confidence_val <= 1.0:
+        raise ValueError("ai_confidence must be between 0 and 1")
+
     raw_dims = data.get("dimensions", {})
     if not isinstance(raw_dims, dict):
         raise ValueError("scoring response dimensions must be an object")
@@ -496,6 +504,7 @@ def build_canonical_v0_result(
     return {
         "contract_version": "v0",
         "interview_score": score_val,
+        "ai_confidence": confidence_val,
         "transcript": canonical_transcript,
         "summary": str(data.get("summary", "Mock interview completed.")),
         "dimensions": dimensions,
@@ -513,6 +522,11 @@ def validate_canonical_v0_result(payload: dict[str, Any]) -> tuple[bool, str]:
         return False, f"interview_score must be a number, got {type(score)}"
     if score < 0 or score > 100:
         return False, f"interview_score must be between 0 and 100, got {score}"
+    confidence = payload.get("ai_confidence")
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+        return False, "ai_confidence must be numeric"
+    if confidence < 0 or confidence > 1:
+        return False, f"ai_confidence must be between 0 and 1, got {confidence}"
     if not isinstance(payload.get("summary"), str):
         return False, "summary must be a string"
     if not isinstance(payload.get("transcript"), list):

@@ -6,7 +6,6 @@ import type {
   LiveKitTranscriptEntry,
   LiveKitQuestionPayload,
 } from '@/types';
-import { supabase } from '@/lib/supabase-client';
 import { loadFromStorage, saveToStorage } from '@/lib/storage';
 
 export type LiveKitInterviewStatus =
@@ -57,7 +56,6 @@ interface LiveKitInterviewState {
   completeInterview: () => void;
   abandonInterview: () => void;
   reset: () => void;
-  persistResults: (interviewId: string, results: LiveKitResultsPayload) => Promise<void>;
   hydrate: () => void;
 }
 
@@ -184,16 +182,5 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
   reset: () => {
     saveToStorage('livekit-current-interview', null);
     set({ currentInterview: null, createError: null, isCreating: false });
-  },
-
-  persistResults: async (interviewId: string, results: LiveKitResultsPayload) => {
-    await supabase
-      .from('interview_sessions')
-      .update({
-        result: results,
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', interviewId);
   },
 }));

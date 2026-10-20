@@ -153,6 +153,7 @@ export interface DiscoveredJob {
   job_type: string;
   employment_type: 'full_time' | 'part_time' | 'contract' | 'internship';
   publication_status: 'published' | 'unpublished';
+  is_msot_post: boolean;
   posted_at: string;
 }
 
