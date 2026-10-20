@@ -2,6 +2,7 @@ import type { UserRole } from '@/types';
 
 const STUDENT_PATHS = ['/dashboard', '/interview', '/interviews', '/applications', '/jobs', '/tracker', '/profile', '/resources'];
 const ADMIN_PATHS = ['/admin', '/admin-dashboard', '/admin-jobs', '/admin-interviews'];
+const GUEST_PREVIEW_PATHS = ['/dashboard', '/dashboard/jobs'];
 
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
@@ -9,6 +10,10 @@ function matchesRoute(pathname: string, route: string): boolean {
 
 export function isAdminPathname(pathname: string): boolean {
   return ADMIN_PATHS.some((path) => matchesRoute(pathname, path));
+}
+
+export function isGuestPreviewPathname(pathname: string): boolean {
+  return GUEST_PREVIEW_PATHS.includes(pathname);
 }
 
 export function safeInternalPath(value: string | null | undefined): string | null {
@@ -67,11 +72,13 @@ export function resolveAccessRedirect({
   const isOnboardingPath = pathname === '/onboarding' || pathname.startsWith('/onboarding/');
   const isAuthPath = ['/auth', '/signin', '/signup', '/login'].some((path) => pathname === path || pathname.startsWith(`${path}/`));
   const isLandingPage = pathname === '/';
+  const isGuestPreviewPath = isGuestPreviewPathname(pathname);
 
   if (!isStudentPath && !isAdminPath && !isOnboardingPath && !isAuthPath && !isLandingPage) return null;
   if (isLandingPage) return null;
 
   if (!authenticated) {
+    if (isGuestPreviewPath) return null;
     if (!isStudentPath && !isAdminPath && !isOnboardingPath) return null;
     return `/auth?redirectTo=${encodeURIComponent(`${pathname}${search}`)}`;
   }

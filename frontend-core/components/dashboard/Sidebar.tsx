@@ -10,6 +10,7 @@ import {
   ChevronRight,
   History,
   Home,
+  LogIn,
   LogOut,
   Mic2,
   Settings,
@@ -86,14 +87,15 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
   const signOut = useAuthStore((state) => state.signOut);
   const readiness = useProfileStore((state) => state.readiness);
   const resetProfile = useProfileStore((state) => state.reset);
-  const displayName = user?.displayName || 'Alex Rivera';
+  const displayName = user?.displayName || 'Guest';
   const initials = displayName
     .split(/\s+/)
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase() || 'AR';
-  const score = readiness?.totalScore ?? 78;
+    .toUpperCase() || 'G';
+  const score = user ? readiness?.totalScore ?? 0 : 0;
+  const profileHref = user ? '/dashboard/profile' : '/auth?mode=signup';
 
   const handleSignOut = async () => {
     resetProfile();
@@ -198,7 +200,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           )}
         >
           <Link
-            href="/dashboard/profile"
+            href={profileHref}
             title="View Profile Settings"
             className={cn(
               'flex min-w-0 items-center outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
@@ -214,7 +216,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                   {displayName}
                 </span>
                 <span className="block truncate text-[10px] text-white/40">
-                  {user?.targetRole ?? 'Full-Stack Engineer'}
+                  {user?.targetRole ?? 'Preview Mode'}
                 </span>
               </span>
             )}
@@ -223,22 +225,24 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           {!collapsed && (
             <div className="flex items-center gap-1">
               <Link
-                href="/dashboard/profile"
+                href={profileHref}
                 aria-label="Settings"
-                title="Profile Settings"
+                title={user ? 'Profile Settings' : 'Create account'}
                 className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
-                <Settings className="h-5 w-5" />
+                {user ? <Settings className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
               </Link>
-              <button
-                type="button"
-                onClick={() => void handleSignOut()}
-                aria-label="Sign out"
-                title="Sign out"
-                className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  aria-label="Sign out"
+                  title="Sign out"
+                  className="grid h-8 w-8 place-items-center rounded-xl text-white/40 transition hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+              )}
             </div>
           )}
         </div>

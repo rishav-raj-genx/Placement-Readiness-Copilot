@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type MouseEvent, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useApplicationStore } from '@/stores/application-store';
@@ -23,6 +24,7 @@ export function TrackedApplyLink({
   className,
   children,
 }: TrackedApplyLinkProps) {
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const addApplication = useApplicationStore((state) => state.addApplication);
   const [isTracking, setIsTracking] = useState(false);
@@ -51,6 +53,11 @@ export function TrackedApplyLink({
   };
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+    if (!user) {
+      event.preventDefault();
+      router.push('/auth');
+      return;
+    }
     if (isTracking) {
       event.preventDefault();
       return;
@@ -60,9 +67,9 @@ export function TrackedApplyLink({
 
   return (
     <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={user ? url : '/auth'}
+      target={user ? '_blank' : undefined}
+      rel={user ? 'noopener noreferrer' : undefined}
       onClick={handleClick}
       aria-busy={isTracking}
       className={cn(className, isTracking && 'pointer-events-none opacity-70')}

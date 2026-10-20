@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { HireableLogo } from '@/components/brand/hireable-logo';
@@ -15,8 +16,10 @@ import { useApplicationStore } from '@/stores/application-store';
 import { useJobStore } from '@/stores/job-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
+import { isGuestPreviewPathname } from '@/lib/auth-routing';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const hydrateAuth = useAuthStore((state) => state.hydrate);
@@ -27,6 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bootstrappedUserId, setBootstrappedUserId] = useState<string | null>(null);
+  const allowGuest = isGuestPreviewPathname(pathname);
 
   useEffect(() => {
     if (!isHydrated) hydrateAuth();
@@ -68,10 +72,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { active = false; };
   }, [analyzeProfile, hydrateApplications, hydrateJobs, hydrateProfile, user]);
 
-  const dataReady = Boolean(user?.id && bootstrappedUserId === user.id);
+  const dataReady = (!user && allowGuest) || Boolean(user?.id && bootstrappedUserId === user.id);
 
   return (
-    <ProtectedRoute requiredRole="student">
+    <ProtectedRoute requiredRole="student" allowGuest={allowGuest}>
       <div className="relative min-h-screen bg-[#0B0F17] text-white">
         <DashboardSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
 
@@ -90,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <TopHeader />
-          <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
+          <main className="mx-auto w-full max-w-[1600px] p-4 pb-32 sm:p-6 sm:pb-32 lg:p-8 lg:pb-32">
             <PageTransition>
               {dataReady ? children : (
                 <SegmentedLoader
@@ -102,6 +106,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </PageTransition>
           </main>
         </div>
+
+        {!user && allowGuest && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-[#0B0F17]/90 backdrop-blur-md border border-indigo-500/30 px-6 py-4 rounded-2xl shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-center gap-4 max-w-[calc(100vw-2rem)]">
+            <div>
+              <h4 className="text-white font-semibold">You are in Preview Mode</h4>
+              <p className="text-slate-400 text-sm">Create an account to take AI interviews and apply for MSOT jobs.</p>
+            </div>
+            <Link className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap" href="/auth">
+              Sign Up Free
+            </Link>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );

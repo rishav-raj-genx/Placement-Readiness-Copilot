@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -18,6 +17,7 @@ import {
   personalizeAndRankDiscoveredJobs,
 } from '@/lib/discovered-jobs';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
+import { createSupabaseServiceClient } from '@/lib/supabase-service-server';
 import { cn } from '@/lib/utils';
 import type { DiscoveredJob } from '@/types';
 
@@ -33,7 +33,6 @@ interface JobDiscoveryResult {
   profile: CandidateMatchProfile | null;
   jobs: DiscoveredJob[];
   error: string | null;
-  authRequired: boolean;
 }
 
 interface JobCardProps {
@@ -62,34 +61,36 @@ function readProfileSkills(value: unknown): string[] {
 async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
   try {
     const supabase = createServerSessionClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    let profile: CandidateMatchProfile | null = null;
 
-    if (authError || !authData.user) {
-      return { profile: null, jobs: [], error: null, authRequired: true };
-    }
+    if (authData.user) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('target_role,skills')
+        .eq('id', authData.user.id)
+        .maybeSingle();
 
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('target_role,skills')
-      .eq('id', authData.user.id)
-      .maybeSingle();
+      if (profileError) {
+        return {
+          profile: null,
+          jobs: [],
+          error: 'Your candidate profile could not be loaded.',
+        };
+      }
 
-    if (profileError) {
-      return {
-        profile: null,
-        jobs: [],
-        error: 'Your candidate profile could not be loaded.',
-        authRequired: false,
+      const profileValue: unknown = profileData;
+      profile = {
+        targetRole: readTargetRole(profileValue),
+        skills: readProfileSkills(profileValue),
       };
     }
 
-    const profileValue: unknown = profileData;
-    const profile: CandidateMatchProfile = {
-      targetRole: readTargetRole(profileValue),
-      skills: readProfileSkills(profileValue),
-    };
+    // Guest reads stay server-side and are limited to published columns below;
+    // the service-role credential is never included in the client bundle.
+    const jobsClient = authData.user ? supabase : createSupabaseServiceClient();
 
-    const { data: jobData, error: jobsError } = await supabase
+    const { data: jobData, error: jobsError } = await jobsClient
       .from('discovered_jobs')
       .select(DISCOVERED_JOB_COLUMNS)
       .eq('publication_status', 'published')
@@ -102,23 +103,20 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
         profile,
         jobs: [],
         error: 'Published job matches could not be loaded.',
-        authRequired: false,
       };
     }
 
     const jobsValue: unknown = jobData;
     return {
       profile,
-      jobs: personalizeAndRankDiscoveredJobs(normalizeDiscoveredJobs(jobsValue), profile.skills),
+      jobs: personalizeAndRankDiscoveredJobs(normalizeDiscoveredJobs(jobsValue), profile?.skills ?? []),
       error: null,
-      authRequired: false,
     };
   } catch {
     return {
       profile: null,
       jobs: [],
       error: 'Job discovery is temporarily unavailable.',
-      authRequired: false,
     };
   }
 }
@@ -255,8 +253,7 @@ function JobCard({ job }: JobCardProps) {
 }
 
 export default async function JobsPage() {
-  const { profile, jobs, error, authRequired } = await loadJobDiscovery();
-  if (authRequired) redirect('/auth?redirectTo=/dashboard/jobs');
+  const { profile, jobs, error } = await loadJobDiscovery();
 
   return (
     <div className="relative min-h-screen pb-24">

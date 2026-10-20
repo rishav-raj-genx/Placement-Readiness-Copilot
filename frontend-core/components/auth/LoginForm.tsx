@@ -15,6 +15,9 @@ interface LoginFormProps {
   redirectTo?: string | null;
 }
 
+const DEMO_ADMIN_EMAIL = 'admin@hireable.com';
+const DEMO_ADMIN_PASSWORD = 'MSOTAdmin2026!';
+
 export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   const router = useRouter();
   const { signIn, isLoading, error, clearError } = useAuthStore();
@@ -26,6 +29,13 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const submitLockRef = useRef(false);
+
+  const fillAdminCredentials = (): void => {
+    clearError();
+    setEmail(DEMO_ADMIN_EMAIL);
+    setPassword(DEMO_ADMIN_PASSWORD);
+    toast.success('MSOT Admin credentials are ready. Select Sign In to continue.');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +211,18 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
             </>
           )}
         </button>
+
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center">
+          <span className="text-xs text-white/40">Evaluating the platform?</span>
+          <button
+            type="button"
+            onClick={fillAdminCredentials}
+            disabled={isLoading}
+            className="text-xs font-semibold text-indigo-300 transition-colors hover:text-indigo-200 disabled:pointer-events-none disabled:opacity-50"
+          >
+            Auto-fill Admin Credentials
+          </button>
+        </div>
       </form>
 
       {/* Subtle Toggle: New here? Build your profile */}

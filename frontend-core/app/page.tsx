@@ -3,25 +3,21 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IntroSequence } from "@/components/IntroSequence";
-import { useAuthStore } from "@/stores/auth-store";
 
 export default function Home() {
   const router = useRouter();
-  const user = useAuthStore((state) => state.user);
-  const isHydrated = useAuthStore((state) => state.isHydrated);
   const [showIntro, setShowIntro] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!isHydrated) return;
     setMounted(true);
     const hasSeen = localStorage.getItem("has_seen_intro");
-    if (user && hasSeen) {
+    if (hasSeen) {
       router.push("/dashboard");
     } else {
       setShowIntro(true);
     }
-  }, [isHydrated, router, user]);
+  }, [router]);
 
   if (!mounted) return <div className="min-h-screen bg-[#0B0F17]" />;
 

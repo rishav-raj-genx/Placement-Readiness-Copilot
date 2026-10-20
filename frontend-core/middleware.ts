@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { isAdminPathname, resolveAccessRedirect } from '@/lib/auth-routing';
+import { isAdminPathname, isGuestPreviewPathname, resolveAccessRedirect } from '@/lib/auth-routing';
 import { createMiddlewareSessionClient } from '@/lib/supabase-session-server';
 
 interface ProfileAccess {
@@ -70,6 +70,17 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   if (!userId && (pathname === '/auth' || pathname.startsWith('/auth/'))) {
+    return response;
+  }
+
+  // Allow public access to dashboard home and jobs
+  if (!userId && (pathname.startsWith('/admin') || pathname === '/dashboard/interview' || pathname.startsWith('/dashboard/interview'))) {
+    const redirectUrl = new URL('/auth', request.url);
+    redirectUrl.searchParams.set('redirectTo', pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+  // Do NOT redirect if pathname is exactly '/dashboard' or '/dashboard/jobs'
+  if (!userId && (pathname === '/dashboard' || pathname === '/dashboard/jobs' || isGuestPreviewPathname(pathname))) {
     return response;
   }
 

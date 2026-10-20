@@ -97,7 +97,7 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
     if (onClose) {
       onClose();
     }
-    router.push('/auth?mode=signup');
+    router.push('/dashboard');
   };
 
   const handleNext = () => {
@@ -283,7 +283,10 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
               ) : (
                 <button
                   type="button"
-                  onClick={handleFinish}
+                  onClick={() => {
+                    localStorage.setItem('has_seen_intro', 'true');
+                    router.push('/dashboard');
+                  }}
                   className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 px-6 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all hover:opacity-95 hover:shadow-indigo-500/50"
                 >
                   <span>Get Started with Hireable</span>

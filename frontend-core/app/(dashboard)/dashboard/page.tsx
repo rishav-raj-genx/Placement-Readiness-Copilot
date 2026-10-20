@@ -29,6 +29,22 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { useApplicationStore } from '@/stores/application-store';
+import type { ReadinessScore } from '@/types';
+
+const GUEST_MOCK_READINESS: ReadinessScore = {
+  totalScore: 0,
+  readinessLevel: 'Not ready',
+  topActions: [],
+  breakdown: {
+    resume: { rawScore: 0, weight: 0.25, weightedPoints: 0, present: false },
+    projects: { rawScore: 0, weight: 0.25, weightedPoints: 0, present: false },
+    mock_interview: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
+    github: { rawScore: 0, weight: 0.1, weightedPoints: 0, present: false },
+    coding_practice: { rawScore: 0, weight: 0.1, weightedPoints: 0, present: false },
+    linkedin: { rawScore: 0, weight: 0.05, weightedPoints: 0, present: false },
+    co_curricular: { rawScore: 0, weight: 0.05, weightedPoints: 0, present: false },
+  },
+};
 
 const QUICK_LINKS = [
   { href: '/dashboard/interview', label: 'Interview Studio', description: 'Round 1 technical viva & speech practice', icon: Mic2 },
@@ -64,23 +80,37 @@ export default function DashboardHomePage() {
     }
   }, [hydrateApplications, isHydrated, user?.id]);
 
-  const roadmap = useMemo(() => buildDashboardRoadmap(readiness), [readiness]);
-  const nextBestActions = useMemo(() => buildNextBestActions(readiness), [readiness]);
-  const score = readiness?.totalScore;
-  const tier = readinessTier(score, readiness?.readinessLevel);
-  const firstName = (profile?.displayName ?? user?.displayName ?? 'Candidate').split(/\s+/)[0];
-  const targetRole = profile?.targetRole ?? user?.targetRole ?? 'your target role';
-  const status = review?.status ?? (isAnalyzing ? 'processing' : 'pending');
+  const visibleReadiness = user ? readiness : GUEST_MOCK_READINESS;
+  const roadmap = useMemo(() => {
+    const nodes = buildDashboardRoadmap(visibleReadiness);
+    return user ? nodes : nodes.map((node) => ({
+      ...node,
+      actionHref: '/auth',
+    }));
+  }, [user, visibleReadiness]);
+  const nextBestActions = useMemo(() => {
+    const actions = buildNextBestActions(visibleReadiness);
+    return user ? actions : actions.map((action) => ({ ...action, href: '/auth' }));
+  }, [user, visibleReadiness]);
+  const score = user ? visibleReadiness?.totalScore ?? 0 : 0;
+  const tier = user ? readinessTier(score, visibleReadiness?.readinessLevel) : 'Building readiness';
+  const rawUserName = (user as unknown as { user_metadata?: { name?: string } })?.user_metadata?.name
+    || user?.displayName
+    || profile?.displayName
+    || 'Guest';
+  const firstName = rawUserName.split(/\s+/)[0] || 'Guest';
+  const targetRole = user ? profile?.targetRole ?? user?.targetRole ?? 'your target role' : 'your target role';
+  const status = user ? review?.status ?? (isAnalyzing ? 'processing' : 'pending') : 'pending';
 
   const appCounts = useMemo(() => {
     return {
-      total: applications.length,
-      applied: applications.filter((a) => a.status === 'applied').length,
-      shortlisted: applications.filter((a) => a.status === 'shortlisted').length,
-      interviewing: applications.filter((a) => a.status === 'interviewing').length,
-      offer: applications.filter((a) => a.status === 'offer').length,
+      total: user ? applications.length : 0,
+      applied: user ? applications.filter((a) => a.status === 'applied').length : 0,
+      shortlisted: user ? applications.filter((a) => a.status === 'shortlisted').length : 0,
+      interviewing: user ? applications.filter((a) => a.status === 'interviewing').length : 0,
+      offer: user ? applications.filter((a) => a.status === 'offer').length : 0,
     };
-  }, [applications]);
+  }, [applications, user]);
 
   return (
     <div className="relative min-h-screen">
@@ -102,15 +132,15 @@ export default function DashboardHomePage() {
               </p>
               <AnalysisStatus
                 status={status}
-                error={review?.errorMessage ?? error}
-                isAnalyzing={isAnalyzing}
+                error={user ? review?.errorMessage ?? error : null}
+                isAnalyzing={Boolean(user && isAnalyzing)}
                 onRetry={user?.id ? () => void analyze(user.id) : undefined}
               />
             </div>
 
             <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-black/15 p-5 sm:p-7">
               <ReadinessRing score={score} level={tier} />
-              <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">{formatUpdatedAt(readiness?.updatedAt ?? review?.updatedAt)}</p>
+              <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">{formatUpdatedAt(visibleReadiness?.updatedAt ?? (user ? review?.updatedAt : undefined))}</p>
             </div>
           </div>
         </section>
@@ -122,7 +152,7 @@ export default function DashboardHomePage() {
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-indigo-300">Internshala-Style Application Tracker</p>
               <h2 id="pipeline-metrics" className="mt-0.5 text-lg font-bold text-white">Your Placement Activity</h2>
             </div>
-            <Link href="/dashboard/tracker" className="inline-flex items-center text-xs text-cyan-300 hover:text-cyan-200 font-semibold">
+            <Link href={user ? '/dashboard/tracker' : '/auth'} className="inline-flex items-center text-xs text-cyan-300 hover:text-cyan-200 font-semibold">
               View Application Pipeline <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Link>
           </div>
@@ -177,7 +207,7 @@ export default function DashboardHomePage() {
               </div>
               <div className="mt-6 flex items-center justify-between">
                 <span className="font-mono text-xs text-indigo-200">Grounded in your resume</span>
-                <Link href="/dashboard/interview">
+                <Link href={user ? '/dashboard/interview' : '/auth'}>
                   <button className="flex items-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-600 transition-colors">
                     Start Round 1 <ArrowRight className="h-3.5 w-3.5" />
                   </button>
@@ -201,7 +231,7 @@ export default function DashboardHomePage() {
               </div>
               <div className="mt-6 flex items-center justify-between">
                 <span className="font-mono text-xs text-cyan-200">O(N) Complexity Analyzer</span>
-                <Link href="/dashboard/interview/coding">
+                <Link href={user ? '/dashboard/interview/coding' : '/auth'}>
                   <button className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-cyan-600 hover:to-indigo-600 transition-colors">
                     Open Coding IDE <ArrowRight className="h-3.5 w-3.5" />
                   </button>
@@ -220,7 +250,7 @@ export default function DashboardHomePage() {
             <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
               {READINESS_CATEGORY_LABELS.map(({ key, label }) => (
                 <div key={key} className={key === 'mock_interview' ? 'md:col-span-2' : undefined}>
-                  <BreakdownMeter label={label} value={readiness?.breakdown[key]} />
+                  <BreakdownMeter label={label} value={visibleReadiness?.breakdown[key]} />
                 </div>
               ))}
             </div>
@@ -253,7 +283,7 @@ export default function DashboardHomePage() {
           <div className="mb-4 flex items-end justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-indigo-300">Keep moving</p><h2 id="quick-links-heading" className="mt-1 text-xl font-bold text-white">Quick links</h2></div></div>
           <div className="grid gap-4 md:grid-cols-3">
             {QUICK_LINKS.map(({ href, label, description, icon: Icon }) => (
-              <Link key={href} href={href} className="group rounded-2xl border border-white/10 bg-[#0E1728]/75 p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+              <Link key={href} href={!user && href !== '/dashboard/jobs' ? '/auth' : href} className="group rounded-2xl border border-white/10 bg-[#0E1728]/75 p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
                 <div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500/15 text-indigo-200"><Icon className="h-5 w-5" aria-hidden="true" /></span><ArrowRight className="h-4 w-4 text-white/30 transition-transform group-hover:translate-x-1 group-hover:text-cyan-200" aria-hidden="true" /></div>
                 <h3 className="mt-4 font-semibold text-white">{label}</h3><p className="mt-1 text-xs text-white/45">{description}</p>
               </Link>
