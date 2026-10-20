@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+
+import { resolveInterviewFocusTopics } from '@/lib/interview-config';
 import { filterRoles, OTHER_OPTION, STANDARD_ROLES } from '@/lib/roles';
 
 describe('role combobox options and filtering', () => {
@@ -27,5 +29,12 @@ describe('role combobox options and filtering', () => {
 
   it('has dedicated Other custom role constant', () => {
     expect(OTHER_OPTION).toBe('Other (Type custom role)');
+  });
+
+  it('uses a role-specific default when no focus topics are supplied', () => {
+    expect(resolveInterviewFocusTopics('Frontend Developer', [])).toEqual([
+      'General Frontend Developer Concepts',
+    ]);
+    expect(resolveInterviewFocusTopics('Frontend Developer', [' React ', ''])).toEqual(['React']);
   });
 });

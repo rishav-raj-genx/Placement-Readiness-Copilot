@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Sparkles, Terminal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { createInterviewSession } from '@/lib/livekit-session';
+import { resolveInterviewFocusTopics } from '@/lib/interview-config';
 import { RoleCombobox } from '@/components/interview/RoleCombobox';
 import type { CompanyType, Difficulty, ExperienceLevel, LiveKitSessionRequest } from '@/types';
 import { toast } from 'sonner';
@@ -78,24 +79,35 @@ export default function ConfigureInterviewPage() {
     setTopics((current) => current.filter((item) => item !== topicToRemove));
   };
 
+  const handleTargetRoleChange = useCallback((value: string) => {
+    setTargetRole(value);
+  }, []);
+
   const begin = async () => {
     if (roundType === 'round2') {
       router.push('/dashboard/interview/coding');
       return;
     }
 
-    if (!user || !targetRole.trim() || topics.length === 0) {
-      toast.error('Add a target role and at least one focus topic.');
+    const normalizedTargetRole = targetRole.trim();
+    if (!normalizedTargetRole) {
+      toast.error('Please select a target role.');
       return;
     }
+    if (!user) {
+      toast.error('Your session has expired. Please sign in again.');
+      return;
+    }
+
+    const focusTopics = resolveInterviewFocusTopics(normalizedTargetRole, topics);
     setCreating(true);
     setCreateError(null);
     try {
       const request: LiveKitSessionRequest = {
         studentId: user.id,
-        targetRole: targetRole.trim(),
-        topics,
-        focusAreas: topics,
+        targetRole: normalizedTargetRole,
+        topics: focusTopics,
+        focusAreas: focusTopics,
         difficulty,
         durationMinutes,
         experienceLevel,
@@ -107,7 +119,7 @@ export default function ConfigureInterviewPage() {
       startInterview(
         session.interviewId,
         session.roomName,
-        targetRole.trim(),
+        normalizedTargetRole,
         session.serverUrl,
         session.token,
         durationMinutes
@@ -188,7 +200,7 @@ export default function ConfigureInterviewPage() {
         <div className="grid gap-6 md:grid-cols-2">
           {/* Target Role with Searchable Combobox */}
           <Field label="Target role">
-            <RoleCombobox value={targetRole} onChange={setTargetRole} />
+            <RoleCombobox value={targetRole} onChange={handleTargetRoleChange} />
           </Field>
 
           {/* Target Company */}
