@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -44,18 +44,9 @@ export default function DashboardHomePage() {
   const profile = useProfileStore((state) => state.profile);
   const review = useProfileStore((state) => state.review);
   const readiness = useProfileStore((state) => state.readiness);
-  const isLoading = useProfileStore((state) => state.isLoading);
   const isAnalyzing = useProfileStore((state) => state.isAnalyzing);
   const error = useProfileStore((state) => state.error);
   const analyze = useProfileStore((state) => state.analyze);
-  const analysisStarted = useRef(false);
-
-  useEffect(() => {
-    if (!user?.id || !profile || review || readiness || isLoading || analysisStarted.current) return;
-    analysisStarted.current = true;
-    void analyze(user.id);
-  }, [analyze, isLoading, profile, readiness, review, user?.id]);
-
   const roadmap = useMemo(() => buildDashboardRoadmap(readiness), [readiness]);
   const nextBestActions = useMemo(() => buildNextBestActions(readiness), [readiness]);
   const score = readiness?.totalScore;

@@ -50,7 +50,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       const profileState = useProfileStore.getState();
       const candidate = profileState.profile ?? user;
-      const needsInitialAnalysis = Boolean(profileState.profile) && (!profileState.review || !profileState.readiness);
+      const needsInitialAnalysis = Boolean(profileState.profile) && (
+        !profileState.review
+        || profileState.review.status === 'failed'
+        || !profileState.readiness
+      );
 
       await Promise.all([
         hydrateJobs({ targetRole: candidate.targetRole ?? '', skills: candidate.skills }),

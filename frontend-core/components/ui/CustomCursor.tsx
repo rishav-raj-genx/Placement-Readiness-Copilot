@@ -73,9 +73,9 @@ export function CustomCursor() {
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-[99999] overflow-hidden"
     >
-      {/* 2. The Trail (The Aura): Spring-delayed, glassmorphic ring */}
+      {/* 2. The Trail (The Aura): Spring-delayed ring */}
       <motion.div
-        className="fixed top-0 left-0 rounded-full border backdrop-blur-sm"
+        className="fixed top-0 left-0 rounded-full border"
         style={{
           x: trailX,
           y: trailY,
@@ -85,21 +85,15 @@ export function CustomCursor() {
           height: 32,
         }}
         animate={{
-          scale: isPressed ? 1.2 : isHovered ? 1.55 : 1,
-          opacity: isVisible ? 1 : 0,
-          backgroundColor: isHovered
-            ? 'rgba(255, 255, 255, 0.08)'
-            : 'rgba(99, 102, 241, 0.04)',
-          borderColor: isHovered ? '#06B6D4' : '#6366F1',
-          boxShadow: isHovered
-            ? '0 0 20px rgba(6, 182, 212, 0.4), inset 0 0 10px rgba(6, 182, 212, 0.2)'
-            : '0 0 10px rgba(99, 102, 241, 0.25)',
+          scale: isHovered || isPressed ? 0 : 1,
+          opacity: isVisible && !isHovered && !isPressed ? 1 : 0,
+          backgroundColor: 'rgba(99, 102, 241, 0.04)',
+          borderColor: '#6366F1',
+          boxShadow: '0 0 10px rgba(99, 102, 241, 0.25)',
         }}
         transition={{
-          scale: { type: 'spring', stiffness: 350, damping: 25 },
-          opacity: { duration: 0.15 },
-          backgroundColor: { duration: 0.2 },
-          borderColor: { duration: 0.2 },
+          scale: { duration: 0.12, ease: 'easeOut' },
+          opacity: { duration: 0.1, ease: 'easeOut' },
         }}
       />
 
@@ -113,8 +107,8 @@ export function CustomCursor() {
           translateY: '-50%',
         }}
         animate={{
-          scale: isHovered ? 0 : isPressed ? 1.3 : 1,
-          opacity: isVisible && !isHovered ? 1 : 0,
+          scale: isPressed ? 1.35 : isHovered ? 1.2 : 1,
+          opacity: isVisible ? 1 : 0,
         }}
         transition={{
           duration: 0.15,

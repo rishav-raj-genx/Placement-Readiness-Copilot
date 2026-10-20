@@ -21,8 +21,8 @@ function configuredServices(): readonly ServiceConfig[] {
   return [
     {
       name: 'profile',
-      url: process.env.PROFILE_REVIEW_API_URL?.trim(),
-      environmentVariable: 'PROFILE_REVIEW_API_URL',
+      url: process.env.PROFILE_REVIEW_API_URL?.trim() || process.env.PROFILE_ENGINE_URL?.trim(),
+      environmentVariable: 'PROFILE_REVIEW_API_URL or PROFILE_ENGINE_URL',
       healthPath: '/health',
     },
     {
@@ -33,7 +33,9 @@ function configuredServices(): readonly ServiceConfig[] {
     },
     {
       name: 'automation',
-      url: process.env.AUTOMATION_API_URL?.trim(),
+      url: process.env.AUTOMATION_API_URL?.trim()
+        || process.env.AUTOMATION_SERVICE_URL?.trim()
+        || process.env.NEXT_PUBLIC_AUTOMATION_URL?.trim(),
       environmentVariable: 'AUTOMATION_API_URL',
       healthPath: '/',
     },

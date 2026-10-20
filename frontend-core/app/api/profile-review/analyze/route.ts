@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAutomationBaseUrl, getProfileReviewBaseUrl, serviceRequest } from '@/lib/backend-services';
+import { getOptionalAutomationBaseUrl, getProfileReviewBaseUrl, serviceRequest } from '@/lib/backend-services';
 import { normalizeUserProfile, isRecord } from '@/lib/profile-adapters';
+import { calculateReadinessLocally, type ReadinessCalculationInput } from '@/lib/readiness-calculator';
 import { scoreCoCurricular } from '@/lib/scoring';
 import { createAdminClient } from '@/lib/supabase-server';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
@@ -17,16 +18,36 @@ function requireOwnedPath(path: string | undefined, userId: string, label: strin
   return path;
 }
 
-async function checkProject(project: CandidateProject, studentId: string, skills: string[]): Promise<unknown> {
-  if (!project.liveUrl) return null;
+async function checkProject(project: CandidateProject, studentId: string, skills: string[], automationBaseUrl: string | null): Promise<unknown> {
+  if (!project.liveUrl || !automationBaseUrl) return null;
   try {
-    return await serviceRequest(`${getAutomationBaseUrl()}/api/link-check`, {
+    return await serviceRequest(`${automationBaseUrl}/api/link-check`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: project.liveUrl, student_id: studentId, project_name: project.name, claimed_keywords: skills }),
       timeoutMs: 30_000,
     });
   } catch {
     return null;
+  }
+}
+
+async function calculateReadiness(
+  input: ReadinessCalculationInput,
+  automationBaseUrl: string | null,
+): Promise<{ payload: unknown; source: 'automation' | 'local_fallback' }> {
+  if (!automationBaseUrl) {
+    return { payload: calculateReadinessLocally(input), source: 'local_fallback' };
+  }
+  try {
+    const payload = await serviceRequest(`${automationBaseUrl}/api/calculate-readiness`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+      timeoutMs: 45_000,
+    });
+    return { payload, source: 'automation' };
+  } catch {
+    return { payload: calculateReadinessLocally(input), source: 'local_fallback' };
   }
 }
 
@@ -61,7 +82,8 @@ export async function POST(): Promise<NextResponse> {
     const review = await serviceRequest(`${getProfileReviewBaseUrl()}/analyze-profile`, { method: 'POST', body: form, timeoutMs: 60_000 });
     if (!isRecord(review)) throw new Error('Profile review returned an invalid response.');
 
-    const projectChecks = await Promise.all(profile.projects.map((project) => checkProject(project, studentId as string, profile.skills)));
+    const automationBaseUrl = getOptionalAutomationBaseUrl();
+    const projectChecks = await Promise.all(profile.projects.map((project) => checkProject(project, studentId as string, profile.skills, automationBaseUrl)));
     const readinessProjects = profile.projects.map((project, index) => {
       const check = projectChecks[index];
       const checked = isRecord(check) ? check : null;
@@ -79,7 +101,7 @@ export async function POST(): Promise<NextResponse> {
     const resumeReview = isRecord(review.resume_review) ? review.resume_review : null;
     const githubReview = isRecord(review.github_review) ? review.github_review : null;
     const linkedinReview = isRecord(review.linkedin_review) ? review.linkedin_review : null;
-    const readinessInput = {
+    const readinessInput: ReadinessCalculationInput = {
       student_id: studentId, student_name: profile.displayName,
       resume: resumeReview ? { score: readNumber(resumeReview.score), page_count: readNumber(resumeReview.page_count), has_action_verbs: resumeReview.uses_action_verbs === true, has_clean_formatting: resumeReview.is_ats_friendly === true, missing_elements: Array.isArray(resumeReview.specific_fixes) ? resumeReview.specific_fixes : [] } : null,
       projects: readinessProjects,
@@ -88,7 +110,8 @@ export async function POST(): Promise<NextResponse> {
       linkedin: linkedinReview ? { score: readNumber(linkedinReview.score), has_about_summary: linkedinReview.has_complete_profile === true, has_headline: linkedinReview.has_complete_profile === true } : null,
       co_curricular: profile.coCurricular ? { score: scoreCoCurricular(profile.coCurricular), hackathons_count: profile.coCurricular.hackathonsCount, certifications_count: profile.coCurricular.certificationsCount, club_leadership: profile.coCurricular.clubLeadership } : null,
     };
-    const readiness = await serviceRequest(`${getAutomationBaseUrl()}/api/calculate-readiness`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(readinessInput), timeoutMs: 45_000 });
+    const readinessResult = await calculateReadiness(readinessInput, automationBaseUrl);
+    const readiness = readinessResult.payload;
     if (!isRecord(readiness)) throw new Error('Readiness service returned an invalid response.');
     const completedAt = new Date().toISOString();
     const { error: readinessSaveError } = await admin.from('readiness_scores').upsert({
@@ -100,6 +123,7 @@ export async function POST(): Promise<NextResponse> {
       raw_inputs: {
         is_provisional: readiness.is_provisional === true,
         missing_components: Array.isArray(readiness.missing_components) ? readiness.missing_components : [],
+        calculation_source: readinessResult.source,
       },
       algorithm_version: typeof readiness.algorithm_version === 'string' ? readiness.algorithm_version : 'v1.0.0',
       updated_at: completedAt,
@@ -107,7 +131,7 @@ export async function POST(): Promise<NextResponse> {
     if (readinessSaveError) throw readinessSaveError;
     const { error: saveError } = await admin.from('candidate_profile_reviews').upsert({ student_id: studentId, status: 'completed', result: review, error_message: null, completed_at: completedAt, updated_at: completedAt }, { onConflict: 'student_id' });
     if (saveError) throw saveError;
-    return NextResponse.json({ review, readiness });
+    return NextResponse.json({ review, readiness, calculationSource: readinessResult.source });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Profile analysis failed.';
     if (studentId) {

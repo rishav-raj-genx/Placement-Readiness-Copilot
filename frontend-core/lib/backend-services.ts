@@ -1,5 +1,9 @@
 type ServiceName = 'profile review' | 'interview' | 'automation';
 
+function firstConfigured(...values: Array<string | undefined>): string | undefined {
+  return values.find((value): value is string => Boolean(value?.trim()));
+}
+
 function normalizeServiceBase(rawValue: string | undefined, service: ServiceName): string {
   if (!rawValue?.trim()) throw new Error(`${service} service URL is not configured.`);
   const url = new URL(rawValue.trim());
@@ -10,7 +14,10 @@ function normalizeServiceBase(rawValue: string | undefined, service: ServiceName
 }
 
 export function getProfileReviewBaseUrl(): string {
-  return normalizeServiceBase(process.env.PROFILE_REVIEW_API_URL, 'profile review');
+  return normalizeServiceBase(
+    firstConfigured(process.env.PROFILE_REVIEW_API_URL, process.env.PROFILE_ENGINE_URL),
+    'profile review',
+  );
 }
 
 export function getInterviewBaseUrl(): string {
@@ -18,7 +25,23 @@ export function getInterviewBaseUrl(): string {
 }
 
 export function getAutomationBaseUrl(): string {
-  return normalizeServiceBase(process.env.AUTOMATION_API_URL, 'automation');
+  return normalizeServiceBase(
+    firstConfigured(
+      process.env.AUTOMATION_API_URL,
+      process.env.AUTOMATION_SERVICE_URL,
+      process.env.NEXT_PUBLIC_AUTOMATION_URL,
+    ),
+    'automation',
+  );
+}
+
+export function getOptionalAutomationBaseUrl(): string | null {
+  const rawValue = firstConfigured(
+    process.env.AUTOMATION_API_URL,
+    process.env.AUTOMATION_SERVICE_URL,
+    process.env.NEXT_PUBLIC_AUTOMATION_URL,
+  );
+  return rawValue ? normalizeServiceBase(rawValue, 'automation') : null;
 }
 
 interface ServiceRequestOptions extends RequestInit {
