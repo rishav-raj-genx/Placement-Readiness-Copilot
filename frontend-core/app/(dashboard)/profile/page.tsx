@@ -1,43 +1,71 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   User,
-  Mail,
   GitBranch,
-  FileText,
   FolderSync,
   Save,
-  CheckCircle2,
-  Sparkles,
   ShieldCheck,
   FileCheck2,
   FileUp,
+  Gauge,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { BreakdownMeter } from '@/components/readiness/breakdown-meter';
+import { READINESS_CATEGORY_LABELS, readinessTier } from '@/lib/dashboard-readiness';
 import { useAuthStore } from '@/stores/auth-store';
+import { useProfileStore } from '@/stores/profile-store';
 import { supabase } from '@/lib/supabase-client';
 import { validatePdf, normalizeUsername } from '@/lib/onboarding';
 
-export default function ProfilePage() {
-  const { user } = useAuthStore();
+type DocumentKind = 'resume' | 'linkedin';
 
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [targetRole, setTargetRole] = useState(user?.targetRole || 'Full-Stack Software Engineer');
-  const [github, setGithub] = useState(user?.githubUsername || '');
+function formatScoreUpdatedAt(value?: string): string {
+  if (!value) return 'Waiting for the first completed analysis';
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return 'Update time unavailable';
+  return `Last recalculated ${timestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`;
+}
+
+export default function ProfilePage() {
+  const user = useAuthStore((state) => state.user);
+  const profile = useProfileStore((state) => state.profile);
+  const readiness = useProfileStore((state) => state.readiness);
+  const isAnalyzing = useProfileStore((state) => state.isAnalyzing);
+  const analyze = useProfileStore((state) => state.analyze);
+  const hydrate = useProfileStore((state) => state.hydrate);
+  const candidate = profile ?? user;
+
+  const [displayName, setDisplayName] = useState(candidate?.displayName || '');
+  const [targetRole, setTargetRole] = useState(candidate?.targetRole || 'Full-Stack Software Engineer');
+  const [github, setGithub] = useState(candidate?.githubUsername || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const [newResume, setNewResume] = useState<File | null>(null);
   const [newLinkedIn, setNewLinkedIn] = useState<File | null>(null);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const selectDocument = (kind: DocumentKind, file: File): void => {
+    const validationError = validatePdf(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    if (kind === 'resume') setNewResume(file);
+    else setNewLinkedIn(file);
+  };
+
+  const handleSave = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!user) return;
 
+    const documentsChanged = Boolean(newResume || newLinkedIn);
+    let profileSaved = false;
     setIsSaving(true);
     try {
-      let resumePath = user.resumePdfPath;
-      let linkedinPath = user.linkedinPdfPath;
+      let resumePath = candidate?.resumePdfPath;
+      let linkedinPath = candidate?.linkedinPdfPath;
 
       if (newResume) {
         const path = `${user.id}/resume.pdf`;
@@ -67,13 +95,29 @@ export default function ProfilePage() {
       }).eq('id', user.id);
 
       if (profileError) throw profileError;
+      profileSaved = true;
 
-      // Asynchronously trigger re-analysis
-      void fetch('/api/profile-review/analyze', { method: 'POST' }).catch(() => {});
+      if (documentsChanged) {
+        const recalculated = await analyze(user.id);
+        if (!recalculated) {
+          throw new Error(useProfileStore.getState().error ?? 'The readiness service did not complete the score recalculation.');
+        }
+      } else {
+        await hydrate(user.id);
+        const refreshError = useProfileStore.getState().error;
+        if (refreshError) throw new Error(refreshError);
+      }
 
-      toast.success('Candidate profile updated and embeddings re-indexed!');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update profile');
+      setNewResume(null);
+      setNewLinkedIn(null);
+      toast.success(documentsChanged
+        ? 'Profile saved and readiness scores recalculated.'
+        : 'Candidate profile updated.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update profile.';
+      toast.error(profileSaved && documentsChanged
+        ? `Profile saved, but updated scores could not be confirmed: ${message}`
+        : message);
     } finally {
       setIsSaving(false);
     }
@@ -94,6 +138,29 @@ export default function ProfilePage() {
           Manage your verified evidence, re-upload updated resumes, and sync career target goals.
         </p>
       </div>
+
+      <section aria-labelledby="profile-readiness-heading" className="overflow-hidden rounded-3xl border border-indigo-400/20 bg-gradient-to-br from-[#111A2D]/95 via-[#101827]/90 to-[#0B1824]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/10 pb-5">
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-200"><Gauge className="h-5 w-5" aria-hidden="true" /></span>
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300">Read-only score summary</p>
+              <h2 id="profile-readiness-heading" className="mt-1 text-xl font-bold text-white">Current readiness scores</h2>
+              <p className="mt-1 text-xs text-white/45">{formatScoreUpdatedAt(readiness?.updatedAt)}</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-right">
+            <p className="font-mono text-2xl font-black text-white">{Math.round(readiness?.totalScore ?? 0)}<span className="text-sm text-white/40">/100</span></p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-indigo-200">{readinessTier(readiness?.totalScore, readiness?.readinessLevel)}</p>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
+          {READINESS_CATEGORY_LABELS.map(({ key, label }) => (
+            <BreakdownMeter key={key} label={label} value={readiness?.breakdown[key]} />
+          ))}
+        </div>
+        {isAnalyzing && <p className="mt-5 inline-flex items-center gap-2 text-xs text-cyan-200" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />Recalculating and saving updated scores…</p>}
+      </section>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Basic Details Panel */}
@@ -173,8 +240,9 @@ export default function ProfilePage() {
                   accept="application/pdf,.pdf"
                   className="sr-only"
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f && !validatePdf(f)) setNewResume(f);
+                    const file = e.currentTarget.files?.[0];
+                    if (file) selectDocument('resume', file);
+                    e.currentTarget.value = '';
                   }}
                 />
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300">
@@ -202,8 +270,9 @@ export default function ProfilePage() {
                   accept="application/pdf,.pdf"
                   className="sr-only"
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f && !validatePdf(f)) setNewLinkedIn(f);
+                    const file = e.currentTarget.files?.[0];
+                    if (file) selectDocument('linkedin', file);
+                    e.currentTarget.value = '';
                   }}
                 />
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-300">
@@ -222,11 +291,11 @@ export default function ProfilePage() {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={isSaving}
+            disabled={isSaving || isAnalyzing}
             className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 px-7 py-3 font-[var(--font-display)] text-xs font-bold text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
-            <Save className="h-4 w-4" />
-            <span>{isSaving ? 'Saving Changes...' : 'Save Profile Changes'}</span>
+            {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+            <span>{isAnalyzing ? 'Recalculating Scores...' : isSaving ? 'Saving Changes...' : 'Save Profile Changes'}</span>
           </button>
         </div>
       </form>

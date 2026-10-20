@@ -23,11 +23,15 @@ describe('safe auth routing', () => {
   });
 
   it('keeps the prominent dashboard behind authentication', () => {
-    expect(resolveAccessRedirect({ pathname: '/', authenticated: false })).toBe('/auth?redirectTo=%2Fdashboard');
+    expect(resolveAccessRedirect({ pathname: '/', authenticated: false })).toBeNull();
     expect(resolveAccessRedirect({ pathname: '/dashboard/jobs', search: '?tab=tracker', authenticated: false })).toBe('/auth?redirectTo=%2Fdashboard%2Fjobs%3Ftab%3Dtracker');
     expect(resolveAccessRedirect({ pathname: '/dashboard', authenticated: false })).toBe('/auth?redirectTo=%2Fdashboard');
     expect(resolveAccessRedirect({ pathname: '/dashboard', authenticated: true, role: 'student', onboardingCompleted: false })).toBe('/auth?mode=signup&resume=1');
     expect(resolveAccessRedirect({ pathname: '/dashboard', authenticated: true, role: 'student', onboardingCompleted: true })).toBeNull();
     expect(resolveAccessRedirect({ pathname: '/dashboard', authenticated: true, role: 'admin', onboardingCompleted: true })).toBe('/admin/dashboard');
+  });
+
+  it('does not retain the deleted review route in protected routing', () => {
+    expect(resolveAccessRedirect({ pathname: '/review', authenticated: false })).toBeNull();
   });
 });

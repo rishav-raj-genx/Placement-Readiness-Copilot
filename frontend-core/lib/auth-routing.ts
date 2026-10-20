@@ -1,6 +1,6 @@
 import type { UserRole } from '@/types';
 
-const STUDENT_PATHS = ['/dashboard', '/interview', '/interviews', '/applications', '/jobs', '/tracker', '/profile', '/resources', '/review'];
+const STUDENT_PATHS = ['/dashboard', '/interview', '/interviews', '/applications', '/jobs', '/tracker', '/profile', '/resources'];
 
 export function safeInternalPath(value: string | null | undefined): string | null {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
@@ -62,7 +62,7 @@ export function resolveAccessRedirect({
   if (!isStudentPath && !isAdminPath && !isOnboardingPath && !isAuthPath && !isLandingPage) return null;
 
   if (!authenticated) {
-    if (isLandingPage) return '/auth?redirectTo=%2Fdashboard';
+    if (isLandingPage) return null;
     if (!isStudentPath && !isAdminPath && !isOnboardingPath) return null;
     return `/auth?redirectTo=${encodeURIComponent(`${pathname}${search}`)}`;
   }

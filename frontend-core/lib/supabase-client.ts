@@ -16,7 +16,13 @@ export function getSupabaseBrowserClient(): SupabaseClient {
       'Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to frontend-core/.env.local.',
     );
   }
-  browserClient ??= createBrowserClient(supabaseUrl, supabaseAnonKey);
+  browserClient ??= createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  });
   return browserClient;
 }
 

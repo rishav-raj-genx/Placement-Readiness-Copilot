@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type { UserProfile } from '@/types';
+import { getAuthErrorMessage } from '@/lib/auth-errors';
 import { normalizeUserProfile } from '@/lib/profile-adapters';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   error: null,
 
   signIn: async (email: string, password: string) => {
+    if (get().isLoading) return;
     set({ isLoading: true, error: null });
     try {
       if (!isSupabaseConfigured) {
@@ -91,13 +93,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       set({ user: profile, isLoading: false });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign in failed';
+    } catch (error: unknown) {
+      const message = getAuthErrorMessage(error, 'sign_in');
       set({ isLoading: false, error: message });
     }
   },
 
   signUp: async (email: string, password: string, displayName: string) => {
+    if (get().isLoading) return 'failed';
     set({ isLoading: true, error: null });
     try {
       if (!isSupabaseConfigured) {
@@ -113,7 +116,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           data: { display_name: displayName },
           emailRedirectTo: typeof window === 'undefined'
             ? undefined
-            : `${window.location.origin}/auth/callback?next=${encodeURIComponent('/auth?mode=signup&resume=1')}`,
+            : `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
@@ -141,8 +144,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ user: profile, isLoading: false });
       return 'authenticated';
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign up failed';
+    } catch (error: unknown) {
+      const message = getAuthErrorMessage(error, 'sign_up');
       set({ isLoading: false, error: message });
       return 'failed';
     }
@@ -151,9 +154,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      set({ user: null, error: error?.message ?? null });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Remote sign out failed.';
+      set({ user: null, error: error ? getAuthErrorMessage(error, 'sign_out') : null });
+    } catch (error: unknown) {
+      const message = getAuthErrorMessage(error, 'sign_out');
       set({ user: null, error: message });
     }
   },
@@ -172,7 +175,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const profile = await fetchProfile(authUser.id);
       set({ user: profile, isHydrated: true });
     }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Unable to restore your session.';
+      const message = getAuthErrorMessage(error, 'session_restore');
       set({ isHydrated: true, error: message });
     });
 
@@ -184,19 +187,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: null });
         return;
       }
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (!session) return;
-        (async () => {
+        window.setTimeout(() => void (async () => {
           const currentUser = get().user;
-          // Avoid re-fetching profile and re-rendering all components if token refreshed for same user
           if (currentUser && currentUser.id === session.user.id) {
             return;
           }
-          const profile = await fetchProfile(session.user.id);
-          if (profile) {
-            set({ user: profile });
+          try {
+            const profile = await fetchProfile(session.user.id);
+            if (profile) {
+              set({ user: profile, error: null });
+            }
+          } catch (error: unknown) {
+            set({ error: getAuthErrorMessage(error, 'session_restore') });
           }
-        })();
+        })(), 0);
       }
     });
   },

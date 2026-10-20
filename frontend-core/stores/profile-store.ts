@@ -15,7 +15,7 @@ interface ProfileState {
   isAnalyzing: boolean;
   error: string | null;
   hydrate: (userId: string) => Promise<void>;
-  analyze: (userId: string) => Promise<void>;
+  analyze: (userId: string) => Promise<boolean>;
   reset: () => void;
 }
 
@@ -59,7 +59,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   analyze: async (userId) => {
-    if (get().isAnalyzing) return;
+    if (get().isAnalyzing) return false;
     set({ isAnalyzing: true, error: null });
     try {
       const response = await fetch('/api/profile-review/analyze', { method: 'POST' });
@@ -71,8 +71,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         throw new Error(message);
       }
       await get().hydrate(userId);
+      return get().error === null;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Profile analysis failed.' });
+      return false;
     } finally {
       set({ isAnalyzing: false });
     }

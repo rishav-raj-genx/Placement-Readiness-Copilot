@@ -5,14 +5,16 @@ import type { JobPosting } from '@/types';
 import { loadFromStorage, saveToStorage } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 import { normalizeDiscoveredJobs } from '@/lib/data-adapters';
+import { inferEmploymentType, matchesJobProfile, type JobMatchProfile } from '@/lib/job-matching';
 
 type NewJobPosting = Omit<JobPosting, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface JobState {
   jobs: JobPosting[];
+  matchedJobs: JobPosting[];
   isHydrated: boolean;
   error: string | null;
-  hydrate: () => Promise<void>;
+  hydrate: (profile?: JobMatchProfile) => Promise<void>;
   addJob: (job: NewJobPosting) => Promise<void>;
   updateJob: (id: string, updates: Partial<JobPosting>) => Promise<void>;
   deleteJob: (id: string) => Promise<void>;
@@ -42,26 +44,72 @@ function persistLocal(jobs: JobPosting[]): void {
 
 export const useJobStore = create<JobState>((set, get) => ({
   jobs: [],
+  matchedJobs: [],
   isHydrated: false,
   error: null,
 
-  hydrate: async () => {
+  hydrate: async (profile) => {
     if (!isSupabaseConfigured) {
-      set({ jobs: loadFromStorage<JobPosting[]>('jobs', []), isHydrated: true, error: null });
+      const jobs = loadFromStorage<JobPosting[]>('jobs', [])
+        .filter((job) => !profile || job.status === 'published');
+      set({
+        jobs,
+        matchedJobs: profile ? jobs.filter((job) => matchesJobProfile(job, profile)) : [],
+        isHydrated: true,
+        error: null,
+      });
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('discovered_jobs')
-        .select('*')
+        .select('*');
+      if (profile) query = query.eq('publication_status', 'published');
+      const { data, error } = await query
         .order('relevance_score', { ascending: false })
         .order('posted_at', { ascending: false });
       if (error) throw error;
-      set({ jobs: normalizeDiscoveredJobs(data as unknown), isHydrated: true, error: null });
+      const jobs = normalizeDiscoveredJobs(data as unknown);
+
+      let matchCandidates = jobs;
+      if (profile) {
+        const employmentType = inferEmploymentType(profile.targetRole);
+        const skills = Array.from(new Set(profile.skills.map((skill) => skill.trim()).filter(Boolean))).slice(0, 12);
+        const filters = skills.length ? skills : [null];
+        const matchResponses = await Promise.all(filters.map(async (skill) => {
+          let matchQuery = supabase
+            .from('discovered_jobs')
+            .select('*')
+            .eq('publication_status', 'published');
+          if (skill) matchQuery = matchQuery.contains('required_skills', [skill]);
+          if (employmentType) matchQuery = matchQuery.eq('employment_type', employmentType);
+          return matchQuery.order('relevance_score', { ascending: false });
+        }));
+        const matchedById = new Map<string, JobPosting>();
+        for (const response of matchResponses) {
+          if (response.error) throw response.error;
+          for (const job of normalizeDiscoveredJobs(response.data as unknown)) matchedById.set(job.id, job);
+        }
+        if (matchedById.size > 0) matchCandidates = Array.from(matchedById.values());
+      }
+
+      set({
+        jobs,
+        matchedJobs: profile ? matchCandidates.filter((job) => matchesJobProfile(job, profile)) : [],
+        isHydrated: true,
+        error: null,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load jobs from Supabase.';
-      set({ jobs: loadFromStorage<JobPosting[]>('jobs', []), isHydrated: true, error: message });
+      const jobs = loadFromStorage<JobPosting[]>('jobs', [])
+        .filter((job) => !profile || job.status === 'published');
+      set({
+        jobs,
+        matchedJobs: profile ? jobs.filter((job) => matchesJobProfile(job, profile)) : [],
+        isHydrated: true,
+        error: message,
+      });
     }
   },
 

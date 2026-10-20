@@ -16,22 +16,18 @@ import { CurvyRoadmapTimeline } from '@/components/dashboard/CurvyRoadmapTimelin
 import { LogoFillBackground } from '@/components/dashboard/LogoFillBackground';
 import { BreakdownMeter } from '@/components/readiness/breakdown-meter';
 import { ReadinessRing } from '@/components/readiness/readiness-ring';
-import { buildDashboardRoadmap, readinessTier } from '@/lib/dashboard-readiness';
+import {
+  READINESS_CATEGORY_LABELS,
+  buildDashboardRoadmap,
+  buildNextBestActions,
+  readinessTier,
+} from '@/lib/dashboard-readiness';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 
-const BREAKDOWN_LABELS = [
-  ['resume', 'Resume'],
-  ['projects', 'Projects'],
-  ['mock_interview', 'Mock interview'],
-  ['github', 'GitHub'],
-  ['linkedin', 'LinkedIn'],
-  ['co_curricular', 'Co-curricular'],
-] as const;
-
 const QUICK_LINKS = [
   { href: '/interview/configure', label: 'Interview', description: 'Start a 15-minute AI viva', icon: Mic2 },
-  { href: '/review', label: 'Review Engine', description: 'Inspect verified profile findings', icon: FileSearch },
+  { href: '#readiness-breakdown', label: 'Review Engine', description: 'Jump to your verified readiness breakdown', icon: FileSearch },
   { href: '/dashboard/jobs', label: 'Jobs', description: 'Open role matches and official jobs', icon: BriefcaseBusiness },
   { href: '/dashboard/profile', label: 'Profile', description: 'Manage identity and documents', icon: Files },
 ] as const;
@@ -61,6 +57,7 @@ export default function DashboardHomePage() {
   }, [analyze, isLoading, profile, readiness, review, user?.id]);
 
   const roadmap = useMemo(() => buildDashboardRoadmap(readiness), [readiness]);
+  const nextBestActions = useMemo(() => buildNextBestActions(readiness), [readiness]);
   const score = readiness?.totalScore;
   const tier = readinessTier(score, readiness?.readinessLevel);
   const firstName = (profile?.displayName ?? user?.displayName ?? 'Candidate').split(/\s+/)[0];
@@ -99,26 +96,29 @@ export default function DashboardHomePage() {
           </div>
         </section>
 
-        <section aria-labelledby="breakdown-heading" className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+        <section id="readiness-breakdown" aria-labelledby="breakdown-heading" className="scroll-mt-24 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="rounded-3xl border border-white/10 bg-[#0E1728]/80 p-6 backdrop-blur-xl sm:p-7">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300">Weighted evidence</p><h2 id="breakdown-heading" className="mt-1 text-xl font-bold text-white">Readiness breakdown</h2></div>
               <p className="text-xs text-white/40">Six categories · 100 total points</p>
             </div>
             <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
-              {BREAKDOWN_LABELS.map(([key, label]) => <BreakdownMeter key={key} label={label} value={readiness?.breakdown[key]} />)}
+              {READINESS_CATEGORY_LABELS.map(({ key, label }) => <BreakdownMeter key={key} label={label} value={readiness?.breakdown[key]} />)}
             </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#0E1728]/80 p-6 backdrop-blur-xl sm:p-7">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-violet-300">Highest impact</p>
             <h2 className="mt-1 text-xl font-bold text-white">Next best actions</h2>
-            {readiness?.topActions.length ? (
+            {nextBestActions.length ? (
               <ol className="mt-5 space-y-3">
-                {readiness.topActions.slice(0, 5).map((action, index) => (
-                  <li key={`${action.title}-${index}`} className="flex gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-500/15 font-mono text-xs font-bold text-violet-200">{index + 1}</span>
-                    <div><p className="text-sm font-medium text-white">{action.title}</p><p className="mt-1 text-xs text-white/45">{action.description ?? action.priority}{typeof action.potentialPointGain === 'number' ? ` · up to ${action.potentialPointGain} pts` : ''}</p></div>
+                {nextBestActions.map((action, index) => (
+                  <li key={action.category}>
+                    <Link href={action.href} className="group flex gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5 transition hover:border-violet-300/25 hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-500/15 font-mono text-xs font-bold text-violet-200">{index + 1}</span>
+                      <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="text-sm font-medium text-white">{action.title}</span><span className="shrink-0 font-mono text-[10px] text-violet-200">{action.score}/100</span></span><span className="mt-1 block text-xs leading-relaxed text-white/45">{action.description}</span></span>
+                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-1 group-hover:text-violet-200" aria-hidden="true" />
+                    </Link>
                   </li>
                 ))}
               </ol>

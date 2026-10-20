@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -29,6 +29,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { LinkedInPdfTooltip } from './LinkedInPdfTooltip';
 import { SignupPdfDropzone } from './SignupPdfDropzone';
 import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
+import { getAuthErrorMessage } from '@/lib/auth-errors';
 
 interface SignUpWizardProps {
   onToggleLogin: () => void;
@@ -66,11 +67,6 @@ const slideVariants: Variants = {
   }),
 };
 
-function confirmationRedirectUrl(): string {
-  const query = new URLSearchParams({ next: '/auth?mode=signup&resume=1' });
-  return `${window.location.origin}/auth/callback?${query.toString()}`;
-}
-
 export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
   const router = useRouter();
   const hydrate = useAuthStore((state) => state.hydrate);
@@ -89,6 +85,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const submissionLockRef = useRef(false);
 
   const accountForm = useForm<SignupAccountValues>({
     resolver: zodResolver(signupAccountSchema),
@@ -214,6 +211,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
   };
 
   const handleFinalSubmit = async () => {
+    if (submissionLockRef.current || isSubmitting) return;
     setSubmissionError(null);
     const hasResume = Boolean(resumeFile || storedProfile?.resume_pdf_path);
     const hasLinkedIn = Boolean(linkedinFile || storedProfile?.linkedin_pdf_path);
@@ -230,6 +228,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       return;
     }
 
+    submissionLockRef.current = true;
     setIsSubmitting(true);
     try {
       if (!isSupabaseConfigured) {
@@ -241,12 +240,19 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
 
       let activeIdentity = identity;
       if (!activeIdentity) {
+        const redirectTo = `${window.location.origin}/auth/callback`;
+        const fullName = accountResult.data.fullName;
+        const targetRole = profileResult.data.targetRole;
         const { data, error } = await supabase.auth.signUp({
           email: draft.email,
           password: accountResult.data.password,
           options: {
-            data: { display_name: draft.displayName, full_name: draft.displayName },
-            emailRedirectTo: confirmationRedirectUrl(),
+            emailRedirectTo: redirectTo,
+            data: {
+              full_name: fullName,
+              target_role: targetRole,
+              display_name: fullName,
+            },
           },
         });
         if (error) throw error;
@@ -304,21 +310,16 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       setIsSuccess(true);
       toast.success('Your Hireable profile is ready.');
       hydrate();
-      void fetch('/api/profile-review/analyze', { method: 'POST' }).catch(() => undefined);
       window.setTimeout(() => {
         router.replace('/dashboard?analysis=processing');
         router.refresh();
       }, 1200);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'object' && error !== null && 'message' in error
-            ? String((error as { message: unknown }).message)
-            : 'Registration failed. Your progress is saved; retry when ready.';
+    } catch (error: unknown) {
+      const message = getAuthErrorMessage(error, 'sign_up');
       setSubmissionError(message);
       toast.error(message);
     } finally {
+      submissionLockRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -408,7 +409,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
               {submissionError && <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-xs text-rose-300">{submissionError}</div>}
               <div className="flex gap-3 pt-2">
                 <BackButton onClick={handlePrevious} disabled={isSubmitting} />
-                <button type="button" disabled={isSubmitting} onClick={() => void handleFinalSubmit()} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 py-3.5 text-sm font-bold shadow-[0_0_30px_rgba(16,185,129,0.35)] transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-50">
+                <button type="button" disabled={isSubmitting} aria-busy={isSubmitting} onClick={() => void handleFinalSubmit()} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 py-3.5 text-sm font-bold shadow-[0_0_30px_rgba(16,185,129,0.35)] transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">
                   {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" />Syncing securely…</> : <><Sparkles className="h-4 w-4" />Create my profile</>}
                 </button>
               </div>

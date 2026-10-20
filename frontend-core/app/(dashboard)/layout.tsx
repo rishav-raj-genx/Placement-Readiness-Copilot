@@ -11,23 +11,60 @@ import { PageTransition } from '@/components/motion/page-transition';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
+import { useApplicationStore } from '@/stores/application-store';
+import { useJobStore } from '@/stores/job-store';
 import { useProfileStore } from '@/stores/profile-store';
+import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const hydrateAuth = useAuthStore((state) => state.hydrate);
   const hydrateProfile = useProfileStore((state) => state.hydrate);
+  const analyzeProfile = useProfileStore((state) => state.analyze);
+  const hydrateApplications = useApplicationStore((state) => state.hydrate);
+  const hydrateJobs = useJobStore((state) => state.hydrate);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [bootstrappedUserId, setBootstrappedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isHydrated) hydrateAuth();
   }, [hydrateAuth, isHydrated]);
 
   useEffect(() => {
-    if (user?.id) void hydrateProfile(user.id);
-  }, [hydrateProfile, user?.id]);
+    if (!user?.id || !user.onboardingCompletedAt) {
+      setBootstrappedUserId(null);
+      return;
+    }
+
+    let active = true;
+    const userId = user.id;
+    setBootstrappedUserId(null);
+
+    const bootstrap = async (): Promise<void> => {
+      await Promise.all([
+        hydrateProfile(userId),
+        hydrateApplications(userId),
+      ]);
+
+      const profileState = useProfileStore.getState();
+      const candidate = profileState.profile ?? user;
+      const needsInitialAnalysis = Boolean(profileState.profile) && (!profileState.review || !profileState.readiness);
+
+      await Promise.all([
+        hydrateJobs({ targetRole: candidate.targetRole ?? '', skills: candidate.skills }),
+        needsInitialAnalysis ? analyzeProfile(userId) : Promise.resolve(),
+      ]);
+
+      if (active) setBootstrappedUserId(userId);
+    };
+
+    void bootstrap();
+    return () => { active = false; };
+  }, [analyzeProfile, hydrateApplications, hydrateJobs, hydrateProfile, user]);
+
+  const dataReady = Boolean(user?.id && bootstrappedUserId === user.id);
 
   return (
     <ProtectedRoute requiredRole="student">
@@ -51,7 +88,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <TopHeader />
           <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
-            <PageTransition>{children}</PageTransition>
+            <PageTransition>
+              {dataReady ? children : (
+                <SegmentedLoader
+                  message="Building your Copilot..."
+                  subtitle="Parsing profile evidence and matching opportunities..."
+                  fullScreen
+                />
+              )}
+            </PageTransition>
           </main>
         </div>
       </div>

@@ -4,9 +4,11 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
+  Award,
   FileText,
   FolderGit2,
   GitBranch,
+  Linkedin,
   Mic2,
   Sparkles,
   type LucideIcon,
@@ -25,13 +27,15 @@ interface CategoryPresentation {
 
 const CATEGORY_PRESENTATION: Record<RoadmapCategory, CategoryPresentation> = {
   resume: { icon: FileText, color: '#818CF8' },
-  github: { icon: GitBranch, color: '#22D3EE' },
   projects: { icon: FolderGit2, color: '#A78BFA' },
   mock_interview: { icon: Mic2, color: '#34D399' },
+  github: { icon: GitBranch, color: '#22D3EE' },
+  linkedin: { icon: Linkedin, color: '#60A5FA' },
+  co_curricular: { icon: Award, color: '#FBBF24' },
 };
 
-const DESKTOP_PATH = 'M500 0 C360 150 640 250 500 400 C360 550 640 650 500 800 C360 950 640 1050 500 1200 C360 1350 640 1450 500 1600';
-const MOBILE_PATH = 'M40 0 C12 150 68 250 40 400 C12 550 68 650 40 800 C12 950 68 1050 40 1200 C12 1350 68 1450 40 1600';
+const DESKTOP_PATH = 'M500 0 C360 150 640 250 500 400 C360 550 640 650 500 800 C360 950 640 1050 500 1200 C360 1350 640 1450 500 1600 C360 1750 640 1850 500 2000 C360 2150 640 2250 500 2400';
+const MOBILE_PATH = 'M40 0 C12 150 68 250 40 400 C12 550 68 650 40 800 C12 950 68 1050 40 1200 C12 1350 68 1450 40 1600 C12 1750 68 1850 40 2000 C12 2150 68 2250 40 2400';
 
 function formatPoints(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -60,13 +64,13 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
           Trace the evidence behind your score
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/55 sm:text-base">
-          The glowing route follows your scroll. Every station uses verified weighted evidence; missing signals stay explicitly unassessed.
+          The glowing route follows your scroll. Every station mirrors its fetched category score, with missing evidence held at zero until it is added.
         </p>
       </header>
 
       <div className="relative">
-        <RoadPath id="mobile" path={MOBILE_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute bottom-0 left-0 top-0 w-20 md:hidden" viewBox="0 0 80 1600" />
-        <RoadPath id="desktop" path={DESKTOP_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute inset-0 hidden h-full w-full md:block" viewBox="0 0 1000 1600" />
+        <RoadPath id="mobile" path={MOBILE_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute bottom-0 left-0 top-0 w-20 md:hidden" viewBox="0 0 80 2400" />
+        <RoadPath id="desktop" path={DESKTOP_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute inset-0 hidden h-full w-full md:block" viewBox="0 0 1000 2400" />
 
         <div className="relative z-10 space-y-20 md:space-y-28">
           {nodes.map((node, index) => {
@@ -74,7 +78,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
             const Icon = presentation.icon;
             const selected = activeNode === node.category;
             const reached = reduceMotion || scrollProgress >= index / Math.max(nodes.length, 1) - 0.08;
-            const meterWidth = node.weightedPoints === null ? 0 : (node.weightedPoints / node.maxPoints) * 100;
+            const meterWidth = (node.weightedPoints / node.maxPoints) * 100;
 
             return (
               <div key={node.category} className="grid min-h-[18rem] grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4 md:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] md:gap-8">
@@ -117,7 +121,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                       <h3 className="mt-1 font-[var(--font-display)] text-xl font-bold text-white sm:text-2xl">{node.title}</h3>
                     </div>
                     <div className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-                      <p className="font-mono text-lg font-black text-white">{node.weightedPoints === null ? '—' : formatPoints(node.weightedPoints)} <span className="text-xs text-white/40">/ {node.maxPoints}</span></p>
+                      <p className="font-mono text-lg font-black text-white">{formatPoints(node.weightedPoints)} <span className="text-xs text-white/40">/ {node.maxPoints}</span></p>
                       <p className="font-mono text-[9px] uppercase tracking-wider text-white/35">weighted points</p>
                     </div>
                   </div>
@@ -134,8 +138,8 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                   </div>
 
                   <div className="mt-4 grid gap-2 text-xs text-white/60 sm:grid-cols-2">
-                    <p className="rounded-xl border border-white/[0.06] bg-black/10 px-3 py-2">Evidence quality: <strong className="text-white">{node.rawScore === null ? 'Not assessed' : `${Math.round(node.rawScore)}%`}</strong></p>
-                    <p className="rounded-xl border border-white/[0.06] bg-black/10 px-3 py-2">Contribution: <strong className="text-white">{node.weightedPoints === null ? 'Pending evidence' : `${formatPoints(node.weightedPoints)} points`}</strong></p>
+                    <p className="rounded-xl border border-white/[0.06] bg-black/10 px-3 py-2">Category score: <strong className="text-white">{Math.round(node.rawScore)}/100</strong></p>
+                    <p className="rounded-xl border border-white/[0.06] bg-black/10 px-3 py-2">Contribution: <strong className="text-white">{formatPoints(node.weightedPoints)} points</strong></p>
                   </div>
 
                   <footer className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">

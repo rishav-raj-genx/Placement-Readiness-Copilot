@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BrainCircuit, BriefcaseBusiness, FileSearch, Files, History, LayoutDashboard, LogOut, Menu, Mic2, PanelLeftClose } from 'lucide-react';
+import { LogOut, Menu, PanelLeftClose } from 'lucide-react';
 import { HireableLogo } from '@/components/brand/hireable-logo';
+import { DASHBOARD_NAV_ITEMS } from '@/components/dashboard/Sidebar';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -12,15 +13,6 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { DemoBanner } from '@/components/shared/demo-banner';
 import { TopHeader } from '@/components/layout/top-header';
-
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/review', label: 'Review Engine', icon: FileSearch },
-  { href: '/interview/configure', label: 'Interview Studio', icon: Mic2 },
-  { href: '/interview/history', label: 'Interview History', icon: History },
-  { href: '/jobs', label: 'Jobs Workspace', icon: BriefcaseBusiness },
-  { href: '/resources', label: 'Profile & Documents', icon: Files },
-] as const;
 
 interface NavigationProps { collapsed?: boolean; onNavigate?: () => void; }
 
@@ -38,7 +30,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
 
   const Navigation = ({ collapsed: compact = false, onNavigate }: NavigationProps) => (
     <nav aria-label="Student navigation" className="space-y-1">
-      {navItems.map(({ href, label, icon: Icon }) => {
+      {DASHBOARD_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
         return (
           <Link key={href} href={href} onClick={onNavigate} title={compact ? label : undefined} className={cn('flex items-center rounded-xl py-2.5 text-sm font-medium transition-colors', compact ? 'justify-center px-2' : 'gap-3 px-3', active ? 'bg-indigo-500/15 text-indigo-100 ring-1 ring-inset ring-indigo-400/20' : 'text-slate-400 hover:bg-white/5 hover:text-white')}>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import { getAuthenticatedDestination } from '@/lib/auth-routing';
 import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
+import { getAuthErrorMessage } from '@/lib/auth-errors';
 
 interface LoginFormProps {
   onToggleSignUp: () => void;
@@ -24,30 +25,39 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
   const [isFocusedPassword, setIsFocusedPassword] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const submitLockRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current || isLoading) return;
     if (!email.trim() || !password) {
       toast.error('Please enter your email and password');
       return;
     }
 
+    submitLockRef.current = true;
     clearError();
-    await signIn(email.trim(), password);
-    const state = useAuthStore.getState();
+    try {
+      await signIn(email.trim(), password);
+      const state = useAuthStore.getState();
 
-    if (state.user) {
-      setIsRedirecting(true);
-      toast.success('Welcome back to Hireable!');
-      const destination = getAuthenticatedDestination({
-        role: state.user.role,
-        onboardingCompleted: Boolean(state.user.onboardingCompletedAt),
-        requestedPath: redirectTo,
-      });
-      router.replace(destination);
-      router.refresh();
-    } else if (state.error) {
-      toast.error(state.error);
+      if (state.user) {
+        setIsRedirecting(true);
+        toast.success('Welcome back to Hireable!');
+        const destination = getAuthenticatedDestination({
+          role: state.user.role,
+          onboardingCompleted: Boolean(state.user.onboardingCompletedAt),
+          requestedPath: redirectTo,
+        });
+        router.replace(destination);
+        router.refresh();
+      } else if (state.error) {
+        toast.error(state.error);
+      }
+    } catch (error: unknown) {
+      toast.error(getAuthErrorMessage(error, 'sign_in'));
+    } finally {
+      submitLockRef.current = false;
     }
   };
 
@@ -91,6 +101,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
           <div className="relative">
             <input
               id="login-email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -98,6 +109,8 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
               onBlur={() => setIsFocusedEmail(false)}
               required
               autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
               className="peer w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 pb-2.5 pt-6 text-sm text-white outline-none transition-all placeholder:text-transparent focus:border-indigo-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-indigo-500/50"
               placeholder="name@example.com"
             />
@@ -120,6 +133,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
           <div className="relative">
             <input
               id="login-password"
+              name="password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -172,6 +186,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
         <button
           type="submit"
           disabled={isLoading}
+          aria-busy={isLoading}
           className="group relative flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 py-3.5 font-[var(--font-display)] text-sm font-bold text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all hover:scale-[1.01] hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
         >
           {isLoading ? (

@@ -16,7 +16,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/jobs': 'Job matches',
   '/dashboard/tracker': 'Application tracker',
   '/dashboard/profile': 'Profile settings',
-  '/review': 'Profile review engine',
   '/jobs': 'Jobs workspace',
   '/resources': 'Profile & documents',
 };
