@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
 import {
   Room,
   RoomEvent,
+  Track,
+  type RemoteTrack,
   type RemoteParticipant,
   type Participant,
   type ConnectionQuality,
@@ -21,8 +23,19 @@ import type {
   LiveKitTranscriptEntry,
 } from '@/types';
 import { resolveLiveKitConnectionUrl } from '@/lib/livekit-session';
+import {
+  BrowserSpeechSynthesizer,
+  BrowserSpeechRecognizer,
+  buildInterviewQuestionPlan,
+  compileInterviewResults,
+  type VoicePlanItem,
+} from '@/lib/voice-speech-engine';
+import { markRound1Completed } from '@/lib/round-status';
 
 interface UseLiveKitInterviewOptions {
+  targetRole?: string;
+  topics?: string[];
+  userId?: string;
   onGreeting?: (payload: LiveKitGreetingPayload) => void;
   onQuestion?: (payload: LiveKitQuestionPayload) => void;
   onTranscript?: (payload: LiveKitTranscriptPayload) => void;
@@ -30,11 +43,13 @@ interface UseLiveKitInterviewOptions {
   onError?: (payload: LiveKitErrorPayload) => void;
 }
 
-interface UseLiveKitInterviewReturn {
+export interface UseLiveKitInterviewReturn {
+  audioContainerRef: RefObject<HTMLDivElement>;
   status: LiveKitSessionStatus;
   connectionQuality: ConnectionQuality | null;
   isMicrophoneEnabled: boolean;
   isSpeakerEnabled: boolean;
+  isAudioPlaybackBlocked: boolean;
   isInterviewerSpeaking: boolean;
   localAudioLevel: number;
   remoteAudioLevel: number;
@@ -43,11 +58,17 @@ interface UseLiveKitInterviewReturn {
   currentQuestion: LiveKitQuestionPayload | null;
   results: LiveKitResultsPayload | null;
   error: string | null;
+  currentCandidateAnswer: string;
+  hasMoreQuestions: boolean;
   connect: (sessionData: LiveKitSessionResponse) => Promise<void>;
   disconnect: () => Promise<void>;
   toggleMicrophone: () => Promise<void>;
-  toggleSpeaker: () => void;
+  toggleSpeaker: () => Promise<void>;
+  enableSpeaker: () => Promise<void>;
   sendFinishMessage: () => void;
+  submitCandidateAnswer: (answerText?: string) => Promise<void>;
+  repeatCurrentQuestion: () => void;
+  setCurrentCandidateAnswer: (text: string) => void;
 }
 
 function parseEvent(raw: Uint8Array): { event: LiveKitEventName; payload: unknown } | null {
@@ -74,10 +95,25 @@ function parseEvent(raw: Uint8Array): { event: LiveKitEventName; payload: unknow
 
 export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): UseLiveKitInterviewReturn {
   const roomRef = useRef<Room | null>(null);
+  const audioContainerRef = useRef<HTMLDivElement | null>(null);
+  const attachedAudioTracksRef = useRef(new Map<string, HTMLMediaElement>());
+
+  // Speech synthesizer and recognizer instances
+  const ttsRef = useRef<BrowserSpeechSynthesizer | null>(null);
+  const sttRef = useRef<BrowserSpeechRecognizer | null>(null);
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasRemoteInterviewerRef = useRef(false);
+
+  // In-browser interview engine state
+  const questionPlanRef = useRef<VoicePlanItem[]>([]);
+  const currentPlanIndexRef = useRef<number>(0);
+  const currentInterviewIdRef = useRef<string>('');
+
   const [status, setStatus] = useState<LiveKitSessionStatus>('idle');
   const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality | null>(null);
   const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
   const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
+  const [isAudioPlaybackBlocked, setIsAudioPlaybackBlocked] = useState(false);
   const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
   const [localAudioLevel, setLocalAudioLevel] = useState(0);
   const [remoteAudioLevel, setRemoteAudioLevel] = useState(0);
@@ -86,11 +122,24 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   const [currentQuestion, setCurrentQuestion] = useState<LiveKitQuestionPayload | null>(null);
   const [results, setResults] = useState<LiveKitResultsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentCandidateAnswer, setCurrentCandidateAnswer] = useState<string>('');
 
   const optionsRef = useRef(options);
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
+
+  // Initialize Speech Engines once on client
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      ttsRef.current = new BrowserSpeechSynthesizer();
+      sttRef.current = new BrowserSpeechRecognizer();
+    }
+    return () => {
+      ttsRef.current?.stop();
+      sttRef.current?.stop();
+    };
+  }, []);
 
   const addTranscript = useCallback((entry: LiveKitTranscriptEntry) => {
     setTranscripts((prev) => {
@@ -103,10 +152,141 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     });
   }, []);
 
+  const startListeningToCandidate = useCallback(() => {
+    if (!sttRef.current || !isMicrophoneEnabled) return;
+    sttRef.current.start((text: string, isFinal: boolean) => {
+      setCurrentCandidateAnswer(text);
+      addTranscript({
+        id: `student_voice_active`,
+        speaker: 'student',
+        text,
+        final: isFinal,
+        timestamp: Date.now(),
+      });
+      optionsRef.current.onTranscript?.({
+        id: `student_voice_active`,
+        speaker: 'student',
+        text,
+        final: isFinal,
+        timestamp: Date.now(),
+      });
+    });
+  }, [addTranscript, isMicrophoneEnabled]);
+
+  const stopListeningToCandidate = useCallback(() => {
+    sttRef.current?.stop();
+  }, []);
+
+  // Speak text using in-browser TTS with voice animation
+  const speakInterviewerAudio = useCallback(
+    (text: string, onDone?: () => void) => {
+      if (!ttsRef.current) {
+        onDone?.();
+        return;
+      }
+
+      stopListeningToCandidate();
+      setIsInterviewerSpeaking(true);
+
+      ttsRef.current.speak(text, {
+        onStart: () => {
+          setIsInterviewerSpeaking(true);
+        },
+        onAudioLevel: (level: number) => {
+          setRemoteAudioLevel(level);
+        },
+        onEnd: () => {
+          setIsInterviewerSpeaking(false);
+          setRemoteAudioLevel(0);
+          startListeningToCandidate();
+          onDone?.();
+        },
+        onError: () => {
+          setIsInterviewerSpeaking(false);
+          setRemoteAudioLevel(0);
+          startListeningToCandidate();
+          onDone?.();
+        },
+      });
+    },
+    [startListeningToCandidate, stopListeningToCandidate]
+  );
+
+  // Present and speak a specific question from plan
+  const presentQuestionIndex = useCallback(
+    (index: number) => {
+      const plan = questionPlanRef.current;
+      if (index >= plan.length) return;
+
+      const qItem = plan[index];
+      currentPlanIndexRef.current = index;
+      setCurrentCandidateAnswer('');
+
+      const questionPayload: LiveKitQuestionPayload = {
+        questionId: qItem.id,
+        text: qItem.text,
+        questionNumber: index + 1,
+        totalQuestions: plan.length,
+      };
+
+      setCurrentQuestion(questionPayload);
+      optionsRef.current.onQuestion?.(questionPayload);
+
+      addTranscript({
+        id: `q_${qItem.id}`,
+        speaker: 'interviewer',
+        text: `Question ${index + 1}: ${qItem.text}`,
+        final: true,
+        timestamp: Date.now(),
+      });
+
+      // Voice prompt to candidate
+      const spokenPrompt = `Question ${index + 1} of ${plan.length}. ${qItem.text}`;
+      speakInterviewerAudio(spokenPrompt);
+    },
+    [addTranscript, speakInterviewerAudio]
+  );
+
+  // Activate browser voice interviewer if remote agent is not broadcasting
+  const activateBrowserVoiceInterviewer = useCallback(() => {
+    if (hasRemoteInterviewerRef.current) return;
+    if (currentQuestion !== null) return;
+
+    const targetRole = optionsRef.current.targetRole || 'Software Engineer';
+    const topics = optionsRef.current.topics || [];
+    const plan = buildInterviewQuestionPlan(targetRole, topics);
+    questionPlanRef.current = plan;
+    currentPlanIndexRef.current = 0;
+
+    const greetingText = `Welcome to your mock interview for ${targetRole}. I will be your interviewer today. Let's begin with your theoretical and architectural viva.`;
+    setCurrentGreeting(greetingText);
+    optionsRef.current.onGreeting?.({ message: greetingText });
+
+    addTranscript({
+      id: `greeting_${Date.now()}`,
+      speaker: 'interviewer',
+      text: greetingText,
+      final: true,
+      timestamp: Date.now(),
+    });
+
+    speakInterviewerAudio(greetingText, () => {
+      // After speaking the greeting, immediately ask Question 1
+      presentQuestionIndex(0);
+    });
+  }, [addTranscript, currentQuestion, presentQuestionIndex, speakInterviewerAudio]);
+
   const handleDataReceived = useCallback(
     (payload: Uint8Array) => {
       const parsed = parseEvent(payload);
       if (!parsed) return;
+
+      // Remote agent is actively broadcasting, yield browser fallback
+      hasRemoteInterviewerRef.current = true;
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
 
       switch (parsed.event) {
         case 'interview:greeting': {
@@ -136,6 +316,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
         case 'interview:results': {
           const p = parsed.payload as LiveKitResultsPayload;
           setResults(p);
+          markRound1Completed(optionsRef.current.userId);
           optionsRef.current.onResults?.(p);
           break;
         }
@@ -150,16 +331,47 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     [addTranscript]
   );
 
-  const handleConnectionQualityChanged = useCallback((quality: ConnectionQuality, _participant: Participant) => {
+  const attachRemoteAudio = useCallback((track: RemoteTrack) => {
+    if (track.kind !== Track.Kind.Audio || !audioContainerRef.current) return;
+    if (track.sid && attachedAudioTracksRef.current.has(track.sid)) return;
+
+    const element = track.attach();
+    element.autoplay = true;
+    element.setAttribute('playsinline', '');
+    audioContainerRef.current.appendChild(element);
+    if (track.sid) {
+      attachedAudioTracksRef.current.set(track.sid, element);
+    }
+
+    void element.play().then(() => {
+      setIsAudioPlaybackBlocked(false);
+    }).catch(() => {
+      setIsAudioPlaybackBlocked(true);
+    });
+  }, []);
+
+  const detachRemoteAudio = useCallback((track: RemoteTrack) => {
+    if (!track.sid) return;
+    const element = attachedAudioTracksRef.current.get(track.sid);
+    if (element) {
+      track.detach(element);
+      element.remove();
+      attachedAudioTracksRef.current.delete(track.sid);
+    }
+  }, []);
+
+  const handleConnectionQualityChanged = useCallback((quality: ConnectionQuality) => {
     setConnectionQuality(quality);
   }, []);
 
-  const handleParticipantConnected = useCallback((_participant: RemoteParticipant) => {
-    // The interviewer (worker) has joined the room
+  const handleParticipantConnected = useCallback((participant: RemoteParticipant) => {
+    // If a non-local participant joins, they may be the remote worker
+    if (!participant.isLocal) {
+      hasRemoteInterviewerRef.current = true;
+    }
   }, []);
 
   const handleActiveSpeakersChanged = useCallback((speakers: Participant[]) => {
-    // Interviewer is speaking if any non-local participant is in the active speakers list
     setIsInterviewerSpeaking(speakers.some((s) => !s.isLocal));
   }, []);
 
@@ -167,6 +379,8 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     setStatus('disconnected');
     setIsMicrophoneEnabled(false);
     setIsInterviewerSpeaking(false);
+    ttsRef.current?.stop();
+    sttRef.current?.stop();
   }, []);
 
   const connect = useCallback(
@@ -176,12 +390,16 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
         roomRef.current = null;
       }
 
+      currentInterviewIdRef.current = sessionData.interviewId;
       setStatus('connecting');
       setError(null);
+      setIsAudioPlaybackBlocked(false);
       setResults(null);
       setTranscripts([]);
       setCurrentGreeting(null);
       setCurrentQuestion(null);
+      setCurrentCandidateAnswer('');
+      hasRemoteInterviewerRef.current = false;
 
       let room: Room | null = null;
       try {
@@ -203,6 +421,11 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
         roomRef.current = room;
 
         room.on(RoomEvent.DataReceived, handleDataReceived);
+        room.on(RoomEvent.TrackSubscribed, attachRemoteAudio);
+        room.on(RoomEvent.TrackUnsubscribed, detachRemoteAudio);
+        room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+          setIsAudioPlaybackBlocked(!room?.canPlaybackAudio);
+        });
         room.on(RoomEvent.ConnectionQualityChanged, handleConnectionQualityChanged);
         room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
         room.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
@@ -214,58 +437,183 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
 
         await room.connect(configuredServerUrl, participantToken);
 
+        room.remoteParticipants.forEach((participant) => {
+          participant.audioTrackPublications.forEach((publication) => {
+            if (publication.track) attachRemoteAudio(publication.track);
+          });
+        });
+
         await room.localParticipant.setMicrophoneEnabled(true);
         setIsMicrophoneEnabled(true);
         setStatus('connected');
-      } catch (error) {
+
+        // Check if remote participants exist. If none after 2.5s, start In-Browser Voice Interviewer!
+        if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = setTimeout(() => {
+          if (!hasRemoteInterviewerRef.current && room?.remoteParticipants.size === 0) {
+            activateBrowserVoiceInterviewer();
+          }
+        }, 2200);
+
+      } catch (err) {
         if (roomRef.current === room) roomRef.current = null;
         if (room) await room.disconnect().catch(() => undefined);
-        const detail = error instanceof Error ? error.message : 'Unknown connection error';
+        attachedAudioTracksRef.current.forEach((element) => element.remove());
+        attachedAudioTracksRef.current.clear();
+        const detail = err instanceof Error ? err.message : 'Unknown connection error';
         const message = `LiveKit connection failed: ${detail}`;
         setError(message);
         setStatus('error');
         throw new Error(message);
       }
     },
-    [handleDataReceived, handleConnectionQualityChanged, handleParticipantConnected, handleActiveSpeakersChanged, handleDisconnected]
+    [activateBrowserVoiceInterviewer, attachRemoteAudio, detachRemoteAudio, handleActiveSpeakersChanged, handleConnectionQualityChanged, handleDataReceived, handleDisconnected, handleParticipantConnected]
   );
 
   const disconnect = useCallback(async () => {
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+    ttsRef.current?.stop();
+    sttRef.current?.stop();
+
     if (!roomRef.current) return;
     setStatus('disconnecting');
     await roomRef.current.disconnect();
     roomRef.current = null;
+    attachedAudioTracksRef.current.forEach((element) => element.remove());
+    attachedAudioTracksRef.current.clear();
     setStatus('disconnected');
     setIsMicrophoneEnabled(false);
   }, []);
 
   const toggleMicrophone = useCallback(async () => {
-    if (!roomRef.current) return;
     const newState = !isMicrophoneEnabled;
-    await roomRef.current.localParticipant.setMicrophoneEnabled(newState);
+    if (roomRef.current) {
+      await roomRef.current.localParticipant.setMicrophoneEnabled(newState);
+    }
     setIsMicrophoneEnabled(newState);
-  }, [isMicrophoneEnabled]);
+    if (!newState) {
+      stopListeningToCandidate();
+    } else if (!isInterviewerSpeaking) {
+      startListeningToCandidate();
+    }
+  }, [isInterviewerSpeaking, isMicrophoneEnabled, startListeningToCandidate, stopListeningToCandidate]);
 
-  const toggleSpeaker = useCallback(() => {
-    if (!roomRef.current) return;
+  const toggleSpeaker = useCallback(async () => {
+    const room = roomRef.current;
     const enabled = !isSpeakerEnabled;
-    roomRef.current.remoteParticipants.forEach((participant) => {
-      participant.audioTrackPublications.forEach((publication) => publication.setEnabled(enabled));
-    });
     setIsSpeakerEnabled(enabled);
+
+    ttsRef.current?.setMuted(!enabled);
+
+    if (room) {
+      if (enabled) {
+        try {
+          await room.startAudio();
+        } catch {
+          setIsAudioPlaybackBlocked(true);
+        }
+      }
+      room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((publication) => publication.setEnabled(enabled));
+      });
+      if (enabled) {
+        attachedAudioTracksRef.current.forEach((element) => {
+          void element.play().then(() => setIsAudioPlaybackBlocked(false)).catch(() => setIsAudioPlaybackBlocked(true));
+        });
+      }
+    }
   }, [isSpeakerEnabled]);
 
-  const sendFinishMessage = useCallback(() => {
-    if (!roomRef.current) return;
-    const message = JSON.stringify({
-      event: 'interview:finish',
-      payload: { reason: 'student_requested' },
-    });
-    const encoder = new TextEncoder();
-    roomRef.current.localParticipant.publishData(encoder.encode(message), {
-      reliable: true,
-    });
+  const enableSpeaker = useCallback(async () => {
+    setIsSpeakerEnabled(true);
+    ttsRef.current?.setMuted(false);
+    const room = roomRef.current;
+    if (!room) return;
+    try {
+      await room.startAudio();
+      room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((publication) => publication.setEnabled(true));
+      });
+      await Promise.all(Array.from(attachedAudioTracksRef.current.values()).map((element) => element.play()));
+      setIsAudioPlaybackBlocked(false);
+    } catch {
+      setIsAudioPlaybackBlocked(true);
+    }
   }, []);
+
+  const sendFinishMessage = useCallback(() => {
+    if (roomRef.current) {
+      const message = JSON.stringify({
+        event: 'interview:finish',
+        payload: { reason: 'student_requested' },
+      });
+      const encoder = new TextEncoder();
+      roomRef.current.localParticipant.publishData(encoder.encode(message), {
+        reliable: true,
+      });
+    }
+  }, []);
+
+  // Submit candidate answer and advance to next question or finish interview
+  const submitCandidateAnswer = useCallback(
+    async (answerText?: string) => {
+      stopListeningToCandidate();
+      const textToRecord = (answerText ?? currentCandidateAnswer).trim();
+
+      if (textToRecord) {
+        const candidateEntry: LiveKitTranscriptEntry = {
+          id: `ans_${Date.now()}`,
+          speaker: 'student',
+          text: textToRecord,
+          final: true,
+          timestamp: Date.now(),
+        };
+        addTranscript(candidateEntry);
+        optionsRef.current.onTranscript?.({
+          id: candidateEntry.id,
+          speaker: 'student',
+          text: textToRecord,
+          final: true,
+          timestamp: Date.now(),
+        });
+      }
+
+      setCurrentCandidateAnswer('');
+
+      const plan = questionPlanRef.current;
+      const nextIndex = currentPlanIndexRef.current + 1;
+
+      if (nextIndex < plan.length) {
+        // Acknowledge and transition to next question with voice
+        const transitionPhrase = 'Thank you for your explanation. Moving to the next question.';
+        speakInterviewerAudio(transitionPhrase, () => {
+          presentQuestionIndex(nextIndex);
+        });
+      } else {
+        // Viva completed! Speak final message and compile results
+        const closingPhrase =
+          'Thank you. That concludes the technical viva. I am now analyzing your responses and compiling your evaluation.';
+        speakInterviewerAudio(closingPhrase, () => {
+          const targetRole = optionsRef.current.targetRole || 'Software Engineer';
+          const compiled = compileInterviewResults(targetRole, transcripts);
+          setResults(compiled);
+          markRound1Completed(optionsRef.current.userId);
+          optionsRef.current.onResults?.(compiled);
+        });
+      }
+    },
+    [addTranscript, currentCandidateAnswer, presentQuestionIndex, speakInterviewerAudio, stopListeningToCandidate, transcripts]
+  );
+
+  const repeatCurrentQuestion = useCallback(() => {
+    if (!currentQuestion) return;
+    const spoken = `Repeating question ${currentQuestion.questionNumber}: ${currentQuestion.text}`;
+    speakInterviewerAudio(spoken);
+  }, [currentQuestion, speakInterviewerAudio]);
+
+  const hasMoreQuestions =
+    questionPlanRef.current.length > 0 &&
+    currentPlanIndexRef.current < questionPlanRef.current.length - 1;
 
   useEffect(() => {
     if (status !== 'connected' && status !== 'active') return;
@@ -273,25 +621,38 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
       const room = roomRef.current;
       if (!room) return;
       setLocalAudioLevel(room.localParticipant.audioLevel);
-      setRemoteAudioLevel(Math.max(0, ...Array.from(room.remoteParticipants.values()).map((participant) => participant.audioLevel)));
+      if (!isInterviewerSpeaking) {
+        const maxLevel = Math.max(
+          0,
+          ...Array.from(room.remoteParticipants.values()).map((p) => p.audioLevel)
+        );
+        setRemoteAudioLevel(maxLevel);
+      }
     }, 120);
     return () => window.clearInterval(interval);
-  }, [status]);
+  }, [isInterviewerSpeaking, status]);
 
   useEffect(() => {
     return () => {
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      ttsRef.current?.stop();
+      sttRef.current?.stop();
       if (roomRef.current) {
         roomRef.current.disconnect();
         roomRef.current = null;
       }
+      attachedAudioTracksRef.current.forEach((element) => element.remove());
+      attachedAudioTracksRef.current.clear();
     };
   }, []);
 
   return {
+    audioContainerRef,
     status,
     connectionQuality,
     isMicrophoneEnabled,
     isSpeakerEnabled,
+    isAudioPlaybackBlocked,
     isInterviewerSpeaking,
     localAudioLevel,
     remoteAudioLevel,
@@ -300,10 +661,16 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     currentQuestion,
     results,
     error,
+    currentCandidateAnswer,
+    hasMoreQuestions,
     connect,
     disconnect,
     toggleMicrophone,
     toggleSpeaker,
+    enableSpeaker,
     sendFinishMessage,
+    submitCandidateAnswer,
+    repeatCurrentQuestion,
+    setCurrentCandidateAnswer,
   };
 }

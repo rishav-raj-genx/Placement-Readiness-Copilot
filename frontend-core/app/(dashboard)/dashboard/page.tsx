@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   Files,
   KanbanSquare,
   Loader2,
+  Lock,
   Mic2,
   RefreshCw,
   Send,
@@ -19,6 +20,7 @@ import { CurvyRoadmapTimeline } from '@/components/dashboard/CurvyRoadmapTimelin
 import { LogoFillBackground } from '@/components/dashboard/LogoFillBackground';
 import { BreakdownMeter } from '@/components/readiness/breakdown-meter';
 import { ReadinessRing } from '@/components/readiness/readiness-ring';
+import { checkRound1Completed } from '@/lib/round-status';
 import {
   READINESS_CATEGORY_LABELS,
   buildDashboardRoadmap,
@@ -70,12 +72,17 @@ export default function DashboardHomePage() {
   const applications = useApplicationStore((state) => state.applications);
   const isHydrated = useApplicationStore((state) => state.isHydrated);
   const hydrateApplications = useApplicationStore((state) => state.hydrate);
+  const [isRound1Done, setIsRound1Done] = useState(false);
 
   useEffect(() => {
     if (user?.id && !isHydrated) {
       void hydrateApplications(user.id);
     }
   }, [hydrateApplications, isHydrated, user?.id]);
+
+  useEffect(() => {
+    void checkRound1Completed(user?.id).then((done) => setIsRound1Done(done));
+  }, [user?.id]);
 
   const visibleReadiness = user ? readiness : GUEST_MOCK_READINESS;
   const roadmap = useMemo(() => {
@@ -211,13 +218,23 @@ export default function DashboardHomePage() {
             </div>
 
             {/* Round 2 Card */}
-            <div className="flex flex-col justify-between rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40">
+            <div className={`flex flex-col justify-between rounded-2xl border p-6 shadow-md shadow-black/40 transition-colors ${
+              isRound1Done
+                ? 'border-stone-800 bg-stone-900'
+                : 'border-stone-800/80 bg-stone-900/60 opacity-80'
+            }`}>
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-800 bg-stone-800 px-3 py-1 text-xs font-bold text-stone-300">
-                    <Code2 className="h-3.5 w-3.5" /> Round 2: DSA + Web Dev IDE
-                  </span>
-                  <span className="text-xs text-stone-500">Interactive editor</span>
+                  {isRound1Done ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-800 bg-stone-800 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-300">
+                      <Code2 className="h-3.5 w-3.5 text-stone-400" /> Round 2: DSA + web dev IDE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                      <Lock className="h-3.5 w-3.5" /> Round 2: Locked (Complete Round 1 First)
+                    </span>
+                  )}
+                  <span className="text-xs text-stone-500">{isRound1Done ? 'Interactive editor' : 'Prerequisite: Round 1'}</span>
                 </div>
                 <h3 className="mt-4 text-lg font-bold text-stone-100">Coding exercise</h3>
                 <p className="mt-2 text-xs leading-relaxed text-stone-400">
@@ -225,12 +242,22 @@ export default function DashboardHomePage() {
                 </p>
               </div>
               <div className="mt-6 flex items-center justify-between">
-                <span className="text-xs text-stone-400">Check your solution</span>
-                <Link href={user ? '/dashboard/interview/coding' : '/auth'}>
-                  <button className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-4 py-2 text-xs font-bold text-stone-100 transition-colors hover:bg-red-600">
-                    Open coding editor <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                </Link>
+                <span className="text-xs text-stone-400">
+                  {isRound1Done ? 'Check your solution' : 'Unlocks after Technical Viva'}
+                </span>
+                {isRound1Done ? (
+                  <Link href={user ? '/dashboard/interview/coding' : '/auth'}>
+                    <button className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-4 py-2 text-xs font-bold text-stone-100 transition-colors hover:bg-red-600">
+                      Open coding editor <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </Link>
+                ) : (
+                  <Link href={user ? '/dashboard/interview' : '/auth'}>
+                    <button className="flex items-center gap-1.5 rounded-lg border border-stone-800 bg-stone-900 px-4 py-2 text-xs font-bold text-stone-400 hover:text-stone-200 transition-colors">
+                      Locked · Complete Round 1 <Lock className="h-3.5 w-3.5" />
+                    </button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

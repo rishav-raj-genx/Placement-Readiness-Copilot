@@ -53,7 +53,7 @@ class MockInterviewAgent(Agent):
         self.target_minutes = target_minutes
 
     async def on_enter(self) -> None:
-        self.session.generate_reply(
+        await self.session.generate_reply(
             instructions=(
                 f"Greet the candidate warmly, state that this session is configured for about {self.target_minutes} minutes, "
                 "and ask the first introductory question."

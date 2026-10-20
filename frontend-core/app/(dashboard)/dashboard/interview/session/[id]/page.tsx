@@ -13,6 +13,8 @@ import {
   Volume2,
   VolumeX,
   Radio,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +37,7 @@ import { useInterviewStore } from '@/stores/interview-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase-client';
+import { markRound1Completed } from '@/lib/round-status';
 import type {
   LiveKitQuestionPayload,
   LiveKitTranscriptPayload,
@@ -102,16 +105,27 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       finishTimeoutRef.current = null;
     }
     await finalizeRecording();
+    markRound1Completed(user?.id);
+    try {
+      await supabase
+        .from('interview_sessions')
+        .update({ status: 'completed', result: p })
+        .eq('id', id);
+    } catch {
+      // Safe fallback
+    }
     liveKitStore.setResults(p);
     toast.success('Interview completed! Viewing results...');
     router.push(`/dashboard/interview/results/${id}`);
-  }, [finalizeRecording, liveKitStore, router, id]);
+  }, [finalizeRecording, id, liveKitStore, router, user?.id]);
 
   const handleError = useCallback((p: LiveKitErrorPayload) => {
     toast.error(p.message);
   }, []);
 
   const livekit = useLiveKitInterview({
+    targetRole: liveKitStore.currentInterview?.targetRole,
+    userId: user?.id,
     onGreeting: handleGreeting,
     onQuestion: handleQuestion,
     onTranscript: handleTranscript,
@@ -357,16 +371,71 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         </CardContent>
       </Card>
 
-      {/* Current Question */}
+      {/* Current Question & Candidate Response Card */}
       {currentQuestion && (
         <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
-          <CardContent className="p-6 space-y-2.5">
-            <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">
-              Question {currentQuestion.questionNumber} of {currentQuestion.totalQuestions}
+          <CardContent className="p-6 md:p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+                Question {currentQuestion.questionNumber} of {currentQuestion.totalQuestions}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={livekit.repeatCurrentQuestion}
+                className="text-xs text-stone-300 border-stone-700 bg-stone-900/60 hover:bg-stone-800"
+              >
+                <Volume2 className="mr-1.5 h-3.5 w-3.5" /> Replay Question Voice
+              </Button>
             </div>
+
             <h2 className="text-base font-semibold leading-relaxed text-stone-100">
               {currentQuestion.text}
             </h2>
+
+            {/* Candidate Response Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                  Your Answer
+                </label>
+                <span className="text-xs text-stone-400">
+                  {livekit.isInterviewerSpeaking
+                    ? 'AI Interviewer speaking... Please listen'
+                    : livekit.isMicrophoneEnabled
+                    ? 'Microphone active · Transcribing speech live'
+                    : 'Unmute mic or type response below'}
+                </span>
+              </div>
+
+              <textarea
+                value={livekit.currentCandidateAnswer}
+                onChange={(e) => livekit.setCurrentCandidateAnswer(e.target.value)}
+                placeholder="Speak your answer naturally into the microphone, or type here..."
+                rows={4}
+                className="flex w-full rounded-xl border border-stone-800 bg-stone-950/70 p-3.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829] resize-none"
+              />
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-stone-500">
+                  Round 1 Technical Viva &middot; Speaks questions aloud via AI voice
+                </span>
+                <Button
+                  onClick={() => void livekit.submitCandidateAnswer(livekit.currentCandidateAnswer)}
+                  className="bg-[#D93829] hover:bg-[#C22F21] text-white font-semibold text-xs px-5 py-2 rounded-xl shadow-lg"
+                >
+                  {livekit.hasMoreQuestions ? (
+                    <>
+                      Submit & Next Question <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      Submit & Complete Viva <Sparkles className="ml-1.5 h-3.5 w-3.5" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -389,7 +458,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         <TranscriptDrawer transcripts={transcripts} />
       </div>
 
-      {/* Audio Controls */}
+      <div ref={livekit.audioContainerRef} className="sr-only" aria-hidden="true" />
       <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div className="flex items-center gap-3">
@@ -435,6 +504,16 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           </div>
         </CardContent>
       </Card>
+
+      {livekit.isAudioPlaybackBlocked && (
+        <div role="status" className="flex items-center justify-between gap-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+          <span>Allow audio playback to hear the interviewer.</span>
+          <Button onClick={() => void livekit.enableSpeaker()}>
+            <Volume2 className="mr-2 h-4 w-4" />
+            Enable interviewer audio
+          </Button>
+        </div>
+      )}
 
       {/* End Interview */}
       <div className="flex items-center justify-between">

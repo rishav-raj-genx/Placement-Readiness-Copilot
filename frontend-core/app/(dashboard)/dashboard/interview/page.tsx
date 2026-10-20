@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Radio, X } from 'lucide-react';
+import { ArrowRight, Check, Code2, Loader2, Lock, Mic2, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { createInterviewSession, getLiveKitClientConfiguration } from '@/lib/livekit-session';
 import { resolveInterviewFocusTopics } from '@/lib/interview-config';
 import { RoleCombobox } from '@/components/interview/RoleCombobox';
+import { checkRound1Completed } from '@/lib/round-status';
 import type { CompanyType, Difficulty, ExperienceLevel, LiveKitSessionRequest } from '@/types';
 import { toast } from 'sonner';
 
@@ -47,6 +48,7 @@ export default function ConfigureInterviewPage() {
   const { startInterview, setCreating, setCreateError, isCreating, createError } = useLiveKitInterviewStore();
 
   const [roundType, setRoundType] = useState<'round1' | 'round2' | 'both'>('round1');
+  const [isRound1Done, setIsRound1Done] = useState(false);
   const [targetRole, setTargetRole] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [topicInput, setTopicInput] = useState('');
@@ -57,6 +59,10 @@ export default function ConfigureInterviewPage() {
   const [targetCompany, setTargetCompany] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
   const livekitConfiguration = getLiveKitClientConfiguration();
+
+  useEffect(() => {
+    void checkRound1Completed(user?.id).then((done) => setIsRound1Done(done));
+  }, [user?.id]);
 
   // Initialize once from profile evidence without clobbering user keystrokes
   useEffect(() => {
@@ -172,27 +178,45 @@ export default function ConfigureInterviewPage() {
 
         <button
           type="button"
-          onClick={() => setRoundType('round2')}
+          onClick={() => {
+            if (!isRound1Done) {
+              toast.info('Round 2 is locked. Please complete Round 1 Technical Viva first!');
+              return;
+            }
+            setRoundType('round2');
+          }}
           className={`flex flex-col rounded-2xl border p-5 text-left transition-colors ${
             roundType === 'round2'
               ? 'border-[#D93829] bg-[#28201E]'
+              : !isRound1Done
+              ? 'border-stone-800 bg-[#28201E]/40 opacity-75 cursor-not-allowed'
               : 'border-stone-800 bg-[#28201E]/60 hover:border-stone-700'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg border border-stone-800 bg-stone-900 text-stone-200">
-                <Code2 className="h-4 w-4" />
+              <span className={`grid h-8 w-8 place-items-center rounded-lg border border-stone-800 ${isRound1Done ? 'bg-stone-900 text-stone-200' : 'bg-amber-500/10 text-amber-400'}`}>
+                {isRound1Done ? <Code2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               </span>
               <div>
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-stone-500">Round 2</span>
+                <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider ${isRound1Done ? 'text-stone-500' : 'text-amber-400'}`}>
+                  {isRound1Done ? 'Round 2' : 'Round 2 (Locked)'}
+                </span>
                 <h3 className="text-sm font-bold text-stone-100">DSA + web dev IDE</h3>
               </div>
             </div>
-            {roundType === 'round2' && <Check className="h-4 w-4 text-[#D93829]" />}
+            {isRound1Done && roundType === 'round2' ? (
+              <Check className="h-4 w-4 text-[#D93829]" />
+            ) : !isRound1Done ? (
+              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                Finish Round 1 First
+              </span>
+            ) : null}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-stone-400">
-            Interactive in-browser code editor testing algorithm efficiency (O(N) vs O(N²)) and architecture.
+            {isRound1Done
+              ? 'Interactive in-browser code editor testing algorithm efficiency (O(N) vs O(N²)) and architecture.'
+              : 'Unlocks after completing Round 1 Technical Viva. Live IDE with benchmark evaluation and test cases.'}
           </p>
         </button>
       </div>
