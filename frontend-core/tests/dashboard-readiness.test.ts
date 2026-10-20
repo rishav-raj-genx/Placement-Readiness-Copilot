@@ -95,6 +95,25 @@ describe('dashboard readiness roadmap', () => {
     });
   });
 
+  it('guarantees Mock Interview is definitively anchored as the final node (05) at the bottom with alternating sides', () => {
+    const nodes = buildDashboardRoadmap(null);
+
+    expect(nodes).toHaveLength(5);
+    expect(nodes.map((n) => n.side)).toEqual(['left', 'right', 'left', 'right', 'left']);
+    const finalNode = nodes[4];
+    expect(finalNode).toMatchObject({
+      id: '05',
+      title: 'Mock Interview',
+      category: 'mock_interview',
+      eyebrow: '15-Minute AI Viva',
+      maxPoints: 20,
+      rawScore: 0,
+      weightedPoints: 0,
+      status: 'Evidence needed',
+      side: 'left',
+    });
+  });
+
   it('creates two actionable recommendations from the lowest scores', () => {
     const actions = buildNextBestActions(readiness);
 
