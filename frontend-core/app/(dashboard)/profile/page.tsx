@@ -127,31 +127,31 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-4xl space-y-8 pb-20">
       {/* Header */}
       <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          <span>VERIFIED MASTER CANDIDATE</span>
+        <div className="inline-flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900 px-3 py-1 text-xs font-semibold text-stone-300">
+          <ShieldCheck className="h-3.5 w-3.5 text-[#D93829]" />
+          <span>Verified candidate profile</span>
         </div>
-        <h1 className="mt-2 font-[var(--font-display)] text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Candidate Profile & Documents
+        <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-stone-100 sm:text-4xl">
+          Candidate profile & documents
         </h1>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-stone-400">
           Manage your verified evidence, re-upload updated resumes, and sync career target goals.
         </p>
       </div>
 
-      <section aria-labelledby="profile-readiness-heading" className="overflow-hidden rounded-3xl border border-indigo-400/20 bg-gradient-to-br from-[#111A2D]/95 via-[#101827]/90 to-[#0B1824]/95 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/10 pb-5">
+      <section aria-labelledby="profile-readiness-heading" className="rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-5 border-b border-stone-800 pb-5">
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-200"><Gauge className="h-5 w-5" aria-hidden="true" /></span>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-stone-800 text-[#D93829]"><Gauge className="h-5 w-5" aria-hidden="true" /></span>
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300">Read-only score summary</p>
-              <h2 id="profile-readiness-heading" className="mt-1 text-xl font-bold text-white">Current readiness scores</h2>
-              <p className="mt-1 text-xs text-white/45">{formatScoreUpdatedAt(readiness?.updatedAt)}</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-stone-400">Read-only score summary</p>
+              <h2 id="profile-readiness-heading" className="mt-1 text-xl font-bold text-stone-100">Current readiness scores</h2>
+              <p className="mt-1 text-xs text-stone-500">{formatScoreUpdatedAt(readiness?.updatedAt)}</p>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-right">
-            <p className="font-mono text-2xl font-black text-white">{Math.round(readiness?.totalScore ?? 0)}<span className="text-sm text-white/40">/100</span></p>
-            <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-indigo-200">{readinessTier(readiness?.totalScore, readiness?.readinessLevel)}</p>
+          <div className="rounded-xl border border-stone-800 bg-stone-950 px-4 py-3 text-right">
+            <p className="font-mono text-2xl font-bold text-stone-100">{Math.round(readiness?.totalScore ?? 0)}<span className="text-sm text-stone-500">/100</span></p>
+            <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">{readinessTier(readiness?.totalScore, readiness?.readinessLevel)}</p>
           </div>
         </div>
         <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
@@ -159,19 +159,19 @@ export default function ProfilePage() {
             <BreakdownMeter key={key} label={label} value={readiness?.breakdown[key]} />
           ))}
         </div>
-        {isAnalyzing && <p className="mt-5 inline-flex items-center gap-2 text-xs text-cyan-200" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />Recalculating and saving updated scores…</p>}
+        {isAnalyzing && <p className="mt-5 inline-flex items-center gap-2 text-xs text-stone-300" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin text-[#D93829]" aria-hidden="true" />Recalculating and saving updated scores…</p>}
       </section>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Basic Details Panel */}
-        <div className="rounded-3xl border border-white/10 bg-[#101827]/80 p-6 shadow-xl backdrop-blur-2xl sm:p-8">
-          <h2 className="font-[var(--font-display)] text-lg font-bold text-white">
+        <div className="rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40 sm:p-8">
+          <h2 className="font-display text-lg font-bold text-stone-100">
             Personal & Career Goals
           </h2>
 
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-white/70">
+              <label className="mb-1.5 block text-xs font-semibold text-stone-300">
                 Display Name
               </label>
               <div className="relative">
@@ -179,26 +179,26 @@ export default function ProfilePage() {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full rounded-xl border border-stone-800 bg-stone-950 px-4 py-3 text-sm text-stone-100 outline-none focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
                 />
-                <User className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-white/30" />
+                <User className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-stone-500" />
               </div>
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-white/70">
+              <label className="mb-1.5 block text-xs font-semibold text-stone-300">
                 Target Role
               </label>
               <input
                 type="text"
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40"
+                className="w-full rounded-xl border border-stone-800 bg-stone-950 px-4 py-3 text-sm text-stone-100 outline-none focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-white/70">
+              <label className="mb-1.5 block text-xs font-semibold text-stone-300">
                 GitHub Handle / Profile
               </label>
               <div className="relative">
@@ -206,9 +206,9 @@ export default function ProfilePage() {
                   type="text"
                   value={github}
                   onChange={(e) => setGithub(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40"
+                  className="w-full rounded-xl border border-stone-800 bg-stone-950 px-4 py-3 text-sm text-stone-100 outline-none focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
                 />
-                <GitBranch className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-white/30" />
+                <GitBranch className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-stone-500" />
               </div>
             </div>
 
@@ -216,23 +216,23 @@ export default function ProfilePage() {
         </div>
 
         {/* Document Ingestion Re-upload Panel */}
-        <div className="rounded-3xl border border-white/10 bg-[#101827]/80 p-6 shadow-xl backdrop-blur-2xl sm:p-8">
-          <h2 className="font-[var(--font-display)] text-lg font-bold text-white">
+        <div className="rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40 sm:p-8">
+          <h2 className="font-display text-lg font-bold text-stone-100">
             Document Ingestion & Proof of Work
           </h2>
-          <p className="mt-1 text-xs text-white/50">
+          <p className="mt-1 text-xs text-stone-500">
             Re-uploading new versions immediately recalculates your placement readiness score.
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* Resume Dropzone */}
             <div>
-              <label className="mb-2 block text-xs font-semibold text-white/70">
+              <label className="mb-2 block text-xs font-semibold text-stone-300">
                 Resume PDF (Active in copilot)
               </label>
               <div
                 onClick={() => document.getElementById('profile-resume-input')?.click()}
-                className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-5 transition-all hover:border-indigo-400/50 hover:bg-white/[0.04]"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-stone-800 bg-stone-950 p-5 transition-all hover:border-stone-700 hover:bg-stone-900/60"
               >
                 <input
                   id="profile-resume-input"
@@ -245,24 +245,24 @@ export default function ProfilePage() {
                     e.currentTarget.value = '';
                   }}
                 />
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300">
-                  {newResume ? <FileCheck2 className="h-5 w-5 text-indigo-400" /> : <FileUp className="h-5 w-5" />}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-800 text-[#D93829]">
+                  {newResume ? <FileCheck2 className="h-5 w-5 text-stone-100" /> : <FileUp className="h-5 w-5" />}
                 </div>
-                <p className="mt-2 text-xs font-bold text-white">
+                <p className="mt-2 text-xs font-semibold text-stone-100">
                   {newResume ? newResume.name : 'Upload New Resume PDF'}
                 </p>
-                <p className="text-[10px] text-white/40">Max 10 MB • Re-indexes skill graph</p>
+                <p className="text-[10px] text-stone-500">Max 10 MB • Re-indexes skill graph</p>
               </div>
             </div>
 
             {/* LinkedIn Dropzone */}
             <div>
-              <label className="mb-2 block text-xs font-semibold text-white/70">
+              <label className="mb-2 block text-xs font-semibold text-stone-300">
                 LinkedIn Export PDF
               </label>
               <div
                 onClick={() => document.getElementById('profile-linkedin-input')?.click()}
-                className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-5 transition-all hover:border-cyan-400/50 hover:bg-white/[0.04]"
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-stone-800 bg-stone-950 p-5 transition-all hover:border-stone-700 hover:bg-stone-900/60"
               >
                 <input
                   id="profile-linkedin-input"
@@ -275,13 +275,13 @@ export default function ProfilePage() {
                     e.currentTarget.value = '';
                   }}
                 />
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-300">
-                  {newLinkedIn ? <FileCheck2 className="h-5 w-5 text-cyan-400" /> : <FolderSync className="h-5 w-5" />}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-800 text-[#D93829]">
+                  {newLinkedIn ? <FileCheck2 className="h-5 w-5 text-stone-100" /> : <FolderSync className="h-5 w-5" />}
                 </div>
-                <p className="mt-2 text-xs font-bold text-white">
+                <p className="mt-2 text-xs font-semibold text-stone-100">
                   {newLinkedIn ? newLinkedIn.name : 'Upload New LinkedIn PDF'}
                 </p>
-                <p className="text-[10px] text-white/40">Exports experience bullets</p>
+                <p className="text-[10px] text-stone-500">Exports experience bullets</p>
               </div>
             </div>
           </div>
@@ -292,7 +292,7 @@ export default function ProfilePage() {
           <button
             type="submit"
             disabled={isSaving || isAnalyzing}
-            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 px-7 py-3 font-[var(--font-display)] text-xs font-bold text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-[#D93829] px-7 py-3 text-xs font-semibold text-white shadow-sm transition hover:bg-[#C22F21] active:scale-[0.98] disabled:opacity-50"
           >
             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
             <span>{isAnalyzing ? 'Recalculating Scores...' : isSaving ? 'Saving Changes...' : 'Save Profile Changes'}</span>

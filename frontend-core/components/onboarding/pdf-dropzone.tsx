@@ -35,13 +35,13 @@ export function PdfDropzone({ label, file, existingPath, progress, onChange }: P
         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => { event.preventDefault(); setDragging(false); acceptFile(event.dataTransfer.files[0]); }}
-        className={cn('w-full rounded-2xl border border-dashed p-6 text-left transition-colors', dragging ? 'border-indigo-400 bg-indigo-500/10' : 'border-white/15 bg-white/[0.03] hover:border-indigo-400/50')}
+        className={cn('w-full rounded-2xl border border-dashed p-6 text-left transition-colors', dragging ? 'border-[#D93829] bg-[#D93829]/10' : 'border-stone-800 bg-stone-900/60 hover:border-stone-700 hover:bg-stone-900')}
         aria-label={`${hasDocument ? 'Replace' : 'Upload'} ${label} PDF`}
       >
         <span className="flex items-center gap-4">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/10 text-indigo-300">{hasDocument ? <FileCheck2 className="h-5 w-5" /> : <FileUp className="h-5 w-5" />}</span>
-          <span className="min-w-0 flex-1"><span className="block font-medium">{label}</span><span className="block truncate text-sm text-muted-foreground">{file?.name ?? (existingPath ? 'Stored securely — choose a file to replace it' : 'Drop a PDF here or browse · max 10 MB')}</span></span>
-          {hasDocument && <Replace className="h-4 w-4 text-muted-foreground" />}
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-stone-800 text-[#D93829]">{hasDocument ? <FileCheck2 className="h-5 w-5" /> : <FileUp className="h-5 w-5 text-stone-400" />}</span>
+          <span className="min-w-0 flex-1"><span className="block font-medium text-stone-100">{label}</span><span className="block truncate text-sm text-stone-400">{file?.name ?? (existingPath ? 'Stored securely — choose a file to replace it' : 'Drop a PDF here or browse · max 10 MB')}</span></span>
+          {hasDocument && <Replace className="h-4 w-4 text-stone-400" />}
         </span>
       </button>
       <input ref={inputRef} className="sr-only" type="file" accept="application/pdf,.pdf" onChange={(event) => acceptFile(event.target.files?.[0])} />

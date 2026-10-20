@@ -31,9 +31,9 @@ function formatRelativeTime(timestamp: string, now: number | null): string {
 }
 
 function NotificationTypeIcon({ type }: Pick<NotificationItem, 'type'>) {
-  if (type === 'success') return <CircleCheck className="h-4 w-4 text-emerald-300" />;
-  if (type === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-300" />;
-  return <Info className="h-4 w-4 text-cyan-300" />;
+  if (type === 'success') return <CircleCheck className="h-4 w-4 text-emerald-400" />;
+  if (type === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-400" />;
+  return <Info className="h-4 w-4 text-[#D93829]" />;
 }
 
 export function NotificationBell() {
@@ -112,28 +112,28 @@ export function NotificationBell() {
           className="relative"
           aria-label={`Open notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
         >
-          <Bell className="h-4 w-4" />
+          <Bell className="h-4 w-4 text-stone-300" />
           {unreadCount > 0 && (
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.95)]" aria-hidden="true" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#D93829]" aria-hidden="true" />
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[22rem] overflow-hidden border-white/10 bg-[#0E1524]/95 p-0 shadow-2xl backdrop-blur-xl">
+      <DropdownMenuContent align="end" className="w-[22rem] overflow-hidden border border-stone-800 bg-stone-900 p-0 shadow-2xl backdrop-blur-xl">
         <motion.div
           initial={{ opacity: 0, y: -8, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-stone-800 px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-white">Notifications</p>
-              <p className="text-[11px] text-slate-400">{unreadCount} unread update{unreadCount === 1 ? '' : 's'}</p>
+              <p className="text-sm font-semibold text-stone-100">Notifications</p>
+              <p className="text-[11px] text-stone-400">{unreadCount} unread update{unreadCount === 1 ? '' : 's'}</p>
             </div>
             <button
               type="button"
               onClick={markAllAsRead}
               disabled={unreadCount === 0}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-cyan-200 transition-colors hover:bg-cyan-300/10 disabled:cursor-default disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-stone-300 transition-colors hover:bg-stone-800 hover:text-stone-100 disabled:cursor-default disabled:opacity-40"
             >
               <CheckCheck className="h-3.5 w-3.5" />
               Mark all as read
@@ -142,22 +142,22 @@ export function NotificationBell() {
 
           <div className="max-h-[22rem] overflow-y-auto p-2">
             {notifications.length === 0 ? (
-              <p className="px-3 py-8 text-center text-xs text-slate-400">Workspace updates will appear here.</p>
+              <p className="px-3 py-8 text-center text-xs text-stone-500">Workspace updates will appear here.</p>
             ) : notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`relative flex gap-3 rounded-xl px-3 py-3 transition-colors ${notification.read ? 'opacity-65' : 'bg-white/[0.04]'}`}
+                className={`relative flex gap-3 rounded-xl px-3 py-3 transition-colors ${notification.read ? 'opacity-60' : 'bg-stone-800/40'}`}
               >
-                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.04]">
+                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-stone-800 bg-stone-800">
                   <NotificationTypeIcon type={notification.type} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-xs font-semibold text-slate-100">{notification.title}</p>
-                    {!notification.read && <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />}
+                    <p className="text-xs font-semibold text-stone-200">{notification.title}</p>
+                    {!notification.read && <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#D93829]" />}
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{notification.message}</p>
-                  <time dateTime={notification.timestamp} className="mt-1.5 block text-[10px] text-slate-500">
+                  <p className="mt-1 text-[11px] leading-relaxed text-stone-400">{notification.message}</p>
+                  <time dateTime={notification.timestamp} className="mt-1.5 block text-[10px] text-stone-500">
                     {formatRelativeTime(notification.timestamp, now)}
                   </time>
                 </div>
