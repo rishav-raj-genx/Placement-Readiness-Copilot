@@ -1,4 +1,9 @@
-# Hireable
+# Hireable (Placement Readiness Copilot)
+
+> 📑 **Official Submission Documentation & Test Report**:  
+> Complete compliance report for Problem 2 (Sections 9 & 10): Architecture Design Document, 7-Component Mathematical Scoring Formula, 122-Test Verification Suite, Concurrency Load Benchmarks, Cloud vs Local Ollama Cost Analysis, and 5 Sample Placement Readiness Reports are documented in [**docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md).  
+> 
+> 🌐 **Live Production Deployment**: [https://placement-readiness-copilot.vercel.app](https://placement-readiness-copilot.vercel.app)
 
 Integrated development environment for the Next.js frontend and three Python
 services: profile review, mock interview, and readiness/job automation.
