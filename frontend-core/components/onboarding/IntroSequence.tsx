@@ -10,9 +10,6 @@ import {
   Briefcase,
   ArrowRight,
   ArrowLeft,
-  X,
-  CheckCircle2,
-  Zap,
 } from 'lucide-react';
 import { HireableLogo } from '@/components/brand/hireable-logo';
 import { saveToStorage } from '@/lib/storage';
@@ -23,69 +20,34 @@ interface IntroSequenceProps {
 }
 
 interface StepData {
-  badge: string;
   title: string;
-  subtitle: string;
-  description: string;
-  highlights: string[];
+  body: string;
   icon: React.ComponentType<{ className?: string }>;
   accentColor: string;
 }
 
 const INTRO_STEPS: StepData[] = [
   {
-    badge: 'Welcome to Hireable',
-    title: 'Autonomous Placement Readiness Copilot',
-    subtitle: 'From profile analysis to offer letter, fully automated.',
-    description:
-      'Prepare for top-tier software engineering and tech roles with an intelligent copilot designed to diagnose your skills and simulate real company interview bars.',
-    highlights: [
-      'Tailored practice plans for FAANG, startups, and high-growth tech',
-      'Realistic role-based competency benchmarks',
-      'Real-time readiness score progression',
-    ],
+    title: 'Stop Guessing Your Readiness.',
+    body: "Rejections hurt when you don't know why. Hireable is your Placement Copilot. We analyze your entire profile and put you through actual AI mock interviews to tell you exactly where you stand before the real HR does.",
     icon: Sparkles,
     accentColor: 'from-indigo-500 to-purple-600',
   },
   {
-    badge: 'Step 1: Diagnostics',
-    title: 'Deep Profile & ATS Extraction',
-    subtitle: 'Instant multi-modal candidate assessment.',
-    description:
-      'Seamlessly upload your Resume PDF and LinkedIn profile. Our parsing engine extracts key technologies, project impact, and GitHub repos to identify your exact skill gaps.',
-    highlights: [
-      'Automated ATS keyword and gap analysis',
-      'GitHub repository audit and project depth verification',
-      'Personalized interview quiz tailoring based on your stack',
-    ],
+    title: 'One Drop. Full Context.',
+    body: 'No more repetitive form filling. Drop your Resume PDF, link your GitHub, and upload your LinkedIn export. We parse the data instantly and build your master candidate profile.',
     icon: FileText,
     accentColor: 'from-blue-500 to-cyan-500',
   },
   {
-    badge: 'Step 2: Simulation',
-    title: 'Live AI Voice & Video Mock Interviews',
-    subtitle: 'Ultra-low latency conversational practice.',
-    description:
-      'Experience hyper-realistic technical screeners and system design interviews powered by real-time voice streaming with adaptive questions that push your problem-solving depth.',
-    highlights: [
-      'Sub-second voice response with realistic interviewer personas',
-      'Live audio waveforms and interactive transcript drawer',
-      'Instant post-interview scoring across communication and correctness',
-    ],
+    title: 'Face the AI Interviewer.',
+    body: "Enter the voice studio. A live AI agent conducts a 15-minute technical mock interview tailored exactly to your resume's tech stack. It listens, adapts, asks dynamic follow-ups, and tests your depth.",
     icon: Bot,
     accentColor: 'from-cyan-500 to-emerald-500',
   },
   {
-    badge: 'Step 3: Execution',
-    title: 'Smart Job Discovery & Kanban Tracking',
-    subtitle: 'Land your dream role faster.',
-    description:
-      'Match your evaluated readiness score directly against live, verified tech job openings and manage your entire application pipeline through an integrated Kanban board.',
-    highlights: [
-      'Automated job discovery matched to your target role',
-      'Visual application funnel from Applied to Offer',
-      'Targeted recommendations to boost your match rate',
-    ],
+    title: 'Know Your Score. Get the Job.',
+    body: 'Get a definitive Placement Readiness Score (out of 100). Review your exact weaknesses, fix them, and let our engine match you with MSOT-approved jobs and targeted internships with 1-click applications.',
     icon: Briefcase,
     accentColor: 'from-purple-500 to-pink-500',
   },
@@ -108,7 +70,8 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
     if (onClose) {
       onClose();
     }
-  }, [onClose]);
+    router.push('/dashboard');
+  }, [onClose, router]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -129,7 +92,11 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
   };
 
   const handleFinish = () => {
-    handleDismiss();
+    localStorage.setItem('has_seen_intro', 'true');
+    saveToStorage('has_seen_intro', true);
+    if (onClose) {
+      onClose();
+    }
     router.push('/auth?mode=signup');
   };
 
@@ -167,6 +134,17 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
         onClick={handleDismiss}
         className="fixed inset-0 bg-[#070A0F]/80 backdrop-blur-xl"
       />
+
+      <button
+        type="button"
+        onClick={() => {
+          localStorage.setItem('has_seen_intro', 'true');
+          router.push('/dashboard');
+        }}
+        className="absolute right-4 top-4 z-30 rounded-full border border-white/15 bg-[#0B0F17]/90 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-xl transition-colors hover:border-white/30 hover:bg-white/10 sm:right-6 sm:top-6"
+      >
+        Skip Tour
+      </button>
 
       {/* 3D Perspective Container */}
       <div
@@ -208,16 +186,6 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
             }}
           />
 
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={handleDismiss}
-            aria-label="Close intro"
-            className="absolute right-5 top-5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
           {/* Top Brand & Step Indicator */}
           <div
             className="flex items-center justify-between border-b border-white/[0.06] pb-5"
@@ -234,7 +202,7 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
             <div className="flex items-center gap-1.5">
               {INTRO_STEPS.map((step, idx) => (
                 <button
-                  key={step.badge}
+                  key={step.title}
                   type="button"
                   onClick={() => setCurrentStep(idx)}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -261,15 +229,9 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
               className="py-6"
               style={{ transform: 'translateZ(45px)' }}
             >
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300">
-                  <Zap className="h-3 w-3 text-cyan-400" />
-                  {current.badge}
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
-                  {currentStep + 1} of {INTRO_STEPS.length}
-                </span>
-              </div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
+                {currentStep + 1} of {INTRO_STEPS.length}
+              </span>
 
               <div className="mt-4 flex items-start gap-4">
                 <div
@@ -281,25 +243,12 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
                   <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                     {current.title}
                   </h3>
-                  <p className="mt-1 text-sm font-medium text-indigo-300/80">
-                    {current.subtitle}
-                  </p>
                 </div>
               </div>
 
               <p className="mt-4 text-sm leading-relaxed text-white/70">
-                {current.description}
+                {current.body}
               </p>
-
-              {/* Highlights */}
-              <div className="mt-5 space-y-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-                {current.highlights.map((item) => (
-                  <div key={item} className="flex items-center gap-2.5 text-xs sm:text-sm text-white/80">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-cyan-400" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
             </motion.div>
           </AnimatePresence>
 
@@ -309,7 +258,7 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
             style={{ transform: 'translateZ(30px)' }}
           >
             <div className="flex items-center gap-2">
-              {currentStep > 0 ? (
+              {currentStep > 0 && (
                 <button
                   type="button"
                   onClick={handlePrev}
@@ -317,14 +266,6 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   <span>Back</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleDismiss}
-                  className="text-xs font-medium text-white/40 transition-colors hover:text-white/80 px-2 py-2"
-                >
-                  Skip Tour
                 </button>
               )}
             </div>
