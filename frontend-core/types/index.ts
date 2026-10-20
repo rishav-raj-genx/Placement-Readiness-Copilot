@@ -137,6 +137,25 @@ export interface JobApplication {
 
 export type JobStatus = 'published' | 'unpublished';
 
+export interface DiscoveredJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source: string;
+  description: string;
+  required_skills: string[]; // jsonb mapped to array
+  matched_skills: string[]; // jsonb mapped to array
+  relevance_score: number; // numeric(5,2)
+  match_reason: string;
+  is_remote: boolean;
+  job_type: string;
+  employment_type: 'full_time' | 'part_time' | 'contract' | 'internship';
+  publication_status: 'published' | 'unpublished';
+  posted_at: string;
+}
+
 export interface JobPosting {
   id: string;
   title: string;
