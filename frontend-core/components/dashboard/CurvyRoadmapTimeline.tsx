@@ -1,10 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
-  Award,
   FileText,
   FolderGit2,
   GitBranch,
@@ -14,7 +13,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { motion, useReducedMotion, useScroll, useMotionValueEvent, type MotionValue } from 'framer-motion';
-import { buildDashboardRoadmap, type DashboardRoadmapNode, type RoadmapCategory } from '@/lib/dashboard-readiness';
+import {
+  buildDashboardRoadmap,
+  type DashboardRoadmapNode,
+  type RoadmapCategory,
+  type RoadmapStatus,
+} from '@/lib/dashboard-readiness';
 
 interface CurvyRoadmapTimelineProps {
   nodes?: DashboardRoadmapNode[];
@@ -25,14 +29,76 @@ interface CategoryPresentation {
   color: string;
 }
 
-const CATEGORY_PRESENTATION: Record<RoadmapCategory, CategoryPresentation> = {
+const CATEGORY_PRESENTATION: Record<string, CategoryPresentation> = {
   resume: { icon: FileText, color: '#818CF8' },
-  projects: { icon: FolderGit2, color: '#A78BFA' },
-  mock_interview: { icon: Mic2, color: '#34D399' },
+  'Document Intelligence': { icon: FileText, color: '#818CF8' },
   github: { icon: GitBranch, color: '#22D3EE' },
+  'Engineering Evidence': { icon: GitBranch, color: '#22D3EE' },
+  projects: { icon: FolderGit2, color: '#A78BFA' },
+  'Proof of Work': { icon: FolderGit2, color: '#A78BFA' },
   linkedin: { icon: Linkedin, color: '#60A5FA' },
-  co_curricular: { icon: Award, color: '#FBBF24' },
+  'Professional Network': { icon: Linkedin, color: '#60A5FA' },
+  mock_interview: { icon: Mic2, color: '#34D399' },
+  '15-Minute AI Viva': { icon: Mic2, color: '#34D399' },
 };
+
+const BASE_TIMELINE_STEPS = [
+  {
+    id: '01',
+    title: 'Resume',
+    category: 'Document Intelligence',
+    categoryKey: 'resume' as RoadmapCategory,
+    eyebrow: 'Document Intelligence',
+    maxPoints: 20,
+    actionLabel: 'Improve resume',
+    actionHref: '/dashboard/profile',
+    side: 'left' as const,
+  },
+  {
+    id: '02',
+    title: 'GitHub',
+    category: 'Engineering Evidence',
+    categoryKey: 'github' as RoadmapCategory,
+    eyebrow: 'Engineering Evidence',
+    maxPoints: 20,
+    actionLabel: 'Review GitHub score',
+    actionHref: '/dashboard#readiness-breakdown',
+    side: 'right' as const,
+  },
+  {
+    id: '03',
+    title: 'Projects',
+    category: 'Proof of Work',
+    categoryKey: 'projects' as RoadmapCategory,
+    eyebrow: 'Proof of Work',
+    maxPoints: 20,
+    actionLabel: 'Manage projects',
+    actionHref: '/dashboard/profile',
+    side: 'left' as const,
+  },
+  {
+    id: '04',
+    title: 'LinkedIn',
+    category: 'Professional Network',
+    categoryKey: 'linkedin' as RoadmapCategory,
+    eyebrow: 'Professional Network',
+    maxPoints: 20,
+    actionLabel: 'Update LinkedIn',
+    actionHref: '/dashboard/profile',
+    side: 'right' as const,
+  },
+  {
+    id: '05',
+    title: 'Mock Interview',
+    category: '15-Minute AI Viva',
+    categoryKey: 'mock_interview' as RoadmapCategory,
+    eyebrow: '15-Minute AI Viva',
+    maxPoints: 20,
+    actionLabel: 'Start mock interview',
+    actionHref: '/dashboard/interview',
+    side: 'left' as const,
+  },
+] as const;
 
 const DESKTOP_PATH = 'M500 0 C360 150 640 250 500 400 C360 550 640 650 500 800 C360 950 640 1050 500 1200 C360 1350 640 1450 500 1600 C360 1750 640 1850 500 2000';
 const MOBILE_PATH = 'M40 0 C12 150 68 250 40 400 C12 550 68 650 40 800 C12 950 68 1050 40 1200 C12 1350 68 1450 40 1600 C12 1750 68 1850 40 2000';
@@ -44,7 +110,7 @@ function formatPoints(value: number): string {
 export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: CurvyRoadmapTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
-  const [activeNode, setActiveNode] = useState<RoadmapCategory>('resume');
+  const [activeNode, setActiveNode] = useState<string>('01');
   const [scrollProgress, setScrollProgress] = useState(0);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -52,6 +118,38 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
   });
 
   useMotionValueEvent(scrollYProgress, 'change', (latest) => setScrollProgress(latest));
+
+  // Hardcode the Sequence Structure: strictly enforce these 5 steps in this exact order.
+  // Map the user's fetched data into this structure, but DO NOT remove the step if data is missing.
+  const timelineSteps = useMemo(() => {
+    const nodeMap = new Map<string, DashboardRoadmapNode>();
+    if (nodes && Array.isArray(nodes)) {
+      for (const node of nodes) {
+        if (node.category) nodeMap.set(node.category, node);
+        if (node.id) nodeMap.set(node.id, node);
+      }
+    }
+
+    return BASE_TIMELINE_STEPS.map((step) => {
+      const match = nodeMap.get(step.categoryKey) ?? nodeMap.get(step.id);
+      const rawScore = typeof match?.rawScore === 'number' && Number.isFinite(match.rawScore)
+        ? Math.max(0, Math.min(100, match.rawScore))
+        : 0;
+      const weightedPoints = typeof match?.weightedPoints === 'number' && Number.isFinite(match.weightedPoints)
+        ? Math.max(0, Math.min(step.maxPoints, match.weightedPoints))
+        : Math.round(rawScore * (step.maxPoints / 100) * 10) / 10;
+      const status: RoadmapStatus = match?.status ?? (rawScore >= 75 ? 'Ready' : rawScore > 0 ? 'In progress' : 'Evidence needed');
+
+      return {
+        ...step,
+        rawScore,
+        weightedPoints,
+        status,
+        actionHref: match?.actionHref ?? step.actionHref,
+        actionLabel: match?.actionLabel ?? step.actionLabel,
+      };
+    });
+  }, [nodes]);
 
   return (
     <section ref={containerRef} aria-labelledby="roadmap-heading" className="relative mx-auto w-full max-w-6xl py-10 sm:py-14">
@@ -73,18 +171,18 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
         <RoadPath id="desktop" path={DESKTOP_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute inset-0 hidden h-full w-full md:block" viewBox="0 0 1000 2000" />
 
         <div className="relative z-10 space-y-20 md:space-y-28">
-          {nodes.map((node, index) => {
-            const presentation = CATEGORY_PRESENTATION[node.category];
+          {timelineSteps.map((node, index) => {
+            const presentation = CATEGORY_PRESENTATION[node.category] ?? CATEGORY_PRESENTATION[node.categoryKey] ?? CATEGORY_PRESENTATION.resume;
             const Icon = presentation.icon;
-            const selected = activeNode === node.category;
-            const reached = reduceMotion || scrollProgress >= index / Math.max(nodes.length - 1, 1) - 0.08;
+            const selected = activeNode === node.category || activeNode === node.id;
+            const reached = reduceMotion || scrollProgress >= index / Math.max(timelineSteps.length - 1, 1) - 0.08;
             const meterWidth = (node.weightedPoints / node.maxPoints) * 100;
 
             return (
-              <div key={node.category} className="grid min-h-[18rem] grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4 md:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] md:gap-8">
+              <div key={node.id} className="grid min-h-[18rem] grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4 md:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] md:gap-8">
                 <motion.button
                   type="button"
-                  onClick={() => setActiveNode(node.category)}
+                  onClick={() => setActiveNode(node.id)}
                   className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-2xl border bg-[#0B0F17] outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:col-start-2 md:justify-self-center"
                   style={{
                     borderColor: reached ? presentation.color : 'rgba(255,255,255,0.16)',
@@ -104,7 +202,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                     />
                   )}
                   <Icon className="h-6 w-6" style={{ color: presentation.color }} aria-hidden="true" />
-                  <span className="absolute -bottom-3 rounded-full bg-slate-900 px-2 py-0.5 font-mono text-[9px] font-bold text-white/70">0{node.stepNumber}</span>
+                  <span className="absolute -bottom-3 rounded-full bg-slate-900 px-2 py-0.5 font-mono text-[9px] font-bold text-white/70">{node.id}</span>
                 </motion.button>
 
                 <motion.article

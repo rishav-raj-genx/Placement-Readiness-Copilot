@@ -36,13 +36,11 @@ const GUEST_MOCK_READINESS: ReadinessScore = {
   readinessLevel: 'Not ready',
   topActions: [],
   breakdown: {
-    resume: { rawScore: 0, weight: 0.25, weightedPoints: 0, present: false },
-    projects: { rawScore: 0, weight: 0.25, weightedPoints: 0, present: false },
+    resume: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
+    github: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
+    projects: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
+    linkedin: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
     mock_interview: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
-    github: { rawScore: 0, weight: 0.1, weightedPoints: 0, present: false },
-    coding_practice: { rawScore: 0, weight: 0.1, weightedPoints: 0, present: false },
-    linkedin: { rawScore: 0, weight: 0.05, weightedPoints: 0, present: false },
-    co_curricular: { rawScore: 0, weight: 0.05, weightedPoints: 0, present: false },
   },
 };
 

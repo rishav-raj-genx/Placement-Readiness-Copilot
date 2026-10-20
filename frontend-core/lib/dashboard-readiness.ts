@@ -2,14 +2,15 @@ import type { ReadinessBreakdownItem, ReadinessScore } from '@/types';
 
 export type RoadmapCategory =
   | 'resume'
-  | 'projects'
-  | 'mock_interview'
   | 'github'
+  | 'projects'
   | 'linkedin'
-  | 'co_curricular';
+  | 'mock_interview';
+
 export type RoadmapStatus = 'Evidence needed' | 'Action required' | 'In progress' | 'Ready';
 
 export interface DashboardRoadmapNode {
+  id: string;
   category: RoadmapCategory;
   stepNumber: number;
   title: string;
@@ -33,15 +34,15 @@ export interface DashboardRecommendation {
 
 export const READINESS_CATEGORY_LABELS: readonly { key: RoadmapCategory; label: string }[] = [
   { key: 'resume', label: 'Resume' },
-  { key: 'projects', label: 'Projects' },
-  { key: 'mock_interview', label: 'Mock interview' },
   { key: 'github', label: 'GitHub' },
+  { key: 'projects', label: 'Projects' },
   { key: 'linkedin', label: 'LinkedIn' },
-  { key: 'co_curricular', label: 'Co-curricular' },
+  { key: 'mock_interview', label: 'Mock Interview' },
 ];
 
 interface RoadmapDefinition {
-  category: RoadmapCategory;
+  id: string;
+  categoryKey: RoadmapCategory;
   stepNumber: number;
   title: string;
   eyebrow: string;
@@ -58,12 +59,61 @@ interface RecommendationDefinition {
 }
 
 const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
-  { category: 'resume', stepNumber: 1, title: 'Resume', eyebrow: 'Document intelligence', maxPoints: 25, actionLabel: 'Improve resume', actionHref: '/dashboard/profile', side: 'left' },
-  { category: 'projects', stepNumber: 2, title: 'Projects', eyebrow: 'Proof of work', maxPoints: 25, actionLabel: 'Manage projects', actionHref: '/dashboard/profile', side: 'right' },
-  { category: 'mock_interview', stepNumber: 3, title: 'Mock Interview', eyebrow: '15-minute AI viva', maxPoints: 20, actionLabel: 'Launch interview', actionHref: '/dashboard/interview', side: 'left' },
-  { category: 'github', stepNumber: 4, title: 'GitHub', eyebrow: 'Engineering evidence', maxPoints: 10, actionLabel: 'Review GitHub score', actionHref: '/dashboard#readiness-breakdown', side: 'right' },
-  { category: 'linkedin', stepNumber: 5, title: 'LinkedIn', eyebrow: 'Recruiter presence', maxPoints: 10, actionLabel: 'Update profile', actionHref: '/dashboard/profile', side: 'left' },
-  { category: 'co_curricular', stepNumber: 6, title: 'Co-curricular', eyebrow: 'Initiative and leadership', maxPoints: 10, actionLabel: 'Add achievements', actionHref: '/dashboard/profile', side: 'right' },
+  {
+    id: '01',
+    categoryKey: 'resume',
+    stepNumber: 1,
+    title: 'Resume',
+    eyebrow: 'Document Intelligence',
+    maxPoints: 20,
+    actionLabel: 'Improve resume',
+    actionHref: '/dashboard/profile',
+    side: 'left',
+  },
+  {
+    id: '02',
+    categoryKey: 'github',
+    stepNumber: 2,
+    title: 'GitHub',
+    eyebrow: 'Engineering Evidence',
+    maxPoints: 20,
+    actionLabel: 'Review GitHub score',
+    actionHref: '/dashboard#readiness-breakdown',
+    side: 'right',
+  },
+  {
+    id: '03',
+    categoryKey: 'projects',
+    stepNumber: 3,
+    title: 'Projects',
+    eyebrow: 'Proof of Work',
+    maxPoints: 20,
+    actionLabel: 'Manage projects',
+    actionHref: '/dashboard/profile',
+    side: 'left',
+  },
+  {
+    id: '04',
+    categoryKey: 'linkedin',
+    stepNumber: 4,
+    title: 'LinkedIn',
+    eyebrow: 'Professional Network',
+    maxPoints: 20,
+    actionLabel: 'Update profile',
+    actionHref: '/dashboard/profile',
+    side: 'right',
+  },
+  {
+    id: '05',
+    categoryKey: 'mock_interview',
+    stepNumber: 5,
+    title: 'Mock Interview',
+    eyebrow: '15-Minute AI Viva',
+    maxPoints: 20,
+    actionLabel: 'Launch interview',
+    actionHref: '/dashboard/interview',
+    side: 'left',
+  },
 ];
 
 const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefinition> = {
@@ -72,19 +122,14 @@ const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefiniti
     description: (score) => `Your resume score is ${score}/100. Add quantified outcomes and role-specific keywords to your strongest bullets.`,
     href: '/dashboard/profile',
   },
-  projects: {
-    title: 'Make your projects verifiable',
-    description: (score) => `Your projects score is ${score}/100. Add a live link, test instructions, and measurable outcomes to your strongest project.`,
-    href: '/dashboard/profile',
-  },
-  mock_interview: {
-    title: 'Practice your interview delivery',
-    description: (score) => `Your mock interview score is ${score}/100. Complete a focused AI viva and act on its weakest-topic feedback.`,
-    href: '/dashboard/interview',
-  },
   github: {
     title: 'Showcase your best GitHub work',
     description: (score) => `Your GitHub score is ${score}/100. Pin 2 representative repositories and add outcome-focused READMEs.`,
+    href: '/dashboard/profile',
+  },
+  projects: {
+    title: 'Make your projects verifiable',
+    description: (score) => `Your projects score is ${score}/100. Add a live link, test instructions, and measurable outcomes to your strongest project.`,
     href: '/dashboard/profile',
   },
   linkedin: {
@@ -92,10 +137,10 @@ const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefiniti
     description: (score) => `Your LinkedIn score is ${score}/100. Add a role-specific headline, relevant skills, and evidence-backed project details.`,
     href: '/dashboard/profile',
   },
-  co_curricular: {
-    title: 'Document achievements beyond coursework',
-    description: (score) => `Your co-curricular score is ${score}/100. Add verified certifications, hackathons, or leadership experience.`,
-    href: '/dashboard/profile',
+  mock_interview: {
+    title: 'Practice your interview delivery',
+    description: (score) => `Your mock interview score is ${score}/100. Complete a focused AI viva and act on its weakest-topic feedback.`,
+    href: '/dashboard/interview',
   },
 };
 
@@ -117,12 +162,27 @@ function statusFor(item: ReadinessBreakdownItem | undefined): RoadmapStatus {
 
 export function buildDashboardRoadmap(readiness: ReadinessScore | null): DashboardRoadmapNode[] {
   return ROADMAP_DEFINITIONS.map((definition) => {
-    const item = readiness?.breakdown?.[definition.category];
+    const item = readiness?.breakdown?.[definition.categoryKey];
+    const rawScore = typeof item?.rawScore === 'number' && Number.isFinite(item.rawScore)
+      ? clamp(item.rawScore, 0, 100)
+      : 0;
+    const weightedPoints = typeof item?.weightedPoints === 'number' && Number.isFinite(item.weightedPoints)
+      ? clamp(item.weightedPoints, 0, definition.maxPoints)
+      : Math.round(rawScore * (definition.maxPoints / 100) * 10) / 10;
+
     return {
-      ...definition,
-      weightedPoints: clamp(item?.weightedPoints ?? 0, 0, definition.maxPoints),
-      rawScore: scoreFor(item),
+      id: definition.id,
+      category: definition.categoryKey,
+      stepNumber: definition.stepNumber,
+      title: definition.title,
+      eyebrow: definition.eyebrow,
+      maxPoints: definition.maxPoints,
+      weightedPoints,
+      rawScore,
       status: statusFor(item),
+      actionLabel: definition.actionLabel,
+      actionHref: definition.actionHref,
+      side: definition.side,
     };
   });
 }
@@ -131,7 +191,7 @@ export function buildNextBestActions(readiness: ReadinessScore | null): Dashboar
   if (!readiness) return [];
 
   return ROADMAP_DEFINITIONS
-    .map(({ category }) => ({ category, score: scoreFor(readiness.breakdown?.[category]) }))
+    .map(({ categoryKey }) => ({ category: categoryKey, score: scoreFor(readiness.breakdown?.[categoryKey]) }))
     .sort((left, right) => left.score - right.score)
     .slice(0, 2)
     .map(({ category, score }) => {
@@ -149,7 +209,7 @@ export function buildNextBestActions(readiness: ReadinessScore | null): Dashboar
 export function readinessTier(score: number | undefined, backendLevel?: string): string {
   if (backendLevel?.trim()) return backendLevel;
   if (typeof score !== 'number') return 'Building readiness';
-  if (score >= 80) return 'Placement ready';
-  if (score >= 60) return 'Nearly ready';
-  return 'Building readiness';
+  if (score >= 75) return 'Placement ready';
+  if (score >= 50) return 'Almost ready';
+  return 'Not ready';
 }
