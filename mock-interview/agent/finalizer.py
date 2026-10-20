@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from threading import Lock
 
 from agent.providers import InterviewLLM
@@ -25,15 +26,21 @@ class InterviewFinalizer:
         self.result_store = result_store
         self.interview_id = interview_id
         self.transcript: list[TranscriptTurn] = []
+        self._start_time: float = time.monotonic()
         self._result: InterviewResult | None = None
         self._persisted = False
         self._lock = Lock()
 
-    def record(self, role: str, text: str) -> None:
+    def record(self, role: str, text: str, timestamp_sec: float | None = None) -> None:
         speaker = "student" if role in {"student", "user"} else "ai"
         cleaned = text.strip()
         if cleaned:
-            self.transcript.append(TranscriptTurn(speaker=speaker, text=cleaned))
+            ts = timestamp_sec if timestamp_sec is not None else round(time.monotonic() - self._start_time, 1)
+            turn_id = len(self.transcript) + 1
+            self.transcript.append(
+                TranscriptTurn(speaker=speaker, text=cleaned, timestamp_sec=ts, turn_id=turn_id)
+            )
+
 
     def finish(self) -> InterviewResult:
         with self._lock:

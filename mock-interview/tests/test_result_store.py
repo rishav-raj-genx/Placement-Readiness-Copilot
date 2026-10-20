@@ -50,7 +50,7 @@ def test_result_store_maps_confirmed_rituraj_columns(monkeypatch):
     assert captured["payload"]["weak_areas"] == ["Quantify impact"]
     assert captured["payload"]["feedback_notes"] == "Strong interview."
     assert captured["payload"]["transcript"] == [
-        {"speaker": "student", "text": "I improved latency.", "timestamp_sec": None}
+        {"speaker": "student", "text": "I improved latency.", "timestamp_sec": None, "turn_id": None}
     ]
 
 

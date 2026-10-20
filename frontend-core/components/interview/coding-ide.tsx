@@ -160,21 +160,20 @@ export function CodingIDE() {
           problem_id: activeProblem.id,
           language,
           code,
-          client_test_passed: testOutput ? testOutput.filter((t) => t.passed).length : undefined,
-          client_test_total: testOutput ? testOutput.length : undefined,
         }),
       });
 
       const data = await res.json();
-      if (data.result) {
+      if (res.ok && data.result) {
         setEvaluation(data.result);
         toast.success('AI Interviewer completed code analysis!');
       } else {
-        toast.error('AI code evaluation could not be processed.');
+        toast.error(data.error || 'AI code evaluation could not be processed.');
       }
     } catch {
       toast.error('Failed to communicate with AI Interviewer service.');
     } finally {
+
       setIsEvaluating(false);
     }
   };

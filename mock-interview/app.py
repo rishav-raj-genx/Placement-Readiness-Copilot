@@ -28,6 +28,7 @@ from scoring.coding_evaluator import (
     evaluate_coding_submission,
 )
 from scoring.result_store import ResultStore, SupabaseResultStore
+from scoring.schemas import SessionConfig
 
 
 class CodingSubmissionPayload(BaseModel):
@@ -118,14 +119,19 @@ def create_app(
                 message = raw_message
                 event = message.get("event")
                 if event == "start":
+                    if session is not None:
+                        raise ValueError("session is already in progress; finish before starting a new one")
                     if require_auth:
                         student_id = authenticate_student(
                             message.get("auth_token"), message.get("student_id")
                         )
-                    session = InterviewSession(adapt_resume(message.get("resume")), scoring_llm)
+                    cfg_raw = message.get("session_config")
+                    cfg = SessionConfig.model_validate(cfg_raw) if isinstance(cfg_raw, dict) else None
+                    session = InterviewSession(adapt_resume(message.get("resume")), scoring_llm, config=cfg)
                     greeting = session.greeting()
                     await _send_voice_event(websocket, "greeting", greeting, text_to_speech)
                     await _send_next_question(websocket, session, text_to_speech)
+
                 elif event == "answer":
                     if session is None:
                         raise ValueError("send a start event before answering")

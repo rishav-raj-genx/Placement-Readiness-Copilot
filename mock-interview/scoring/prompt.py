@@ -86,7 +86,7 @@ def _build_transcript_heuristic_result(
     transcript: list[TranscriptTurn],
     context: InterviewContext | None = None,
 ) -> InterviewResult:
-    """Deterministically generate an evidence-grounded scoring result when LLM fails."""
+    """Deterministically generate an evidence-labeled scoring result when LLM fails."""
     student_turns = [turn.text for turn in transcript if turn.speaker == "student"]
     total_words = sum(len(turn.split()) for turn in student_turns)
     total_answers = max(1, len(student_turns))
@@ -96,21 +96,27 @@ def _build_transcript_heuristic_result(
     full_text = " ".join(student_turns).lower()
     matched_skills = [s for s in target_skills if s in full_text] if target_skills else []
 
-    comm_score = int(min(92, max(50, 60 + min(25, avg_words * 0.8))))
-    tech_score = int(min(90, max(45, 55 + (len(matched_skills) * 8) + min(15, total_words * 0.05))))
+    comm_score = int(min(88, max(45, 55 + min(25, avg_words * 0.7))))
+    tech_score = int(min(88, max(40, 50 + (len(matched_skills) * 8) + min(15, total_words * 0.04))))
     behavioral_keywords = ["team", "feedback", "learned", "trade-off", "production", "issue", "fixed", "collaborate"]
     behavioral_matches = sum(1 for kw in behavioral_keywords if kw in full_text)
-    behav_score = int(min(95, max(50, 58 + min(30, behavioral_matches * 6))))
+    behav_score = int(min(90, max(45, 52 + min(28, behavioral_matches * 6))))
 
     overall_score = round(0.35 * tech_score + 0.35 * comm_score + 0.30 * behav_score, 1)
 
+    # Extract actual quoted candidate snippets for evidence retention
+    evidence_snippets = [
+        f'"{turn[:100]}…"' if len(turn) > 100 else f'"{turn}"'
+        for turn in student_turns[:3]
+    ]
+
     strengths = [
-        f"Answered {total_answers} question(s) with an average of {int(avg_words)} words per response, showing active engagement.",
-        f"Demonstrated technical context in {', '.join(matched_skills[:3]) or 'software development practices'}.",
+        f"Delivered {total_answers} response(s) averaging {int(avg_words)} words, maintaining consistent session engagement.",
+        f"Verified context in skills: {', '.join(matched_skills[:3]) or 'software development fundamentals'}.",
     ]
     improvements = [
-        "Provide more measurable production metrics (e.g. latency, throughput, error rates) in technical responses.",
-        "Elaborate further on alternative architectures considered before settling on the chosen solution.",
+        "Include more concrete architectural trade-offs and quantified metrics (e.g. latency percentiles, failure rates).",
+        "Adopt the STAR method (Situation, Task, Action, Result) for structured behavioral responses.",
     ]
 
     return InterviewResult(
@@ -118,31 +124,38 @@ def _build_transcript_heuristic_result(
         interview_score=overall_score,
         transcript=transcript,
         summary=(
-            f"Candidate completed {total_answers} questions with {int(avg_words)} words/turn on average. "
-            f"Showed {len(matched_skills)} verified technical competencies with clear communicative clarity."
+            f"[HEURISTIC EVALUATION] AI scoring model was unavailable; result computed from transcript metrics. "
+            f"Candidate completed {total_answers} answers ({int(avg_words)} words/turn avg). "
+            "For full LLM rubric feedback, verify provider connectivity."
         ),
         strengths=strengths,
         improvement_areas=improvements,
         dimensions={
             "communication": DimensionScore(
                 score=comm_score,
-                feedback="Responses were coherent, articulate, and addressed the interviewer's prompts directly.",
-                strengths=["Structured conversational delivery.", "Prompt adherence."],
-                improvement_areas=["Practice concise executive summaries for complex ideas."],
+                feedback="[Heuristic] Assessed based on response volume, coherence, and answer completeness.",
+                strengths=["Consistent turn engagement.", "Prompt adherence."],
+                improvement_areas=["Practice executive summaries for technical topics."],
+                evidence=evidence_snippets[:1],
             ),
             "technical_depth": DimensionScore(
                 score=tech_score,
-                feedback="Sound conceptual foundation with references to practical implementation details.",
-                strengths=["Applied domain knowledge.", "Identified key concepts in stack."],
-                improvement_areas=["Deepen explanation of failure edge cases and distributed state."],
+                feedback="[Heuristic] Assessed from technical keywords, framework mentions, and system concepts.",
+                strengths=["Domain terminology referenced.", "Practical implementation intent."],
+                improvement_areas=["Deepen explanation of edge cases, distributed state, and recovery."],
+                evidence=evidence_snippets[1:2] if len(evidence_snippets) > 1 else evidence_snippets[:1],
             ),
             "behavioral": DimensionScore(
                 score=behav_score,
-                feedback="Demonstrated professional demeanor, willingness to adapt, and team collaboration awareness.",
-                strengths=["Professional tone.", "Openness to feedback."],
-                improvement_areas=["Use the STAR method (Situation, Task, Action, Result) for behavioral answers."],
+                feedback="[Heuristic] Assessed from collaborative terminology and conflict resolution keywords.",
+                strengths=["Professional tone.", "Team awareness."],
+                improvement_areas=["Explicitly structure answers around Situation, Task, Action, and Result."],
+                evidence=evidence_snippets[2:3] if len(evidence_snippets) > 2 else evidence_snippets[:1],
             ),
         },
+        rubric_version="v1.0-heuristic",
+        evaluation_mode="heuristic_fallback",
+        is_fallback=True,
     )
 
 
@@ -168,6 +181,11 @@ def parse_scoring_result(
 
     raw_dict["contract_version"] = CONTRACT_VERSION
     raw_dict["transcript"] = transcript
+    raw_dict["rubric_version"] = "v1.0-standard"
+    raw_dict["evaluation_mode"] = "llm_rubric"
+    raw_dict["is_fallback"] = False
+
+    student_turns = [t.text for t in transcript if t.speaker == "student"]
 
     if not isinstance(raw_dict.get("summary"), str) or not raw_dict["summary"].strip():
         raw_dict["summary"] = "Candidate completed the interview session."
@@ -203,6 +221,8 @@ def parse_scoring_result(
                     found = dims[alias]
                     break
 
+        evidence_list = [f'"{t[:90]}…"' for t in student_turns[:2]]
+
         if isinstance(found, dict):
             score = found.get("score")
             try:
@@ -213,19 +233,23 @@ def parse_scoring_result(
             feedback = str(found.get("feedback") or f"Evaluation of candidate's {target_key.replace('_', ' ')}.")
             strengths = found.get("strengths") if isinstance(found.get("strengths"), list) else ["Clear performance."]
             improvements = found.get("improvement_areas") if isinstance(found.get("improvement_areas"), list) else ["Continue practicing edge cases."]
+            raw_evidence = found.get("evidence") if isinstance(found.get("evidence"), list) else evidence_list
             normalized_dims[target_key] = DimensionScore(
                 score=score_int,
                 feedback=feedback,
                 strengths=[str(s) for s in strengths] or ["Competent."],
                 improvement_areas=[str(i) for i in improvements] or ["Refine details."],
+                evidence=[str(e) for e in raw_evidence] if raw_evidence else evidence_list,
             )
         else:
-            base_score = 70
+            # Missing dimension: clearly label as estimated with evidence rather than silently faking 70
+            base_score = 65
             normalized_dims[target_key] = DimensionScore(
                 score=base_score,
-                feedback=f"Candidate displayed satisfactory {target_key.replace('_', ' ')}.",
-                strengths=["Good baseline competency."],
-                improvement_areas=["Further expand technical trade-off explanations."],
+                feedback=f"[Model Omission] The evaluation model omitted the {target_key.replace('_', ' ')} dimension; estimated baseline applied.",
+                strengths=["Active participation in interview session."],
+                improvement_areas=[f"Demonstrate explicit competencies in {target_key.replace('_', ' ')}."],
+                evidence=evidence_list,
             )
 
     raw_dict["dimensions"] = normalized_dims
@@ -244,4 +268,5 @@ def parse_scoring_result(
         return InterviewResult.model_validate(raw_dict)
     except (ValueError, TypeError, KeyError):
         return _build_transcript_heuristic_result(transcript, context)
+
 

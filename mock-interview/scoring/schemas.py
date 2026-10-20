@@ -27,12 +27,36 @@ class InterviewContext(BaseModel):
     education: list[str] = Field(default_factory=list)
 
 
+class SessionConfig(BaseModel):
+    """Configuration for an interview session, duration, question plan, and role."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_duration_minutes: int = Field(default=15, ge=5, le=60)
+    max_duration_minutes: int | None = Field(default=None, ge=5, le=90)
+    technical_question_count: int = Field(default=6, ge=1, le=12)
+    project_deep_dive_count: int = Field(default=1, ge=1, le=3)
+    hr_question_count: int = Field(default=1, ge=1, le=3)
+    role_category: str = "backend"
+    question_source: Literal["curated_bank", "template", "custom"] = "curated_bank"
+
+    @property
+    def effective_max_minutes(self) -> int:
+        return self.max_duration_minutes if self.max_duration_minutes is not None else self.target_duration_minutes + 2
+
+    @property
+    def total_question_target(self) -> int:
+        # 1 intro + project deep dive + technical + hr
+        return 1 + self.project_deep_dive_count + self.technical_question_count + self.hr_question_count
+
+
 class TranscriptTurn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     speaker: Literal["ai", "student"]
     text: str
     timestamp_sec: float | None = Field(default=None, ge=0)
+    turn_id: int | None = None
 
 
 class DimensionScore(BaseModel):
@@ -42,6 +66,7 @@ class DimensionScore(BaseModel):
     feedback: str = ""
     strengths: list[str] = Field(default_factory=list)
     improvement_areas: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
 
 
 class InterviewResult(BaseModel):
@@ -56,6 +81,9 @@ class InterviewResult(BaseModel):
     strengths: list[str] = Field(min_length=1)
     improvement_areas: list[str] = Field(min_length=1)
     dimensions: dict[str, DimensionScore] = Field(min_length=3)
+    rubric_version: str = "v1.0-standard"
+    evaluation_mode: str = "llm_rubric"
+    is_fallback: bool = False
 
     @model_validator(mode="after")
     def require_scoring_dimensions(self) -> InterviewResult:
@@ -64,6 +92,7 @@ class InterviewResult(BaseModel):
         if missing:
             raise ValueError(f"missing scoring dimensions: {', '.join(missing)}")
         return self
+
 
 
 def contract_markdown() -> str:

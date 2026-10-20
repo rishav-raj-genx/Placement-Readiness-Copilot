@@ -27,3 +27,12 @@ def test_app_exposes_health_and_interview_websocket():
 
     assert "/health" in paths
     assert "/ws/interview" in paths
+
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["target_duration_minutes"] == 15

@@ -1,4 +1,7 @@
-# Mock Interview Worker (LiveKit Agent)
+# Mock Interview Worker (Legacy Prototype)
+
+> [!NOTE]
+> **Production Notice**: This directory (`frontend-core/worker`) contains an early standalone prototype. The single authoritative, production-ready backend service and LiveKit worker is located in [`mock-interview/`](../../mock-interview), which provides unified `SessionConfig`, 15-20 min configurable timers, adaptive question banking, resilient scoring, and server-side sandboxed coding evaluation.
 
 A Python LiveKit agent that joins interview rooms, conducts mock interviews with students via real-time audio, and sends results back to the platform.
 

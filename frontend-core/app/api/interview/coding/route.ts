@@ -109,34 +109,14 @@ export async function POST(req: Request): Promise<NextResponse> {
     });
     return NextResponse.json(data);
   } catch (error) {
-    // Local heuristic evaluation fallback if interview service is starting or unreachable
-    const code = String(body.code || '');
-    const hasMap = code.includes('Map') || code.includes('seen') || code.includes('dict') || code.includes('{}');
-    const hasLoop = code.includes('for ') || code.includes('while ');
-    const isOptimal = hasMap || !hasLoop;
-
-    const fallbackResult = {
-      status: 'ok',
-      result: {
-        problem_id: body.problem_id || 'two_sum',
-        problem_title: 'Two Sum Target Indices',
-        overall_score: isOptimal ? 90 : 72,
-        passed_tests: isOptimal ? 3 : 2,
-        total_tests: 3,
-        estimated_time_complexity: isOptimal ? 'O(N)' : 'O(N^2)',
-        estimated_space_complexity: isOptimal ? 'O(N)' : 'O(1)',
-        optimal_time_complexity: 'O(N)',
-        optimal_space_complexity: 'O(N)',
-        complexity_comparison: isOptimal
-          ? 'Optimal! You utilized hash-based lookups for linear O(N) runtime.'
-          : 'Nested iteration detected resulting in quadratic O(N^2) runtime.',
-        code_quality_feedback: `Evaluated ${code.split('\n').length} lines of code. Solution passes test cases with sound logic structure.`,
-        strengths: ['Clear algorithm structure', isOptimal ? 'Optimal time complexity' : 'Functional implementation'],
-        improvement_areas: [isOptimal ? 'Consider memory limits with large inputs' : 'Optimize to O(N) using a hash map'],
-        interviewer_follow_up: 'Interviewer Follow-Up: If the input array is already sorted, how would you solve this in O(1) auxiliary space without a hash map?',
-        optimal_code_diff_note: 'Compare with optimal O(N) time and O(N) space benchmark.',
+    return NextResponse.json(
+      {
+        status: 'unavailable',
+        error:
+          'Coding evaluation service is temporarily unavailable. Please verify that the mock-interview backend service is running on port 8002.',
       },
-    };
-    return NextResponse.json(fallbackResult);
+      { status: 503 }
+    );
   }
 }
+

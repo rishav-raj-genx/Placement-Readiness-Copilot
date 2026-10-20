@@ -30,23 +30,23 @@ from agent.context_adapter import adapt_resume
 from agent.finalizer import InterviewFinalizer
 from agent.livekit_events import encode_event, results_event
 from agent.providers import GroqLLM
-from agent.session import InterviewSession
 from scoring.result_store import SupabaseInterviewSessionStore
-from scoring.schemas import InterviewContext
+from scoring.schemas import InterviewContext, SessionConfig
 
 logger = logging.getLogger("mock-interview")
 server = AgentServer()
 
 
 class MockInterviewAgent(Agent):
-    def __init__(self, instructions: str) -> None:
+    def __init__(self, instructions: str, target_minutes: int = 15) -> None:
         super().__init__(instructions=instructions)
+        self.target_minutes = target_minutes
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
             instructions=(
-                "Greet the candidate, explain that this is an 18-minute mock "
-                "interview, and ask the first question."
+                f"Greet the candidate warmly, state that this session is configured for about {self.target_minutes} minutes, "
+                "and ask the first introductory question."
             )
         )
 
@@ -57,7 +57,16 @@ async def entrypoint(ctx: JobContext) -> None:
     metadata = _resume_from_room_metadata(ctx.room.metadata)
     context = adapt_resume(metadata)
     interview_id = _interview_id(metadata)
-    instructions = _interview_instructions(context)
+
+    target_duration = _duration_from_metadata(metadata)
+    session_config = SessionConfig(
+        target_duration_minutes=target_duration,
+        technical_question_count=6,
+        project_deep_dive_count=2,
+        hr_question_count=2,
+    )
+    instructions = _interview_instructions(context, session_config)
+
     session = AgentSession(
         stt=inference.STT(
             os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-3"),
@@ -99,8 +108,9 @@ async def entrypoint(ctx: JobContext) -> None:
         session.shutdown()
 
     async def enforce_max_duration() -> None:
-        await asyncio.sleep(InterviewSession.MAX_DURATION_MINUTES * 60)
-        logger.info("Maximum interview duration reached; finalizing the session")
+        max_seconds = session_config.effective_max_minutes * 60
+        await asyncio.sleep(max_seconds)
+        logger.info("Maximum interview duration reached (%d sec); finalizing the session", max_seconds)
         await finish_and_close()
 
     duration_task = asyncio.create_task(enforce_max_duration())
@@ -120,8 +130,17 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(finalize_on_shutdown)
     await session.start(
         room=ctx.room,
-        agent=MockInterviewAgent(instructions),
+        agent=MockInterviewAgent(instructions, target_minutes=session_config.target_duration_minutes),
     )
+
+
+def _duration_from_metadata(metadata: Mapping[str, object]) -> int:
+    val = metadata.get("durationMinutes") or metadata.get("duration_minutes") or metadata.get("target_duration_minutes")
+    if isinstance(val, (int, float)) and 5 <= int(val) <= 60:
+        return int(val)
+    if isinstance(val, str) and val.isdigit() and 5 <= int(val) <= 60:
+        return int(val)
+    return 15 if os.getenv("E2E_MODE") else 20
 
 
 def _resume_from_room_metadata(metadata: str) -> dict[str, object]:
@@ -150,28 +169,30 @@ def _is_finish_packet(data: bytes) -> bool:
     return isinstance(value, Mapping) and value.get("event") == "interview:finish"
 
 
-def _interview_instructions(context: InterviewContext) -> str:
+def _interview_instructions(context: InterviewContext, config: SessionConfig) -> str:
     # Grounded in Internshala & PrepLabsAI InterviewMentor standards.
     return (
-        "You are an experienced, empathetic, and professional mock interviewer conducting a 15-20 "
-        "minute technical and behavioral session. Speak at a calm, natural conversational cadence. "
+        f"You are an experienced, empathetic, and professional mock interviewer conducting a {config.target_duration_minutes}-minute "
+        "technical and behavioral session. Speak at a calm, natural conversational cadence. "
         "Do not sound robotic or rush through questions. "
         "Always listen actively: before asking the next question, briefly acknowledge one concrete "
         "point the candidate made in their preceding answer. If the candidate expresses uncertainty or "
         "says they haven't worked with a tool, respond supportively and pivot constructively. "
-        "Ask exactly six primary questions, one at a time: "
+        "Ask questions one at a time: "
         "Question 1 is a warm introduction and interest in the role. "
         "Questions 2 and 3 must name a specific project from the candidate context, probing architecture, "
         "personal contribution, technical trade-offs, and how the system behaves under 10x scale or failures. "
-        "Question 4 must probe a listed skill in production depth, including edge cases and performance. "
-        "Question 5 must probe debugging, reliability, or testing practices. "
-        "Question 6 is an HR/behavioral question prompting for the STAR method (Situation, Task, Action, Result). "
+        "Questions 4 through 7 probe listed technical skills in production depth, including edge cases and performance. "
+        "Question 8 probes debugging, reliability, or testing practices. "
+        "Questions 9 and 10 are HR/behavioral questions prompting for the STAR method (Situation, Task, Action, Result). "
         "Ask at most one concise, context-aware follow-up per primary question if an answer lacks depth. "
-        "Target 18 minutes and finish by 20 minutes. Never reveal live scores or grading during the conversation. "
+        f"Target {config.target_duration_minutes} minutes and finish by {config.effective_max_minutes} minutes. "
+        "Never reveal live scores or grading during the conversation. "
         f"Candidate context: {context.model_dump_json(exclude_none=True)}\n\n"
         "When the candidate asks to finish, warmly thank them for their time, acknowledge the conclusion "
         "of the session, and explain that detailed diagnostic feedback is ready on their dashboard."
     )
+
 
 
 

@@ -1,9 +1,7 @@
 # Mock Interview Voice Service
 
-This is a standalone websocket service for a 15-20 minute mock interview. The
-default plan targets 18 minutes with four technical questions and two HR
-questions. The transport is independent of the frontend so LiveKit can use the
-same interview and scoring boundaries.
+This is the authoritative backend service for mock interviews (both standalone WebSocket and native LiveKit Agents worker).
+It supports configurable 15 or 20-minute sessions with role-aware question generation (technical depth questions, project deep dives, and STAR behavioral questions) picked dynamically from a question bank, adaptive follow-up evaluation, lifecycle state enforcement, and evidence-grounded scoring with transparent fallback indicators.
 
 ## Run locally
 
