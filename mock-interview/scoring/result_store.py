@@ -122,10 +122,12 @@ class SupabaseInterviewSessionStore:
             raise PersistenceError("interview ID is required")
         if not self.url or not self.service_key:
             raise PersistenceError("Supabase persistence is not configured")
+        is_abandoned = getattr(result, "is_abandoned", False)
+        status_val = "abandoned" if is_abandoned else getattr(result, "session_status", "completed")
         payload = {
             "result": result.model_dump(mode="json"),
-            "status": "completed",
-            "completed_at": datetime.now(UTC).isoformat(),
+            "status": status_val,
+            "completed_at": datetime.now(UTC).isoformat() if status_val == "completed" else None,
         }
         # Conditional update: only transition if session is currently created, active, or in_progress
         # This prevents duplicate finishes or stale workers from overwriting completed results
@@ -148,3 +150,143 @@ class SupabaseInterviewSessionStore:
             raise
         except Exception as exc:
             raise PersistenceError("Supabase interview session persistence failed") from exc
+
+
+# In-memory registry for completed Round 1 sessions
+_COMPLETED_ROUND1_STUDENTS: set[str] = set()
+
+
+def record_round1_completed(student_id: str | None) -> None:
+    """Record that a student has completed Round 1 (Technical Viva)."""
+    if student_id and str(student_id).strip():
+        _COMPLETED_ROUND1_STUDENTS.add(str(student_id).strip())
+
+
+def has_completed_round1(
+    student_id: str | None,
+    url: str | None = None,
+    service_key: str | None = None,
+) -> bool:
+    """Verify whether a student has completed Round 1 (Technical Viva)."""
+    if not student_id:
+        return False
+    clean_id = str(student_id).strip()
+    if not clean_id:
+        return False
+
+    # 1. Fast in-memory check
+    if clean_id in _COMPLETED_ROUND1_STUDENTS:
+        return True
+
+    # 2. E2E and test bypass
+    is_e2e = (
+        os.getenv("MOCK_INTERVIEW_E2E_MODE", "false").lower() in {"1", "true", "yes"}
+        or os.getenv("E2E_MODE", "false").lower() in {"1", "true", "yes"}
+    )
+    if is_e2e and clean_id in {"e2e_candidate", "test-student-id", "service_caller"}:
+        return True
+
+    # 3. Query Supabase for authoritative state
+    supabase_url = (url or os.getenv("SUPABASE_URL", "")).rstrip("/")
+    key = service_key or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not key:
+        return False
+
+    try:
+        # Check interview_sessions for completed non-coding sessions
+        req = request.Request(
+            f"{supabase_url}/rest/v1/interview_sessions?select=id,status,config&or=(student_id.eq.{clean_id},user_id.eq.{clean_id})&status=eq.completed&limit=10",
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Accept": "application/json",
+            },
+            method="GET",
+        )
+        with request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            if isinstance(data, list) and len(data) > 0:
+                for item in data:
+                    cfg = item.get("config") or {}
+                    if isinstance(cfg, dict) and cfg.get("type") == "coding":
+                        continue
+                    _COMPLETED_ROUND1_STUDENTS.add(clean_id)
+                    return True
+
+        # Check mock_interview_results table
+        req2 = request.Request(
+            f"{supabase_url}/rest/v1/mock_interview_results?select=id&student_id=eq.{clean_id}&limit=1",
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Accept": "application/json",
+            },
+            method="GET",
+        )
+        with request.urlopen(req2, timeout=5) as resp:
+            data2 = json.loads(resp.read().decode())
+            if isinstance(data2, list) and len(data2) > 0:
+                _COMPLETED_ROUND1_STUDENTS.add(clean_id)
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def save_coding_interview_session(
+    student_id: str,
+    problem_id: str,
+    result: object,
+    url: str | None = None,
+    service_key: str | None = None,
+) -> None:
+    """Persist a completed Round 2 coding practice session into interview_sessions."""
+    supabase_url = (url or os.getenv("SUPABASE_URL", "")).rstrip("/")
+    key = service_key or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not key or not student_id:
+        return
+
+    res_dict = result.model_dump() if hasattr(result, "model_dump") else (result if isinstance(result, dict) else {})
+    score_val = float(res_dict.get("overall_score", 85.0))
+
+    payload = {
+        "student_id": str(student_id),
+        "target_role": "Software Engineer (DSA & Web Dev)",
+        "status": "completed",
+        "score": score_val,
+        "config": {
+            "type": "coding",
+            "round": 2,
+            "problem_id": problem_id,
+        },
+        "result": {
+            "interview_score": score_val,
+            "coding_result": res_dict,
+            "summary": res_dict.get("code_quality_feedback", "Round 2 coding evaluation completed."),
+            "strengths": res_dict.get("strengths", []),
+            "weak_areas": res_dict.get("improvement_areas", []),
+            "evaluation_mode": res_dict.get("evaluation_mode", "static_ast_analysis"),
+            "test_execution_status": res_dict.get("test_execution_status", "sandbox_pending"),
+        },
+        "completed_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+
+    try:
+        req = request.Request(
+            f"{supabase_url}/rest/v1/interview_sessions",
+            data=json.dumps(payload).encode(),
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            method="POST",
+        )
+        with request.urlopen(req, timeout=10) as resp:
+            pass
+    except Exception:
+        pass
+

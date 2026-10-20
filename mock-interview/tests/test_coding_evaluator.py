@@ -122,3 +122,84 @@ def two_sum(nums, target):
     assert result.passed_tests == 3
     assert result.overall_score >= 85
 
+
+def test_round1_gating_and_activation(monkeypatch):
+    from scoring.result_store import record_round1_completed
+
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-internal-secret")
+    app = create_app(require_auth=True)
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer test-internal-secret"}
+
+    # 1. Candidate who has not completed Round 1 is locked out
+    candidate_id = "student_gate_test_101"
+    locked_resp = client.get(f"/api/interview/coding-problems?student_id={candidate_id}", headers=headers)
+    assert locked_resp.status_code == 200
+    locked_data = locked_resp.json()
+    assert locked_data["status"] == "locked"
+    assert locked_data["round1_completed"] is False
+    assert len(locked_data["problems"]) == 0
+
+    locked_eval = client.post(
+        "/api/interview/coding-evaluate",
+        headers=headers,
+        json={
+            "student_id": candidate_id,
+            "problem_id": "two_sum",
+            "language": "python",
+            "code": "def two_sum(n, t): return [0, 1]",
+        },
+    )
+    assert locked_eval.status_code == 200
+    eval_locked_data = locked_eval.json()
+    assert eval_locked_data["status"] == "locked"
+    assert eval_locked_data["round1_completed"] is False
+
+    # 2. Candidate completes Round 1
+    record_round1_completed(candidate_id)
+
+    # 3. Candidate is now unlocked for Round 2
+    active_resp = client.get(f"/api/interview/coding-problems?student_id={candidate_id}", headers=headers)
+    assert active_resp.status_code == 200
+    active_data = active_resp.json()
+    assert active_data["status"] == "ok"
+    assert active_data["round1_completed"] is True
+    assert len(active_data["problems"]) >= 3
+
+    # 4. Candidate submits code on IDE -> Evaluates and provides follow-up
+    eval_resp = client.post(
+        "/api/interview/coding-evaluate",
+        headers=headers,
+        json={
+            "student_id": candidate_id,
+            "problem_id": "two_sum",
+            "language": "python",
+            "code": "def two_sum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        if target - num in seen: return [seen[target - num], i]\n        seen[num] = i\n    return []",
+        },
+    )
+    assert eval_resp.status_code == 200
+    eval_data = eval_resp.json()
+    assert eval_data["status"] == "ok"
+    assert eval_data["result"]["next_problem_id"] == "lru_cache"
+    assert "sorted" in eval_data["result"]["interviewer_follow_up"]
+
+    # 5. Candidate answers the follow-up question -> Evaluator assesses and asks next question
+    follow_up_resp = client.post(
+        "/api/interview/coding-evaluate",
+        headers=headers,
+        json={
+            "student_id": candidate_id,
+            "problem_id": "two_sum",
+            "language": "python",
+            "code": "def two_sum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        if target - num in seen: return [seen[target - num], i]\n        seen[num] = i\n    return []",
+            "follow_up_answer": "I would use two pointers from left and right moving inwards.",
+        },
+    )
+    assert follow_up_resp.status_code == 200
+    follow_up_data = follow_up_resp.json()
+    assert follow_up_data["status"] == "ok"
+    assert "Two-Pointer" in follow_up_data["result"]["interviewer_follow_up"]
+    assert "LRU Cache" in follow_up_data["result"]["interviewer_follow_up"]
+    assert follow_up_data["result"]["next_problem_id"] == "lru_cache"
+
+

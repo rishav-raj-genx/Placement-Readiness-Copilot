@@ -28,10 +28,19 @@ from livekit.agents.llm import ChatMessage
 
 from agent.context_adapter import adapt_resume
 from agent.finalizer import InterviewFinalizer
-from agent.livekit_events import encode_event, question_event, results_event
+from agent.livekit_events import (
+    encode_event,
+    greeting_event,
+    question_event,
+    results_event,
+    transcript_event,
+)
 from agent.providers import GroqLLM, OllamaLLM, ResilientLLM
 from agent.session import build_question_plan
-from scoring.result_store import SupabaseInterviewSessionStore
+from scoring.result_store import (
+    SupabaseInterviewSessionStore,
+    record_round1_completed,
+)
 from scoring.schemas import InterviewContext, SessionConfig
 
 logger = logging.getLogger("mock-interview")
@@ -58,6 +67,7 @@ async def entrypoint(ctx: JobContext) -> None:
     metadata = _resume_from_room_metadata(ctx.room.metadata)
     context = adapt_resume(metadata)
     interview_id = _interview_id(metadata)
+    student_id = _student_id(metadata)
 
     target_duration = _duration_from_metadata(metadata)
     session_config = SessionConfig(
@@ -108,61 +118,119 @@ async def entrypoint(ctx: JobContext) -> None:
 
     plan = build_question_plan(context, session_config)
     current_question_index = 0
+    user_answered_since_last_question = False
+
+    # Broadcast initial greeting event to room
+    welcome_msg = (
+        f"Welcome to your mock interview for {context.target_role or 'Software Engineer'}. "
+        f"This technical viva is configured for about {session_config.target_duration_minutes} minutes."
+    )
+    with suppress(Exception):
+        asyncio.create_task(
+            ctx.room.local_participant.publish_data(
+                encode_event(
+                    greeting_event(
+                        text=welcome_msg,
+                        interview_id=interview_id,
+                        target_role=context.target_role,
+                    )
+                ),
+                reliable=True,
+            )
+        )
 
     @session.on("conversation_item_added")
     def on_conversation_item_added(event: ConversationItemAddedEvent) -> None:
-        nonlocal current_question_index
+        nonlocal current_question_index, user_answered_since_last_question
         if not isinstance(event.item, ChatMessage):
             return
         if event.item.role not in {"assistant", "user"}:
             return
         finalizer.record(event.item.role, event.item.text_content)
 
-        # Broadcast question state when assistant asks a question
-        if event.item.role == "assistant" and current_question_index < len(plan):
-            q_item = plan[current_question_index]
-            current_question_index += 1
-            with suppress(Exception):
-                asyncio.create_task(
-                    ctx.room.local_participant.publish_data(
-                        encode_event(
-                            question_event(
-                                text=q_item.text,
-                                question_index=current_question_index,
-                                total_questions=len(plan),
-                                category=q_item.category.value,
-                            )
-                        ),
-                        reliable=True,
-                    )
+        # Broadcast live transcript entry
+        speaker = "interviewer" if event.item.role == "assistant" else "student"
+        with suppress(Exception):
+            asyncio.create_task(
+                ctx.room.local_participant.publish_data(
+                    encode_event(
+                        transcript_event(
+                            text=event.item.text_content,
+                            speaker=speaker,
+                            is_final=True,
+                        )
+                    ),
+                    reliable=True,
                 )
+            )
 
-    # Issue 12: Atomic finalization state to ensure exactly-once execution across tasks
+        # Broadcast question state when assistant asks a planned question
+        if event.item.role == "assistant" and current_question_index < len(plan):
+            if user_answered_since_last_question or current_question_index == 0:
+                q_item = plan[current_question_index]
+                current_question_index += 1
+                user_answered_since_last_question = False
+                with suppress(Exception):
+                    asyncio.create_task(
+                        ctx.room.local_participant.publish_data(
+                            encode_event(
+                                question_event(
+                                    text=q_item.text,
+                                    question_index=current_question_index,
+                                    total_questions=len(plan),
+                                    category=q_item.category.value,
+                                )
+                            ),
+                            reliable=True,
+                        )
+                    )
+        elif event.item.role == "user":
+            user_answered_since_last_question = True
+
+    # Issue 12 & Finding 3: Multi-state finalization ensuring retryability on transient failures
     finalization_lock = asyncio.Lock()
-    is_finalized = False
+    finalization_state = "idle"  # idle | in_progress | succeeded | failed_retryable
 
     async def finalize_interview(*, publish: bool) -> bool:
-        nonlocal is_finalized
+        nonlocal finalization_state
         async with finalization_lock:
-            if is_finalized:
-                logger.info("Interview already finalized; ignoring duplicate invocation")
+            if finalization_state == "succeeded":
+                logger.info("Interview already successfully finalized; ignoring duplicate invocation")
                 return True
-            is_finalized = True
+            if finalization_state == "in_progress":
+                logger.info("Finalization already in progress; waiting")
+                return False
+            finalization_state = "in_progress"
 
         try:
             result = await asyncio.to_thread(finalizer.finish)
             if publish:
-                await ctx.room.local_participant.publish_data(
-                    encode_event(results_event(result)),
-                    reliable=True,
-                )
+                with suppress(Exception):
+                    await ctx.room.local_participant.publish_data(
+                        encode_event(results_event(result)),
+                        reliable=True,
+                    )
+            # Only record Round 1 as completed if the session was truly completed, not abandoned
+            if not getattr(result, "is_abandoned", False) and getattr(result, "session_status", "completed") == "completed":
+                if student_id:
+                    record_round1_completed(student_id)
+                if interview_id:
+                    record_round1_completed(interview_id)
+            async with finalization_lock:
+                finalization_state = "succeeded"
             return True
-        except (RuntimeError, ValueError) as exc:
-            logger.error("Unable to finalize interview: %s", exc)
+        except (RuntimeError, ValueError, OSError, Exception) as exc:
+            logger.error("Finalization attempt failed (retryable): %s", exc)
+            async with finalization_lock:
+                finalization_state = "failed_retryable"
             return False
 
     async def finish_and_close() -> None:
-        await finalize_interview(publish=True)
+        success = await finalize_interview(publish=True)
+        if not success:
+            # Retry once after brief backoff before closing
+            await asyncio.sleep(1.0)
+            await finalize_interview(publish=True)
         session.shutdown()
 
     async def enforce_max_duration() -> None:
@@ -217,6 +285,19 @@ def _resume_from_room_metadata(metadata: str) -> dict[str, object]:
 def _interview_id(metadata: Mapping[str, object]) -> str | None:
     value = metadata.get("interviewId") or metadata.get("interview_id")
     return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _student_id(metadata: Mapping[str, object]) -> str | None:
+    student = metadata.get("student")
+    if isinstance(student, Mapping) and student.get("id"):
+        return str(student["id"]).strip()
+    val = (
+        metadata.get("studentId")
+        or metadata.get("student_id")
+        or metadata.get("userId")
+        or metadata.get("user_id")
+    )
+    return str(val).strip() if val else None
 
 
 def _is_finish_packet(data: bytes) -> bool:

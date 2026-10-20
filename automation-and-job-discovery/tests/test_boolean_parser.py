@@ -38,3 +38,16 @@ def test_build_query_from_profile():
     )
     assert '("React" OR "Node.js")' in query
     assert "Remote" in query
+
+
+def test_malformed_boolean_query_raises_value_error():
+    import pytest
+
+    with pytest.raises(ValueError, match="Invalid query|unparsed tokens|Unclosed|Mismatched"):
+        BooleanSearchParser.matches("Python AND (Senior OR", "Python Senior")
+
+    with pytest.raises(ValueError):
+        BooleanSearchParser.matches("Python AND AND Java", "Python Java")
+
+    with pytest.raises(ValueError):
+        BooleanSearchParser.matches("Python NOT", "Python")

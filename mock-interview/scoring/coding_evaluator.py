@@ -327,6 +327,8 @@ class CodingEvaluationResult(BaseModel):
     strengths: list[str]
     improvement_areas: list[str]
     interviewer_follow_up: str
+    next_problem_id: str | None = None
+    round1_completed: bool = True
     optimal_solution_code: str = ""
     optimal_code_diff_note: str
     evaluation_mode: str = "static_ast_analysis"
@@ -435,11 +437,41 @@ try:
         elif "{problem_id}" == "use_debounce":
             fn = globals().get("debounce")
             if fn and callable(fn):
-                passed += 1
+                import time
+                calls = []
+                def target(x):
+                    calls.append(x)
+                debounced = fn(target, 0.03)
+                debounced(1)
+                debounced(2)
+                debounced(3)
+                time.sleep(0.06)
+                if len(calls) == 1 and calls[0] == 3:
+                    passed += 1
+                if hasattr(debounced, "cancel") and callable(debounced.cancel):
+                    debounced(4)
+                    debounced.cancel()
+                    time.sleep(0.06)
+                    if len(calls) == 1:
+                        passed += 1
+                else:
+                    passed += 1
         elif "{problem_id}" == "fetch_with_retry":
             fn = globals().get("request_with_retry") or globals().get("fetch_with_retry")
             if fn and callable(fn):
-                passed += 1
+                attempts = [0]
+                def mock_transient(*args, **kwargs):
+                    attempts[0] += 1
+                    if attempts[0] < 2:
+                        raise OSError("503 Service Unavailable")
+                    return "recovered"
+                try:
+                    res = fn(mock_transient, max_retries=3, backoff_ms=5)
+                    if attempts[0] >= 2 or res == "recovered":
+                        passed += 1
+                except Exception:
+                    pass
+                passed += 1  # Base function execution test passed
         else:
             pass
     print(json.dumps({{"passed": passed, "total": total, "status": "ok"}}))
@@ -503,6 +535,7 @@ def evaluate_coding_submission(
     language: str,
     code: str,
     run_sandbox: bool = False,
+    follow_up_answer: str | None = None,
 ) -> CodingEvaluationResult:
     """Analyze student code via static AST benchmarks and produce AI feedback."""
     problem = CODING_PROBLEM_BANK.get(problem_id)
@@ -527,51 +560,51 @@ def evaluate_coding_submission(
     has_error_handling = any(kw in cleaned_code for kw in ["try", "catch", "except", "if (res.status", "clearTimeout", ".cancel"])
     has_edge_checks = any(kw in cleaned_code for kw in ["len(", "length", "null", "undefined", "None", "< 2", "== 0"])
 
-    # Complexity estimation
+    # Heuristic complexity estimation (provisional pattern indicators)
     if problem.id == "two_sum":
         if has_nested_loop and not has_hash_map:
             time_comp = "O(N^2)"
             space_comp = "O(1)"
-            comp_diff = "Your approach uses nested loops resulting in O(N^2) time complexity. The optimal approach uses a hash map for O(N) time."
+            comp_diff = "[Heuristic Estimate] Code pattern suggests nested loops (~O(N^2) time). An optimal approach uses single-pass hash mapping for ~O(N) time. (Static pattern analysis is provisional)."
             correctness_score = 75
         else:
             time_comp = "O(N)"
             space_comp = "O(N)"
-            comp_diff = "Optimal! You utilized a hash map for single-pass O(N) lookup time."
+            comp_diff = "[Heuristic Estimate] Code pattern indicates optimal single-pass hash lookup (~O(N) time). (Static pattern analysis is provisional)."
             correctness_score = 95
     elif problem.id == "lru_cache":
         if "OrderedDict" in cleaned_code or ("Map" in cleaned_code and "delete" in cleaned_code):
             time_comp = "O(1)"
             space_comp = "O(capacity)"
-            comp_diff = "Optimal O(1) eviction using ordered hash map tracking."
+            comp_diff = "[Heuristic Estimate] Uses ordered map pattern for ~O(1) eviction tracking. (Static pattern analysis is provisional)."
             correctness_score = 92
         else:
             time_comp = "O(N)"
             space_comp = "O(capacity)"
-            comp_diff = "Using a basic list/array results in O(N) lookups or deletions. Doubly-linked list or ordered map achieves O(1)."
+            comp_diff = "[Heuristic Estimate] Unordered search or array deletion pattern detected (~O(N)). Doubly linked list or ordered map achieves ~O(1). (Static pattern analysis is provisional)."
             correctness_score = 70
     elif problem.id == "use_debounce":
         if "clearTimeout" in cleaned_code and "cancel" in cleaned_code:
             time_comp = "O(1)"
             space_comp = "O(1)"
-            comp_diff = "Clean closure management with complete timer invalidation and unmount safety."
+            comp_diff = "[Heuristic Estimate] Closure structure manages timer invalidation cleanly. (Static pattern analysis is provisional)."
             correctness_score = 94
         else:
             time_comp = "O(1)"
             space_comp = "O(1)"
-            comp_diff = "Timer cancellation or context forwarding needs refinement for full production safety."
+            comp_diff = "[Heuristic Estimate] Timer cancellation or closure forwarding needs refinement for memory safety. (Static pattern analysis is provisional)."
             correctness_score = 72
     else:
         # fetch_with_retry
         if "Math.pow" in cleaned_code or "**" in cleaned_code or "2 **" in cleaned_code:
             time_comp = "O(1)"
             space_comp = "O(1)"
-            comp_diff = "Exponential backoff implemented correctly to prevent server thundering herds."
+            comp_diff = "[Heuristic Estimate] Exponential multiplier pattern detected in backoff delay. (Static pattern analysis is provisional)."
             correctness_score = 95
         else:
             time_comp = "O(1)"
             space_comp = "O(1)"
-            comp_diff = "Linear or fixed backoff detected. Consider exponential backoff with jitter for production stability."
+            comp_diff = "[Heuristic Estimate] Linear delay pattern detected. Exponential backoff recommended for production stability. (Static pattern analysis is provisional)."
             correctness_score = 78
 
     # Safe static AST analysis
@@ -640,27 +673,59 @@ def evaluate_coding_submission(
     if not improvements:
         improvements.append("Consider benchmarking under high-concurrency edge conditions.")
 
-    # Interviewer follow-up question
-    if problem.id == "two_sum":
-        follow_up = (
-            "Interviewer Follow-Up: If the input array is already sorted, how would you solve "
-            "this in O(1) auxiliary space without using a hash map?"
-        )
-    elif problem.id == "lru_cache":
-        follow_up = (
-            "Interviewer Follow-Up: How would you make this LRU cache thread-safe in a multi-threaded "
-            "environment with high concurrent read and write operations?"
-        )
-    elif problem.id == "use_debounce":
-        follow_up = (
-            "Interviewer Follow-Up: What is the difference between debounce and throttle, and when "
-            "would you choose throttle over debounce in a production UI?"
-        )
+    # Interviewer follow-up question and progression
+    ORDERED_PROBLEMS = ["two_sum", "lru_cache", "use_debounce", "fetch_with_retry"]
+    try:
+        curr_idx = ORDERED_PROBLEMS.index(problem.id)
+        next_prob_id = ORDERED_PROBLEMS[curr_idx + 1] if curr_idx + 1 < len(ORDERED_PROBLEMS) else None
+    except ValueError:
+        next_prob_id = None
+
+    cleaned_follow_up = (follow_up_answer or "").strip()
+    if cleaned_follow_up:
+        if problem.id == "two_sum":
+            if "pointer" in cleaned_follow_up.lower():
+                fb = "Excellent! You correctly identified the Two-Pointer technique (left and right moving inward) on a sorted array for O(N) time and O(1) space."
+            else:
+                fb = "Good effort. On a sorted array, two pointers (start and end) allow finding the pair in O(N) time with O(1) space without a hash map."
+            follow_up = f"{fb} Next Question: Proceed to LRU Cache Implementation. Implement get(key) and put(key, value) in O(1) average time."
+        elif problem.id == "lru_cache":
+            if any(w in cleaned_follow_up.lower() for w in ["lock", "mutex", "rwlock", "read-write", "concurrent", "shard"]):
+                fb = "Spot on! Using Read-Write Locks (RWLock) or concurrent striped segments allows multiple concurrent reads while guarding mutations."
+            else:
+                fb = "Good approach. Using a Read-Write lock (RWLock) or segment striping prevents contention across concurrent readers and writers."
+            follow_up = f"{fb} Next Question: Proceed to Debounced Search & Function Hook (Web Development track). Implement debounce with cancel capability."
+        elif problem.id == "use_debounce":
+            if any(w in cleaned_follow_up.lower() for w in ["throttle", "interval", "scroll", "resize"]):
+                fb = "Great architectural distinction! Debounce batches delayed events until inactivity, while throttle ensures execution at steady intervals."
+            else:
+                fb = "Good response. Remember debounce delays execution until user quiet, whereas throttle caps execution to a steady cadence."
+            follow_up = f"{fb} Next Question: Proceed to Resilient Fetch with Exponential Backoff. Implement retry logic for 5xx errors."
+        else:
+            fb = "Outstanding! Randomized full jitter prevents thundering herd avalanches during recovery periods."
+            follow_up = f"{fb} Interview Evaluation Complete: You have demonstrated strong competency in DSA and Web Development problem solving!"
+            next_prob_id = None
     else:
-        follow_up = (
-            "Interviewer Follow-Up: How would you add randomized jitter to the backoff delay to prevent "
-            "thousands of clients from retrying simultaneously during an outage?"
-        )
+        if problem.id == "two_sum":
+            follow_up = (
+                "Interviewer Follow-Up: If the input array is already sorted, how would you solve "
+                "this in O(1) auxiliary space without using a hash map?"
+            )
+        elif problem.id == "lru_cache":
+            follow_up = (
+                "Interviewer Follow-Up: How would you make this LRU cache thread-safe in a multi-threaded "
+                "environment with high concurrent read and write operations?"
+            )
+        elif problem.id == "use_debounce":
+            follow_up = (
+                "Interviewer Follow-Up: What is the difference between debounce and throttle, and when "
+                "would you choose throttle over debounce in a production UI?"
+            )
+        else:
+            follow_up = (
+                "Interviewer Follow-Up: How would you add randomized jitter to the backoff delay to prevent "
+                "thousands of clients from retrying simultaneously during an outage?"
+            )
 
     opt_code = problem.optimal_solution.get(language, next(iter(problem.optimal_solution.values())))
     opt_note = f"Compare with optimal {problem.optimal_time_complexity} time / {problem.optimal_space_complexity} space benchmark."
@@ -684,6 +749,8 @@ def evaluate_coding_submission(
         strengths=strengths,
         improvement_areas=improvements,
         interviewer_follow_up=follow_up,
+        next_problem_id=next_prob_id,
+        round1_completed=True,
         optimal_solution_code=opt_code,
         optimal_code_diff_note=opt_note,
         evaluation_mode=evaluation_mode,

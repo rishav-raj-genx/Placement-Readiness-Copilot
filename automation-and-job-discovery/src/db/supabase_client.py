@@ -41,6 +41,17 @@ class SupabaseHandler:
             )
             self.is_live = False
 
+    def check_operational(self) -> bool:
+        """Verifies that Supabase is not merely configured, but verified operational with active query permissions."""
+        if not self.is_live or not self.supabase:
+            return False
+        try:
+            self.supabase.table("readiness_scores").select("student_id").limit(1).execute()
+            return True
+        except Exception as e:
+            logger.warning(f"Supabase operational check failed: {e}")
+            return False
+
     def _init_local_fallback(self):
         """Initializes a local SQLite fallback database inside data/local_cache.db."""
         self.local_db_path = config.DATA_DIR / "local_cache.db"
@@ -177,9 +188,13 @@ class SupabaseHandler:
                 res = self.supabase.table("project_live_checks").insert(payload).execute()
                 return {"success": True, "source": "supabase", "data": res.data}
             except Exception as e:
-                logger.error(f"Error inserting into Supabase: {e}. Storing locally.")
+                logger.error(f"Error inserting into Supabase: {e}")
+                if config.is_production():
+                    raise RuntimeError(f"Database write to Supabase failed in production: {e}") from e
+        elif config.is_production():
+            raise RuntimeError("Supabase database not connected in production; local SQLite fallback is disabled.")
 
-        # Local SQLite storage fallback
+        # Local SQLite storage fallback (development / testing only)
         conn = sqlite3.connect(self.local_db_path)
         cur = conn.cursor()
         cur.execute(
@@ -250,9 +265,13 @@ class SupabaseHandler:
                     "count": len(res.data) if res.data else len(cleaned_jobs),
                 }
             except Exception as e:
-                logger.error(f"Error upserting jobs into Supabase: {e}. Storing locally.")
+                logger.error(f"Error upserting jobs into Supabase: {e}")
+                if config.is_production():
+                    raise RuntimeError(f"Database upsert to Supabase failed in production: {e}") from e
+        elif config.is_production():
+            raise RuntimeError("Supabase database not connected in production; local SQLite fallback is disabled.")
 
-        # Local fallback
+        # Local fallback (development / testing only)
         conn = sqlite3.connect(self.local_db_path)
         cur = conn.cursor()
         for job in jobs:
@@ -308,9 +327,13 @@ class SupabaseHandler:
                 )
                 return {"success": True, "source": "supabase", "data": res.data}
             except Exception as e:
-                logger.error(f"Error upserting readiness score to Supabase: {e}. Storing locally.")
+                logger.error(f"Error upserting readiness score to Supabase: {e}")
+                if config.is_production():
+                    raise RuntimeError(f"Database upsert to Supabase failed in production: {e}") from e
+        elif config.is_production():
+            raise RuntimeError("Supabase database not connected in production; local SQLite fallback is disabled.")
 
-        conn = sqlite3.connect(self.local_db_path)
+        # Local SQLite storage fallback (development / testing only)
         cur = conn.cursor()
         cur.execute(
             """

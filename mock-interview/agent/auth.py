@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from collections.abc import Mapping
 
@@ -27,14 +28,28 @@ def authenticate_student(
     *,
     jwt_secret: str | None = None,
 ) -> str:
-    """Verify a Supabase JWT and return its subject.
+    """Verify a Supabase JWT or authorized internal service token and return its subject.
 
-    The token is accepted only from the websocket start message and is never
-    logged or returned. A client-supplied student ID must match the JWT subject.
+    The token is never logged or returned. A client-supplied student ID must match
+    the JWT subject or be validated by the internal service key.
     """
 
     if not isinstance(token, str) or not token.strip():
         raise AuthenticationError("authentication token is required")
+    raw_token = token.strip()
+
+    # 1. Internal service key authorization (service-to-service communication)
+    expected_service_key = os.getenv("MOCK_INTERVIEW_SERVICE_TOKEN") or os.getenv("INTERNAL_SERVICE_KEY")
+    if expected_service_key and hmac.compare_digest(raw_token, expected_service_key):
+        return str(requested_student_id) if requested_student_id else "service_caller"
+
+    # 2. E2E simulation mode authorization
+    is_e2e = os.getenv("MOCK_INTERVIEW_E2E_MODE", "false").lower() in {"1", "true", "yes"} or \
+             os.getenv("E2E_MODE", "false").lower() in {"1", "true", "yes"}
+    if is_e2e and raw_token in {"e2e-internal-token", "test-token"}:
+        return str(requested_student_id) if requested_student_id else "e2e_candidate"
+
+    # 3. Supabase user JWT verification
     secret = jwt_secret or os.getenv("SUPABASE_JWT_SECRET")
     if not secret:
         raise AuthenticationError("SUPABASE_JWT_SECRET is not configured")
@@ -42,7 +57,7 @@ def authenticate_student(
         import jwt
 
         decoded: object = jwt.decode(
-            token,
+            raw_token,
             secret,
             algorithms=["HS256"],
             audience="authenticated",

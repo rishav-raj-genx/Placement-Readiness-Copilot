@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import feedparser
 
+import requests
+
 logger = logging.getLogger("rss_fetcher")
 
 STANDARD_RSS_FEEDS = [
@@ -29,11 +31,16 @@ STANDARD_RSS_FEEDS = [
 class RSSJobFetcher:
     """
     Compliant job fetcher using official RSS feeds and `feedparser`.
-    Parses syndicated feeds without violating any terms of service.
+    Parses syndicated feeds with explicit connect/read timeouts, response size limits, and per-feed status.
     """
+
+    CONNECT_TIMEOUT = 5.0
+    READ_TIMEOUT = 10.0
+    MAX_FEED_BYTES = 2 * 1024 * 1024  # 2MB response size bound
 
     def __init__(self, feeds: Optional[List[Dict[str, str]]] = None):
         self.feeds = feeds or STANDARD_RSS_FEEDS
+        self.feed_statuses: Dict[str, str] = {}
 
     def fetch_feed(self, feed_info: Dict[str, str], max_items: int = 25) -> List[Dict[str, Any]]:
         feed_url = feed_info["url"]
@@ -41,7 +48,30 @@ class RSSJobFetcher:
         jobs: List[Dict[str, Any]] = []
 
         try:
-            parsed = feedparser.parse(feed_url)
+            resp = requests.get(
+                feed_url,
+                timeout=(self.CONNECT_TIMEOUT, self.READ_TIMEOUT),
+                stream=True,
+                headers={"User-Agent": "Placement-Readiness-JobDiscovery/1.0 (RSS Syndication Reader)"},
+            )
+            resp.raise_for_status()
+
+            # Bound response size to avoid memory exhaustion from oversized feeds
+            content_chunks = []
+            total_bytes = 0
+            for chunk in resp.iter_content(chunk_size=65536):
+                total_bytes += len(chunk)
+                if total_bytes > self.MAX_FEED_BYTES:
+                    logger.warning(
+                        f"Feed {feed_url} exceeded max size limit ({self.MAX_FEED_BYTES} bytes). Truncating."
+                    )
+                    break
+                content_chunks.append(chunk)
+
+            content = b"".join(content_chunks)
+            parsed = feedparser.parse(content)
+            self.feed_statuses[source_name] = "ok"
+
             for entry in parsed.entries[:max_items]:
                 title = entry.get("title", "")
                 link = entry.get("link", "")
@@ -83,7 +113,8 @@ class RSSJobFetcher:
                 )
 
         except Exception as e:
-            logger.error(f"Error parsing RSS feed {feed_url}: {e}")
+            logger.error(f"Error fetching/parsing RSS feed {feed_url}: {e}")
+            self.feed_statuses[source_name] = f"error: {str(e)}"
 
         return jobs
 

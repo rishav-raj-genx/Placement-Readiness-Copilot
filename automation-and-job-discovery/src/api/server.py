@@ -5,8 +5,9 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from src import config
 from src.db.supabase_client import db_client
 from src.job_discovery.aggregator import JobAggregator
 from src.link_checker.checker import LiveLinkChecker
@@ -25,8 +26,20 @@ security = HTTPBearer(auto_error=False)
 
 
 def is_e2e_mode() -> bool:
+    if config.is_production():
+        return False
     val = os.environ.get("E2E_MODE") or os.environ.get("AUTOMATION_E2E_MODE") or ""
     return val.lower().strip() in {"1", "true", "yes"}
+
+
+@app.on_event("startup")
+def validate_production_configuration():
+    """Refuses to launch in production if E2E bypass modes are active."""
+    val = os.environ.get("E2E_MODE") or os.environ.get("AUTOMATION_E2E_MODE") or ""
+    if config.is_production() and val.lower().strip() in {"1", "true", "yes"}:
+        raise RuntimeError(
+            "FATAL CONFIGURATION ERROR: Cannot launch automation service in production with E2E_MODE or AUTOMATION_E2E_MODE enabled."
+        )
 
 
 def verify_service_token(
@@ -57,18 +70,18 @@ job_aggregator = JobAggregator()
 
 
 class LinkCheckRequest(BaseModel):
-    url: str
-    student_id: Optional[str] = "student_api"
-    project_name: Optional[str] = "Project Submission"
-    claimed_keywords: Optional[List[str]] = None
+    url: str = Field(..., min_length=1, max_length=2048)
+    student_id: Optional[str] = Field("student_api", max_length=128)
+    project_name: Optional[str] = Field("Project Submission", max_length=256)
+    claimed_keywords: Optional[List[str]] = Field(default=None, max_length=50)
 
 
 class JobSearchRequest(BaseModel):
-    skills: List[str]
-    target_role: Optional[str] = "Software Engineer Intern"
-    boolean_query: Optional[str] = None
-    locations: Optional[List[str]] = None
-    max_results: Optional[int] = 20
+    skills: List[str] = Field(..., min_length=1, max_length=50)
+    target_role: Optional[str] = Field("Software Engineer Intern", max_length=128)
+    boolean_query: Optional[str] = Field(None, max_length=500)
+    locations: Optional[List[str]] = Field(None, max_length=20)
+    max_results: Optional[int] = Field(20, ge=1, le=100)
     force_refresh: Optional[bool] = False
 
 
@@ -83,17 +96,24 @@ def root():
 
 @app.get("/health")
 def health():
-    """Liveness probe: verifies automation service is running."""
+    """Liveness probe: verifies automation service process is responsive."""
     return {"status": "ok", "service": "automation-and-job-discovery"}
 
 
 @app.get("/ready")
 def ready():
-    """Readiness probe: verifies Supabase and worker readiness."""
+    """Readiness probe: verifies Supabase operational connectivity and dependencies."""
+    is_operational = db_client.check_operational() if db_client.is_live else False
+    if config.is_production():
+        is_ready = is_operational
+    else:
+        is_ready = is_operational or is_e2e_mode() or not db_client.is_live
+
     return {
-        "status": "ok" if db_client.is_live else "degraded",
-        "ready": True,
-        "supabase_connected": db_client.is_live,
+        "status": "ok" if is_operational else "degraded",
+        "ready": is_ready,
+        "supabase_configured": db_client.is_live,
+        "supabase_operational": is_operational,
     }
 
 
@@ -144,6 +164,14 @@ def discover_jobs(
             "jobs": jobs,
             "freshness": freshness,
         }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_QUERY",
+                "message": str(e),
+            },
+        )
     except Exception as e:
         error_id = str(uuid.uuid4())
         logger.error(f"[{error_id}] Job discovery failed: {e}", exc_info=True)
@@ -159,11 +187,18 @@ def discover_jobs(
 @app.post("/api/calculate-readiness", response_model=ReadinessReport)
 def calculate_readiness(
     profile: StudentProfileEvaluation,
+    persist: bool = False,
     _auth: bool = Depends(verify_service_token),
 ):
-    """Calculates Module 4 composite placement readiness score and top 5 actions."""
+    """Calculates Module 4 composite placement readiness score and top 5 actions.
+    Pure calculation by default (persist=False). Set persist=True for explicit durable write.
+    """
     try:
-        report = PlacementReadinessCalculator.calculate_readiness(profile, save_to_db=True)
+        report = PlacementReadinessCalculator.calculate_readiness(
+            profile,
+            save_to_db=persist,
+            require_supabase=config.is_production() if persist else False,
+        )
         return report
     except Exception as e:
         error_id = str(uuid.uuid4())
@@ -176,5 +211,33 @@ def calculate_readiness(
             detail={
                 "code": "CALCULATION_FAILED",
                 "message": f"Readiness calculation failed. Reference ID: {error_id}",
+            },
+        )
+
+
+@app.post("/api/persist-readiness", response_model=ReadinessReport)
+def persist_readiness(
+    profile: StudentProfileEvaluation,
+    _auth: bool = Depends(verify_service_token),
+):
+    """Explicitly calculates and persists Module 4 composite placement readiness score to database."""
+    try:
+        report = PlacementReadinessCalculator.calculate_readiness(
+            profile,
+            save_to_db=True,
+            require_supabase=config.is_production(),
+        )
+        return report
+    except Exception as e:
+        error_id = str(uuid.uuid4())
+        logger.error(
+            f"[{error_id}] Readiness persistence failed for student {profile.student_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "PERSISTENCE_FAILED",
+                "message": f"Readiness persistence failed. Reference ID: {error_id}",
             },
         )

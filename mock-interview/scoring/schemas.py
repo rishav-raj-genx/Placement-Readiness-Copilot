@@ -85,6 +85,8 @@ class InterviewResult(BaseModel):
     evaluation_mode: str = "llm_rubric"
     is_fallback: bool = False
     is_provisional: bool = False
+    is_abandoned: bool = False
+    session_status: str = "completed"
 
     @model_validator(mode="after")
     def require_scoring_dimensions(self) -> InterviewResult:

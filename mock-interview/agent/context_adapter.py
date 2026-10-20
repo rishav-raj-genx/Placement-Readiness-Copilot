@@ -24,25 +24,33 @@ SECTION_HEADINGS = {
 }
 
 
+MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB limit
+MAX_PDF_PAGES = 5  # Standard resume limit
+MAX_EXTRACTED_TEXT_CHARS = 25000
+
+
 def extract_pdf_text(pdf_source: str | bytes) -> str:
-    """Safely extract plain text from a PDF signed URL or binary bytes using pypdf."""
+    """Safely extract plain text from a PDF signed URL or binary bytes with strict size & page limits."""
     pdf_bytes: bytes | None = None
     if isinstance(pdf_source, bytes):
-        pdf_bytes = pdf_source
+        pdf_bytes = pdf_source[:MAX_PDF_BYTES]
     elif isinstance(pdf_source, str) and pdf_source.startswith(("http://", "https://")):
         with contextlib.suppress(error.URLError, TimeoutError, ValueError, OSError):
             req = request.Request(pdf_source, headers={"User-Agent": "Placement-Readiness-Copilot/1.0"})
             with request.urlopen(req, timeout=10) as resp:
                 if resp.status == 200:
-                    pdf_bytes = resp.read()
+                    pdf_bytes = resp.read(MAX_PDF_BYTES + 1)
+                    if len(pdf_bytes) > MAX_PDF_BYTES:
+                        pdf_bytes = pdf_bytes[:MAX_PDF_BYTES]
 
     if not pdf_bytes:
         return ""
 
     with contextlib.suppress(Exception):
         reader = PdfReader(io.BytesIO(pdf_bytes))
-        pages_text = [page.extract_text() or "" for page in reader.pages]
-        return "\n".join(pages_text).strip()
+        pages_text = [page.extract_text() or "" for page in reader.pages[:MAX_PDF_PAGES]]
+        joined = "\n".join(pages_text).strip()
+        return joined[:MAX_EXTRACTED_TEXT_CHARS]
 
     return ""
 

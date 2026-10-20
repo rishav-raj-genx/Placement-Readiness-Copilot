@@ -70,7 +70,7 @@ class BooleanSearchParser:
 
         def parse_factor(index: int):
             if index >= len(tokens):
-                return False, index
+                raise ValueError("Unexpected end of boolean query expression.")
 
             token = tokens[index]
 
@@ -80,24 +80,62 @@ class BooleanSearchParser:
 
             if token == "(":
                 val, next_idx = parse_expression(index + 1)
-                if next_idx < len(tokens) and tokens[next_idx] == ")":
-                    next_idx += 1
-                return val, next_idx
+                if next_idx >= len(tokens) or tokens[next_idx] != ")":
+                    raise ValueError("Mismatched parentheses: expected ')'")
+                return val, next_idx + 1
 
             if token == ")":
-                return False, index
+                raise ValueError("Unexpected ')' token in boolean expression.")
+
+            if token in ("AND", "OR"):
+                raise ValueError(f"Unexpected operator '{token}' at position {index}.")
 
             # Terminal literal keyword
             term_val = match_term(token)
             return term_val, index + 1
 
-        try:
-            result, _ = parse_expression(0)
-            return bool(result)
-        except Exception:
-            # Fallback to simple all-terms check if complex nested syntax has typos
-            raw_terms = [t.lower() for t in tokens if t not in ("AND", "OR", "NOT", "(", ")")]
-            return any(t in normalized_text for t in raw_terms)
+        cls.validate_syntax(query)
+        result, next_idx = parse_expression(0)
+        if next_idx < len(tokens):
+            raise ValueError(
+                f"Invalid Boolean query syntax: unparsed tokens {tokens[next_idx:]} in '{query}'"
+            )
+        return bool(result)
+
+    @classmethod
+    def validate_syntax(cls, query: str) -> None:
+        """Validates that query syntax is well-formed with balanced parentheses and valid operator placement."""
+        if not query or not query.strip():
+            return
+        tokens = cls.tokenize(query)
+        if not tokens:
+            return
+
+        paren_depth = 0
+        prev_token = None
+        for i, t in enumerate(tokens):
+            if t == "(":
+                paren_depth += 1
+                if prev_token not in (None, "AND", "OR", "NOT", "("):
+                    raise ValueError(f"Invalid query: keyword directly preceding '(' without operator at '{query}'")
+            elif t == ")":
+                paren_depth -= 1
+                if paren_depth < 0:
+                    raise ValueError(f"Invalid query: unexpected ')' in '{query}'")
+                if prev_token in ("AND", "OR", "NOT", "("):
+                    raise ValueError(f"Invalid query: empty parentheses or operator before ')' in '{query}'")
+            elif t in ("AND", "OR"):
+                if prev_token is None or prev_token in ("AND", "OR", "NOT", "("):
+                    raise ValueError(f"Invalid query: misplaced operator '{t}' at token {i} in '{query}'")
+            elif t == "NOT":
+                if prev_token not in (None, "AND", "OR", "("):
+                    raise ValueError(f"Invalid query: 'NOT' must follow an operator or '(' at token {i} in '{query}'")
+            prev_token = t
+
+        if paren_depth != 0:
+            raise ValueError(f"Invalid query: unclosed '(' in '{query}'")
+        if tokens[-1] in ("AND", "OR", "NOT"):
+            raise ValueError(f"Invalid query: trailing operator '{tokens[-1]}' in '{query}'")
 
     @staticmethod
     def build_query_from_profile(

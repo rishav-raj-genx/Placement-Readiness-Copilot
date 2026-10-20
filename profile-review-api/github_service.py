@@ -1,6 +1,7 @@
 import os
+import time
 
-from github import Auth, Github, GithubException, UnknownObjectException
+from github import Auth, Github, GithubException, RateLimitExceededException, UnknownObjectException
 from github.Repository import Repository
 
 SOURCE_DIRECTORIES = {"app", "apps", "backend", "frontend", "lib", "server", "src"}
@@ -14,13 +15,17 @@ DEPENDENCY_MANIFESTS = {
     "requirements.txt",
 }
 
+# 15-minute in-memory cache for inspected profiles to conserve rate limits
+_PROFILE_CACHE: dict[str, tuple[float, dict[str, object]]] = {}
+_CACHE_TTL_SECONDS = 900.0
+
 
 def _repository_limit() -> int:
-    raw_limit = os.getenv("GITHUB_REPO_LIMIT", "30")
+    raw_limit = os.getenv("GITHUB_REPO_LIMIT", "6")
     try:
-        return min(100, max(1, int(raw_limit)))
+        return min(15, max(1, int(raw_limit)))
     except ValueError:
-        return 30
+        return 6
 
 
 def _inspect_repository(repository: Repository) -> dict[str, object]:
@@ -76,21 +81,41 @@ def _inspect_repository(repository: Repository) -> dict[str, object]:
 
 
 def fetch_github_data(username: str) -> dict[str, object]:
-    normalized_username = username.strip()
+    normalized_username = username.strip().lower()
     if not normalized_username:
         raise ValueError("GitHub username is required.")
+
+    now = time.time()
+    cached = _PROFILE_CACHE.get(normalized_username)
+    if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
+        return cached[1]
 
     token = os.getenv("GITHUB_TOKEN", "").strip()
     github = Github(auth=Auth.Token(token)) if token else Github()
     try:
         user = github.get_user(normalized_username)
         repositories: list[dict[str, object]] = []
-        for index, repository in enumerate(user.get_repos(sort="updated")):
-            if index >= _repository_limit():
-                break
-            repositories.append(_inspect_repository(repository))
+        rate_limited = False
+        repo_limit = _repository_limit()
 
-        return {
+        try:
+            for index, repository in enumerate(user.get_repos(sort="updated")):
+                if index >= repo_limit:
+                    break
+                try:
+                    repositories.append(_inspect_repository(repository))
+                except (RateLimitExceededException, GithubException) as exc:
+                    if getattr(exc, "status", None) in (403, 429) or "rate limit" in str(exc).lower():
+                        rate_limited = True
+                        break
+                    raise
+        except (RateLimitExceededException, GithubException) as exc:
+            if getattr(exc, "status", None) in (403, 429) or "rate limit" in str(exc).lower():
+                rate_limited = True
+            else:
+                raise
+
+        result: dict[str, object] = {
             "username": user.login,
             "name": user.name,
             "bio": user.bio,
@@ -99,6 +124,10 @@ def fetch_github_data(username: str) -> dict[str, object]:
             "following": user.following,
             "repositories": repositories,
             "repositories_inspected": len(repositories),
+            "rate_limited": rate_limited,
         }
+
+        _PROFILE_CACHE[normalized_username] = (now, result)
+        return result
     finally:
         github.close()

@@ -1,5 +1,7 @@
+import ipaddress
 import os
 import re
+import threading
 import time
 import urllib.parse
 from pathlib import Path
@@ -18,6 +20,10 @@ from playwright.sync_api import (
 
 from src import config
 from src.db.supabase_client import db_client
+
+# Bounded global concurrency pool for Chromium browser instances
+MAX_CONCURRENT_BROWSERS = int(os.environ.get("MAX_CONCURRENT_BROWSERS", "3"))
+_BROWSER_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_BROWSERS)
 
 
 class LiveLinkChecker:
@@ -155,6 +161,26 @@ class LiveLinkChecker:
             "device_scale_factor": 2,
         }
 
+        acquired = _BROWSER_SEMAPHORE.acquire(timeout=25.0)
+        if not acquired:
+            return {
+                "id": f"chk_busy_{int(time.time())}",
+                "student_id": student_id,
+                "project_name": project_name,
+                "project_url": url,
+                "status_code": 429,
+                "is_live": False,
+                "load_time_ms": 0,
+                "mobile_friendly": False,
+                "screenshot_url": "",
+                "console_errors": [],
+                "network_errors": [{"url": url, "error": "Browser capacity reached. Concurrency limit enforced."}],
+                "content_evaluation": {"is_blank_page": True, "error": "CONCURRENCY_LIMIT"},
+                "quality_score": 0.0,
+                "recommendations": ["Server browser capacity busy. Please retry in a few moments."],
+                "passed": False,
+            }
+
         try:
             with sync_playwright() as p:
                 browser = None
@@ -217,6 +243,23 @@ class LiveLinkChecker:
                             network_errors.append({"url": request.url, "error": str(error_text)})
 
                     def on_response(response):
+                        # DNS Rebinding check: verify the server IP that was actually connected to
+                        try:
+                            server_addr = response.server_addr()
+                            if server_addr and "ipAddress" in server_addr:
+                                ip_safe, ip_reason = self.is_safe_public_url(f"http://{server_addr['ipAddress']}")
+                                if not ip_safe:
+                                    network_errors.append(
+                                        {
+                                            "url": response.url,
+                                            "error": f"DNS rebinding blocked: connected to unsafe destination ({ip_reason})",
+                                        }
+                                    )
+                                    page.close()
+                                    return
+                        except Exception:
+                            pass
+
                         if response.status >= 400 and not any(
                             track in response.url
                             for track in ["google-analytics", "doubleclick", "hotjar"]
@@ -299,6 +342,8 @@ class LiveLinkChecker:
         except Exception as e:
             is_live = False
             page_errors.append(f"Unexpected error checking URL: {str(e)}")
+        finally:
+            _BROWSER_SEMAPHORE.release()
 
         load_time_ms = int((time.time() - start_time) * 1000)
 

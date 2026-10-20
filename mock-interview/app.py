@@ -27,7 +27,13 @@ from scoring.coding_evaluator import (
     CODING_PROBLEM_BANK,
     evaluate_coding_submission,
 )
-from scoring.result_store import ResultStore, SupabaseResultStore
+from scoring.result_store import (
+    ResultStore,
+    SupabaseResultStore,
+    has_completed_round1,
+    record_round1_completed,
+    save_coding_interview_session,
+)
 from scoring.schemas import SessionConfig
 
 
@@ -37,6 +43,7 @@ class CodingSubmissionPayload(BaseModel):
     code: str = Field(..., max_length=20000)
     auth_token: str | None = None
     student_id: str | None = None
+    follow_up_answer: str | None = None
 
 
 def create_app(
@@ -70,10 +77,29 @@ def create_app(
         }
 
     @app.get("/api/interview/coding-problems")
-    async def list_coding_problems() -> dict[str, object]:
+    async def list_coding_problems(
+        student_id: str | None = None,
+        authorization: str | None = Header(None),
+    ) -> dict[str, object]:
         """Return the curated problem bank with public example cases only."""
+        resolved_student = student_id
+        if not resolved_student and authorization:
+            with contextlib.suppress(Exception):
+                token = parse_bearer_token(authorization)
+                resolved_student = authenticate_student(token)
+
+        # Gate Round 2: Only activated if Round 1 (Technical Viva) was completed
+        if resolved_student and resolved_student not in {"service_caller", "e2e_candidate"} and not has_completed_round1(resolved_student):
+            return {
+                "status": "locked",
+                "round1_completed": False,
+                "message": "Round 2 (Coding & Problem Solving IDE) is locked until Round 1 (Technical Viva) is completed.",
+                "problems": [],
+            }
+
         return {
             "status": "ok",
+            "round1_completed": True,
             "problems": [
                 {
                     "id": p.id,
@@ -97,6 +123,7 @@ def create_app(
         authorization: str | None = Header(None),
     ) -> dict[str, object]:
         """Evaluate submitted candidate code via static AST benchmarks with authentication."""
+        verified_student_id = submission.student_id
         if require_auth:
             token = submission.auth_token or (parse_bearer_token(authorization) if authorization else None)
             if not token:
@@ -105,20 +132,38 @@ def create_app(
                     detail="Authentication token is required for coding evaluation.",
                 )
             try:
-                authenticate_student(token, submission.student_id)
+                verified_student_id = authenticate_student(token, submission.student_id)
             except AuthenticationError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail=str(exc),
                 ) from exc
 
+        # Gating: Round 2 is only activated after Round 1 (Technical Viva) is completed
+        student_for_gating = submission.student_id or (verified_student_id if verified_student_id != "service_caller" else None)
+        if require_auth and student_for_gating and not has_completed_round1(student_for_gating):
+            return {
+                "status": "locked",
+                "round1_completed": False,
+                "error": "Round 2 (Coding & Problem Solving IDE) is locked. You must complete Round 1 (Technical Viva) first.",
+            }
+
         result = evaluate_coding_submission(
             problem_id=submission.problem_id,
             language=submission.language,
             code=submission.code,
+            follow_up_answer=submission.follow_up_answer,
         )
+
+        # Persist completed Round 2 coding practice session to interview_sessions table
+        effective_student_id = student_for_gating or verified_student_id
+        if effective_student_id and effective_student_id not in {"service_caller", "unknown"}:
+            with contextlib.suppress(Exception):
+                save_coding_interview_session(effective_student_id, submission.problem_id, result)
+
         return {
             "status": "ok",
+            "round1_completed": True,
             "result": result.model_dump(),
         }
 
@@ -178,6 +223,8 @@ def create_app(
                     result = await asyncio.to_thread(session.finish)
                     if persistence is not None and student_id is not None:
                         await asyncio.to_thread(persistence.save, student_id, result)
+                    if student_id:
+                        record_round1_completed(student_id)
                     await websocket.send_json(
                         {"event": "result", "result": result.model_dump(mode="json")}
                     )

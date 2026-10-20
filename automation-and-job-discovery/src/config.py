@@ -31,6 +31,16 @@ AUTOMATION_E2E_MODE = os.getenv("AUTOMATION_E2E_MODE", "false").lower() in (
     "yes",
 )
 
+# Environment mode
+ENVIRONMENT = (
+    os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("NODE_ENV") or "development"
+).lower().strip()
+
+
+def is_production() -> bool:
+    return ENVIRONMENT in ("production", "prod")
+
+
 # Local Data Cache / Fallback directory
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)

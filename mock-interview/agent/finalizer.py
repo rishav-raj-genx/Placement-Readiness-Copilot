@@ -31,22 +31,29 @@ class InterviewFinalizer:
         self._persisted = False
         self._lock = Lock()
 
+    MAX_TURN_CHARS = 2000
+    MAX_TRANSCRIPT_TURNS = 50
+
     def record(self, role: str, text: str, timestamp_sec: float | None = None) -> None:
         speaker = "student" if role in {"student", "user"} else "ai"
-        cleaned = text.strip()
-        if cleaned:
+        cleaned = text.strip()[: self.MAX_TURN_CHARS]
+        if cleaned and len(self.transcript) < self.MAX_TRANSCRIPT_TURNS:
             ts = timestamp_sec if timestamp_sec is not None else round(time.monotonic() - self._start_time, 1)
             turn_id = len(self.transcript) + 1
             self.transcript.append(
                 TranscriptTurn(speaker=speaker, text=cleaned, timestamp_sec=ts, turn_id=turn_id)
             )
 
-
     def finish(self) -> InterviewResult:
         with self._lock:
             if self._result is None:
-                if not any(turn.speaker == "student" for turn in self.transcript):
+                student_turns = [turn for turn in self.transcript if turn.speaker == "student"]
+                if not student_turns:
                     raise ValueError("an interview needs at least one candidate answer")
+
+                student_turns_count = len(student_turns)
+                elapsed_sec = time.monotonic() - self._start_time
+
                 try:
                     raw_result = self.llm.complete(
                         SCORING_SYSTEM_PROMPT,
@@ -54,12 +61,23 @@ class InterviewFinalizer:
                     )
                 except (RuntimeError, ValueError, TypeError, OSError):
                     raw_result = None
+
                 result = parse_scoring_result(raw_result, self.transcript, self.context)
-                student_turns_count = len([t for t in self.transcript if t.speaker == "student"])
-                if student_turns_count < 3:
+
+                # Completion policy: At least 3 candidate answers and min 45 seconds engagement
+                if student_turns_count < 3 or elapsed_sec < 45:
                     result.is_provisional = True
-                    if not result.summary.startswith("[PARTIAL"):
-                        result.summary = f"[PARTIAL / EARLY TERMINATION - {student_turns_count} ANSWERS] {result.summary}"
+                    result.is_abandoned = True
+                    result.session_status = "abandoned"
+                    if not result.summary.startswith("[ABANDONED"):
+                        result.summary = (
+                            f"[ABANDONED / EARLY EXIT - {student_turns_count} ANSWERS, {int(elapsed_sec)}s] "
+                            f"{result.summary}"
+                        )
+                else:
+                    result.is_abandoned = False
+                    result.session_status = "completed"
+
                 self._result = result
 
             if self.result_store is not None and not self._persisted:
@@ -67,4 +85,5 @@ class InterviewFinalizer:
                     raise ValueError("interview ID is required for result persistence")
                 self.result_store.save(self.interview_id, self._result)
                 self._persisted = True
+
             return self._result
