@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
@@ -100,6 +100,16 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
 
+  const handleDismiss = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('has_seen_intro', 'true');
+    }
+    saveToStorage('has_seen_intro', true);
+    if (onClose) {
+      onClose();
+    }
+  }, [onClose]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -108,7 +118,7 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleDismiss]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -116,16 +126,6 @@ export function IntroSequence({ open = true, onClose }: IntroSequenceProps) {
     const x = (e.clientX - rect.left) / rect.width - 0.5;
     const y = (e.clientY - rect.top) / rect.height - 0.5;
     setMousePosition({ x, y });
-  };
-
-  const handleDismiss = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('has_seen_intro', 'true');
-    }
-    saveToStorage('has_seen_intro', true);
-    if (onClose) {
-      onClose();
-    }
   };
 
   const handleFinish = () => {

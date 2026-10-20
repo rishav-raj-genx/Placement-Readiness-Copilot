@@ -96,7 +96,7 @@ class PlacementReadinessCalculator:
         missing_components: List[str] = []
 
         # 1. Resume subscore
-        if profile.resume is not None:
+        if profile.resume is not None and profile.resume.score is not None:
             resume_raw = cls.clamp(profile.resume.score)
         else:
             resume_raw = 0.0
@@ -118,28 +118,28 @@ class PlacementReadinessCalculator:
             missing_components.append("mock_interview")
 
         # 4. GitHub
-        if profile.github is not None:
+        if profile.github is not None and profile.github.score is not None:
             github_raw = cls.clamp(profile.github.score)
         else:
             github_raw = 0.0
             missing_components.append("github")
 
         # 5. Coding Practice (LeetCode / DSA)
-        if profile.coding_practice is not None:
+        if profile.coding_practice is not None and profile.coding_practice.score is not None:
             coding_raw = cls.clamp(profile.coding_practice.score)
         else:
             coding_raw = 0.0
             missing_components.append("coding_practice")
 
         # 6. LinkedIn
-        if profile.linkedin is not None:
+        if profile.linkedin is not None and profile.linkedin.score is not None:
             linkedin_raw = cls.clamp(profile.linkedin.score)
         else:
             linkedin_raw = 0.0
             missing_components.append("linkedin")
 
         # 7. Co-curricular
-        if profile.co_curricular is not None:
+        if profile.co_curricular is not None and profile.co_curricular.score is not None:
             co_curr_raw = cls.clamp(profile.co_curricular.score)
         else:
             co_curr_raw = 0.0

@@ -34,8 +34,7 @@ function configuredServices(): readonly ServiceConfig[] {
     {
       name: 'automation',
       url: process.env.AUTOMATION_API_URL?.trim()
-        || process.env.AUTOMATION_SERVICE_URL?.trim()
-        || process.env.NEXT_PUBLIC_AUTOMATION_URL?.trim(),
+        || process.env.AUTOMATION_SERVICE_URL?.trim(),
       environmentVariable: 'AUTOMATION_API_URL',
       healthPath: '/',
     },
@@ -104,7 +103,10 @@ async function checkService(service: ServiceConfig): Promise<[ServiceName, Servi
   }
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
+  const { searchParams } = new URL(request.url);
+  const mode = searchParams.get('mode') ?? 'liveness';
+
   const entries = await Promise.all(configuredServices().map(checkService));
   const services = Object.fromEntries(entries) as Record<ServiceName, ServiceHealth>;
   const ready = Object.values(services).every((service) => service.status === 'ok');
@@ -112,6 +114,8 @@ export async function GET(): Promise<NextResponse> {
   return NextResponse.json(
     {
       status: ready ? 'ok' : 'degraded',
+      mode,
+      ready,
       services,
     },
     { status: ready ? 200 : 503 },

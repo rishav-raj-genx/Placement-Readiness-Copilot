@@ -14,6 +14,12 @@ AUTOMATION_PORT="${AUTOMATION_PORT:-8003}"
 E2E_MODE="${E2E_MODE:-true}"
 INSTALL_DEPENDENCIES=false
 
+echo "=========================================================================="
+echo "  LOCAL WORKSTATION DEVELOPMENT RUNNER ONLY"
+echo "  This script launches background dev processes (pnpm dev, uvicorn reload)."
+echo "  DO NOT USE FOR PRODUCTION DEPLOYMENTS."
+echo "=========================================================================="
+
 if [[ "${1:-}" == "--install" ]]; then
   INSTALL_DEPENDENCIES=true
 elif [[ -n "${1:-}" ]]; then
@@ -123,7 +129,10 @@ trap cleanup EXIT INT TERM
 
 (
   cd "$ROOT_DIR/profile-review-api"
-  exec env LLM_PROVIDER="${PROFILE_LLM_PROVIDER:-static}" \
+  exec env \
+    E2E_MODE="$E2E_MODE" \
+    INTERNAL_SERVICE_KEY="${INTERNAL_SERVICE_KEY:-e2e-internal-token}" \
+    LLM_PROVIDER="${PROFILE_LLM_PROVIDER:-static}" \
     uv run --locked python -m uvicorn main:app \
     --host 127.0.0.1 --port "$PROFILE_PORT"
 ) >"$LOG_DIR/profile-review.log" 2>&1 &
@@ -132,7 +141,10 @@ NAMES+=("profile-review")
 
 (
   cd "$ROOT_DIR/mock-interview"
-  exec env MOCK_INTERVIEW_E2E_MODE="$E2E_MODE" \
+  exec env \
+    E2E_MODE="$E2E_MODE" \
+    MOCK_INTERVIEW_E2E_MODE="$E2E_MODE" \
+    INTERNAL_SERVICE_KEY="${INTERNAL_SERVICE_KEY:-e2e-internal-token}" \
     uv run --locked python -m uvicorn app:create_runtime_app --factory \
     --host 127.0.0.1 --port "$INTERVIEW_PORT"
 ) >"$LOG_DIR/mock-interview.log" 2>&1 &
@@ -141,7 +153,10 @@ NAMES+=("mock-interview")
 
 (
   cd "$ROOT_DIR/automation-and-job-discovery"
-  exec env AUTOMATION_E2E_MODE="$E2E_MODE" \
+  exec env \
+    E2E_MODE="$E2E_MODE" \
+    AUTOMATION_E2E_MODE="$E2E_MODE" \
+    INTERNAL_SERVICE_KEY="${INTERNAL_SERVICE_KEY:-e2e-internal-token}" \
     uv run --locked python -m uvicorn src.api.server:app \
     --host 127.0.0.1 --port "$AUTOMATION_PORT"
 ) >"$LOG_DIR/automation.log" 2>&1 &
@@ -151,6 +166,8 @@ NAMES+=("automation")
 (
   cd "$ROOT_DIR/frontend-core"
   exec env \
+    E2E_MODE="$E2E_MODE" \
+    INTERNAL_SERVICE_KEY="${INTERNAL_SERVICE_KEY:-e2e-internal-token}" \
     PROFILE_REVIEW_API_URL="http://127.0.0.1:$PROFILE_PORT/health" \
     INTERVIEW_SERVICE_URL="http://127.0.0.1:$INTERVIEW_PORT/health" \
     AUTOMATION_API_URL="http://127.0.0.1:$AUTOMATION_PORT/" \

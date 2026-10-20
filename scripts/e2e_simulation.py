@@ -18,6 +18,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
 PROFILE_URL = os.getenv("PROFILE_URL", "http://127.0.0.1:8001")
 INTERVIEW_WS_URL = os.getenv("INTERVIEW_WS_URL", "ws://127.0.0.1:8002/ws/interview")
 AUTOMATION_URL = os.getenv("AUTOMATION_URL", "http://127.0.0.1:8003")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "e2e-internal-token")
 
 
 async def request_json(
@@ -26,7 +27,10 @@ async def request_json(
     url: str,
     **kwargs: object,
 ) -> dict[str, Any]:
-    response = await client.request(method, url, **kwargs)
+    headers = dict(kwargs.pop("headers", None) or {})
+    if "Authorization" not in headers:
+        headers["Authorization"] = f"Bearer {INTERNAL_SERVICE_KEY}"
+    response = await client.request(method, url, headers=headers, **kwargs)
     if not response.is_success:
         raise RuntimeError(
             f"API routing error: {method} {url} returned HTTP {response.status_code}: "

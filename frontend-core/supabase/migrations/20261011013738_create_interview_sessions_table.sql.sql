@@ -65,13 +65,37 @@ CREATE POLICY "update_own_interview_sessions"
   ON interview_sessions FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    auth.uid() = user_id
+    AND status IN ('in_progress', 'abandoned', 'cancelled')
+  );
 
+-- Client DELETE is disabled for auditing and retention compliance.
 DROP POLICY IF EXISTS "delete_own_interview_sessions" ON interview_sessions;
-CREATE POLICY "delete_own_interview_sessions"
-  ON interview_sessions FOR DELETE
-  TO authenticated
-  USING (auth.uid() = user_id);
+
+-- Prevent students from altering finalized results or scoring via database API
+CREATE OR REPLACE FUNCTION public.check_interview_session_client_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF current_user = 'service_role' OR (SELECT current_setting('request.jwt.claim.role', true)) = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.result IS DISTINCT FROM OLD.result THEN
+    RAISE EXCEPTION 'Clients cannot modify interview result directly.';
+  END IF;
+  IF NEW.score IS DISTINCT FROM OLD.score THEN
+    RAISE EXCEPTION 'Clients cannot modify interview score directly.';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_protect_interview_session_result ON interview_sessions;
+CREATE TRIGGER trg_protect_interview_session_result
+  BEFORE UPDATE ON interview_sessions
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_interview_session_client_update();
 
 CREATE INDEX IF NOT EXISTS idx_interview_sessions_user_id ON interview_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_interview_sessions_status ON interview_sessions(status);

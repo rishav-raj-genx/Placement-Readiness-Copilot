@@ -115,6 +115,21 @@ def _get_chat_model(provider: ModelProvider) -> BaseChatModel:
     raise ValueError("The static provider does not create a chat model.")
 
 
+def _sanitize_error_message(msg: str) -> str:
+    """Sanitize upstream provider errors to avoid leaking credentials or sensitive payloads."""
+    # Redact potential keys, tokens, or auth headers
+    sanitized = re.sub(
+        r"(?i)(bearer|key|token|auth|password|secret)[\s:=]+['\"]?[a-zA-Z0-9_\-\.]{8,}['\"]?",
+        r"\1=[REDACTED]",
+        msg,
+    )
+    # Strip URLs with query parameters
+    sanitized = re.sub(r"https?://[^\s\?]+(\?[^\s]*)?", "[URL]", sanitized)
+    if len(sanitized) > 100:
+        sanitized = sanitized[:100] + "..."
+    return sanitized
+
+
 def _invoke_structured[SchemaType: BaseModel](
     prompt: ChatPromptTemplate,
     schema: type[SchemaType],
@@ -129,7 +144,7 @@ def _invoke_structured[SchemaType: BaseModel](
             response = reviewer.invoke(dict(payload))
             return response if isinstance(response, schema) else schema.model_validate(response)
         except Exception as exc:  # noqa: BLE001 - provider SDKs expose unrelated exception types
-            failures.append(f"{provider}: {exc}")
+            failures.append(f"{provider}: {_sanitize_error_message(str(exc))}")
 
     raise ReviewBackendError("; ".join(failures) or "No LLM provider is enabled.")
 
@@ -186,7 +201,9 @@ def _static_resume_review(text: str, page_count: int) -> ReviewResult:
     ]
     has_language_issues = bool(spelling_issues)
 
-    fixes: list[str] = []
+    fixes: list[str] = [
+        "[Heuristic Check] Rule-based evaluation used. Visual layout, columns, tables, and complex grammar could not be verified."
+    ]
     if not is_one_page:
         fixes.append(f"Resume is {page_count} pages instead of 1.")
     if not is_ats_friendly:
@@ -283,12 +300,51 @@ GithubReview schema with practical repository-specific fixes.""",
         )
     except ReviewBackendError:
         repositories = github_data.get("repositories", [])
-        repository_count = len(repositories) if isinstance(repositories, list) else 0
+        if not isinstance(repositories, list) or not repositories:
+            return GithubReview(
+                score=0.0,
+                specific_fixes=[
+                    "[Heuristic Check] No public repositories found. Add publicly visible source code repositories with clear READMEs, tests, and dependency manifests.",
+                ],
+            )
+        # Quality-based fallback scoring on inspected repository attributes
+        repo_scores: list[float] = []
+        fixes: list[str] = [
+            "[Heuristic Check] Static structural assessment used (LLM unavailable). Semantic code quality and commit history could not be verified."
+        ]
+        has_tests_any = False
+        has_manifest_any = False
+        has_readme_any = False
+        for repo in repositories:
+            if not isinstance(repo, dict):
+                continue
+            r_score = 20.0  # base presence
+            structure = repo.get("structure", {}) if isinstance(repo.get("structure"), dict) else {}
+            if repo.get("has_readme") and int(repo.get("readme_length", 0)) > 150:
+                r_score += 25.0
+                has_readme_any = True
+            if structure.get("has_source_directory") or structure.get("has_dependency_manifest"):
+                r_score += 25.0
+                has_manifest_any = True
+            if structure.get("has_tests"):
+                r_score += 20.0
+                has_tests_any = True
+            if repo.get("description"):
+                r_score += 10.0
+            if repo.get("is_fork"):
+                r_score *= 0.5
+            repo_scores.append(min(100.0, r_score))
+
+        avg_score = round(sum(repo_scores) / len(repo_scores), 1) if repo_scores else 0.0
+        if not has_readme_any:
+            fixes.append("Add detailed README files (>150 characters) explaining architecture and installation.")
+        if not has_manifest_any:
+            fixes.append("Include standard dependency manifests (e.g. package.json, requirements.txt, pyproject.toml).")
+        if not has_tests_any:
+            fixes.append("Add automated unit tests in a dedicated test directory.")
         return GithubReview(
-            score=min(100, repository_count * 10),
-            specific_fixes=[
-                "Add clear READMEs, conventional source directories, dependency manifests, and tests to each featured repository."
-            ],
+            score=avg_score,
+            specific_fixes=fixes,
         )
 
 
@@ -310,13 +366,28 @@ LinkedInReviewResult schema.""",
         return _invoke_structured(prompt, LinkedInReviewResult, {"linkedin_text": text})
     except ReviewBackendError:
         normalized = text.lower()
-        has_complete_profile = "about" in normalized and "headline" in normalized
-        has_skills = "skills" in normalized
+        if len(normalized.strip()) < 120:
+            return LinkedInReviewResult(
+                score=0.0,
+                has_complete_profile=False,
+                skills_relevant=False,
+                suggested_rewrites=[
+                    "[Heuristic Check] LinkedIn PDF export contains insufficient text content. Ensure you use 'Save to PDF' from a complete profile.",
+                ],
+            )
+        has_about = bool(re.search(r"about\s*[\n\r]+.{20,}", normalized, re.DOTALL))
+        has_headline = "headline" in normalized or any(
+            term in normalized for term in ("engineer", "developer", "student", "intern", "specialist")
+        )
+        has_skills = "skills" in normalized and bool(re.search(r"skills\s*[\n\r]+.{15,}", normalized, re.DOTALL))
+        has_complete = has_about and has_headline
+
+        score = (40.0 if has_headline else 0.0) + (30.0 if has_about else 0.0) + (30.0 if has_skills else 0.0)
         return LinkedInReviewResult(
-            score=(50 if has_complete_profile else 0) + (50 if has_skills else 0),
-            has_complete_profile=has_complete_profile,
+            score=round(score, 1),
+            has_complete_profile=has_complete,
             skills_relevant=has_skills,
             suggested_rewrites=[
-                "Add a role-specific headline, a concise About section, and skills aligned with your target role."
+                "[Heuristic Check] Rule-based keyword matching used (LLM provider unavailable). Add a descriptive About section and list at least 5 relevant technical skills.",
             ],
         )

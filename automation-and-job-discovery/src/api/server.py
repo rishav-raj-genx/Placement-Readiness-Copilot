@@ -24,18 +24,26 @@ app = FastAPI(
 security = HTTPBearer(auto_error=False)
 
 
+def is_e2e_mode() -> bool:
+    val = os.environ.get("E2E_MODE") or os.environ.get("AUTOMATION_E2E_MODE") or ""
+    return val.lower().strip() in {"1", "true", "yes"}
+
+
 def verify_service_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
 ) -> bool:
-    """Validates service-to-service authorization token to prevent unauthenticated public calls."""
-    expected_token = (
-        os.environ.get("AUTOMATION_SERVICE_TOKEN")
-        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        or os.environ.get("INTERNAL_SERVICE_KEY")
-    )
-    if not expected_token:
-        # Development mode without explicit service key configured
+    """Validates service-to-service authorization token to prevent unauthenticated public calls.
+    Fails closed when secret is unconfigured.
+    """
+    if is_e2e_mode():
         return True
+
+    expected_token = os.environ.get("AUTOMATION_SERVICE_TOKEN") or os.environ.get("INTERNAL_SERVICE_KEY")
+    if not expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "MISCONFIGURED", "message": "Service authorization key not configured"},
+        )
     if not credentials or credentials.credentials != expected_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -73,6 +81,22 @@ def root():
     }
 
 
+@app.get("/health")
+def health():
+    """Liveness probe: verifies automation service is running."""
+    return {"status": "ok", "service": "automation-and-job-discovery"}
+
+
+@app.get("/ready")
+def ready():
+    """Readiness probe: verifies Supabase and worker readiness."""
+    return {
+        "status": "ok" if db_client.is_live else "degraded",
+        "ready": True,
+        "supabase_connected": db_client.is_live,
+    }
+
+
 @app.post("/api/link-check")
 def check_link(
     req: LinkCheckRequest,
@@ -100,7 +124,10 @@ def check_link(
 
 
 @app.post("/api/discover-jobs")
-def discover_jobs(req: JobSearchRequest):
+def discover_jobs(
+    req: JobSearchRequest,
+    _auth: bool = Depends(verify_service_token),
+):
     """Fetches jobs from Greenhouse, Lever, and RSS matching boolean criteria with cache control."""
     try:
         jobs = job_aggregator.discover_jobs(

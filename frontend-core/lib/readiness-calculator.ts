@@ -174,13 +174,13 @@ export function calculateReadinessLocally(input: ReadinessCalculationInput): Rea
 
   return {
     student_id: input.student_id,
-    algorithm_version: 'v2.0.0',
+    algorithm_version: 'v2.1.0',
     total_score: totalScore,
-    is_provisional: missingComponents.length > 0,
+    is_provisional: missingComponents.length > 0 || isInterviewProvisional,
     missing_components: missingComponents,
     readiness_level: readinessLevel,
     category_scores: categoryScores,
     top_actions: topActions,
-    is_placement_ready: readinessLevel === 'Placement ready' && missingComponents.length === 0,
+    is_placement_ready: readinessLevel === 'Placement ready' && missingComponents.length === 0 && !isInterviewProvisional,
   };
 }

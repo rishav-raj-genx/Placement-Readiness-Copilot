@@ -35,8 +35,10 @@ def create_two_page_resume() -> bytes:
 
 def test_review_resume_flags_two_page_pdf(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
     response = client.post(
         "/review/resume",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
         files={
             "file": (
                 "two-page-resume.pdf",
@@ -54,6 +56,28 @@ def test_review_resume_flags_two_page_pdf(monkeypatch: MonkeyPatch) -> None:
     assert payload["has_spelling_or_grammar_issues"] is True
     assert "Resume is 2 pages instead of 1." in payload["specific_fixes"]
     print(json.dumps(payload, indent=2))
+
+
+def test_auth_fails_closed_when_secret_missing(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.delenv("INTERNAL_SERVICE_KEY", raising=False)
+    monkeypatch.delenv("PROFILE_REVIEW_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("E2E_MODE", "false")
+    response = client.post(
+        "/review/resume",
+        files={"file": ("resume.pdf", create_two_page_resume(), "application/pdf")},
+    )
+    assert response.status_code == 500
+
+
+def test_auth_rejects_unauthorized_token(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    monkeypatch.setenv("E2E_MODE", "false")
+    response = client.post(
+        "/review/resume",
+        headers={"Authorization": "Bearer wrong-token"},
+        files={"file": ("resume.pdf", create_two_page_resume(), "application/pdf")},
+    )
+    assert response.status_code == 403
 
 
 def test_provider_toggle_and_ollama_fallback(monkeypatch: MonkeyPatch) -> None:

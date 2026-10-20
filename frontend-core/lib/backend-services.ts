@@ -39,7 +39,6 @@ export function getAutomationBaseUrl(): string {
     firstConfigured(
       process.env.AUTOMATION_API_URL,
       process.env.AUTOMATION_SERVICE_URL,
-      process.env.NEXT_PUBLIC_AUTOMATION_URL,
     ),
     'automation',
   );
@@ -49,7 +48,6 @@ export function getOptionalAutomationBaseUrl(): string | null {
   const rawValue = firstConfigured(
     process.env.AUTOMATION_API_URL,
     process.env.AUTOMATION_SERVICE_URL,
-    process.env.NEXT_PUBLIC_AUTOMATION_URL,
   );
   return rawValue ? normalizeServiceBase(rawValue, 'automation') : null;
 }
@@ -58,12 +56,26 @@ interface ServiceRequestOptions extends RequestInit {
   timeoutMs?: number;
 }
 
+function getInternalServiceToken(): string {
+  const token = firstConfigured(
+    process.env.INTERNAL_SERVICE_KEY,
+    process.env.PROFILE_REVIEW_SERVICE_TOKEN,
+    process.env.AUTOMATION_SERVICE_TOKEN,
+  );
+  if (token) return token;
+
+  const isE2e = (process.env.E2E_MODE ?? '').toLowerCase().trim() === 'true';
+  if (isE2e) return 'e2e-internal-token';
+
+  throw new Error('INTERNAL_SERVICE_KEY is required for server-to-service communication but is not configured.');
+}
+
 export async function serviceRequest(url: string, options: ServiceRequestOptions = {}): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
-  const serviceToken = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.INTERNAL_SERVICE_KEY || 'service-role-internal';
   const headers = new Headers(options.headers);
   if (!headers.has('Authorization')) {
+    const serviceToken = getInternalServiceToken();
     headers.set('Authorization', `Bearer ${serviceToken}`);
   }
   try {

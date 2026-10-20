@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 
 # Contract version for interview session payload
 CANONICAL_INTERVIEW_CONTRACT_VERSION = "v0"
-ALGORITHM_VERSION = "v2.0.0"
+ALGORITHM_VERSION = "v2.1.0"
 
 
 class InterviewDimensions(BaseModel):
@@ -36,7 +36,7 @@ class CanonicalInterviewResult(BaseModel):
 
 
 class ResumeInput(BaseModel):
-    score: float = Field(default=0.0, ge=0.0, le=100.0, description="Resume quality score (0-100)")
+    score: Optional[float] = Field(default=None, ge=0.0, le=100.0, description="Resume quality score (0-100)")
     has_metrics: bool = False
     page_count: int = 1
     has_action_verbs: bool = False
@@ -57,8 +57,8 @@ class ProjectItem(BaseModel):
 
 
 class GitHubActivityInput(BaseModel):
-    score: float = Field(
-        default=0.0, ge=0.0, le=100.0, description="GitHub profile activity score (0-100)"
+    score: Optional[float] = Field(
+        default=None, ge=0.0, le=100.0, description="GitHub profile activity score (0-100)"
     )
     pinned_repos_count: int = 0
     recent_commit_streak_days: int = 0
@@ -66,8 +66,8 @@ class GitHubActivityInput(BaseModel):
 
 
 class CodingPracticeInput(BaseModel):
-    score: float = Field(
-        default=0.0, ge=0.0, le=100.0, description="Coding practice / LeetCode score (0-100)"
+    score: Optional[float] = Field(
+        default=None, ge=0.0, le=100.0, description="Coding practice / LeetCode score (0-100)"
     )
     problems_solved: int = 0
     easy_count: int = 0
@@ -76,8 +76,8 @@ class CodingPracticeInput(BaseModel):
 
 
 class LinkedInInput(BaseModel):
-    score: float = Field(
-        default=0.0, ge=0.0, le=100.0, description="LinkedIn profile score (0-100)"
+    score: Optional[float] = Field(
+        default=None, ge=0.0, le=100.0, description="LinkedIn profile score (0-100)"
     )
     has_headline: bool = False
     has_about_summary: bool = False
@@ -85,8 +85,8 @@ class LinkedInInput(BaseModel):
 
 
 class CoCurricularInput(BaseModel):
-    score: float = Field(
-        default=0.0, ge=0.0, le=100.0, description="Achievements, hackathons, clubs (0-100)"
+    score: Optional[float] = Field(
+        default=None, ge=0.0, le=100.0, description="Achievements, hackathons, clubs (0-100)"
     )
     hackathons_count: int = 0
     certifications_count: int = 0

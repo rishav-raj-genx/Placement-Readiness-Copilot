@@ -1,4 +1,4 @@
--- Public browser-recorded interview audio with owner-scoped writes.
+-- Private browser-recorded interview audio with owner-scoped writes and authorized signed URLs.
 
 ALTER TABLE public.interview_sessions
   ADD COLUMN IF NOT EXISTS audio_url text;
@@ -7,12 +7,12 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES (
   'interview_recordings',
   'interview_recordings',
-  true,
+  false,
   104857600,
   ARRAY['audio/webm']::text[]
 )
 ON CONFLICT (id) DO UPDATE
-SET public = true,
+SET public = false,
     file_size_limit = 104857600,
     allowed_mime_types = ARRAY['audio/webm']::text[];
 
