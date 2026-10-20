@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Sparkles, Terminal, X } from 'lucide-react';
+import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Radio, Sparkles, Terminal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
-import { createInterviewSession } from '@/lib/livekit-session';
+import { createInterviewSession, getLiveKitClientConfiguration } from '@/lib/livekit-session';
 import { resolveInterviewFocusTopics } from '@/lib/interview-config';
 import { RoleCombobox } from '@/components/interview/RoleCombobox';
 import type { CompanyType, Difficulty, ExperienceLevel, LiveKitSessionRequest } from '@/types';
@@ -56,6 +56,7 @@ export default function ConfigureInterviewPage() {
   const [companyType, setCompanyType] = useState<CompanyType>('other');
   const [targetCompany, setTargetCompany] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
+  const livekitConfiguration = getLiveKitClientConfiguration();
 
   // Initialize once from profile evidence without clobbering user keystrokes
   useEffect(() => {
@@ -334,6 +335,16 @@ export default function ConfigureInterviewPage() {
           <p role="alert" className="mt-5 text-sm text-red-300">
             {createError}
           </p>
+        )}
+
+        {roundType !== 'round2' && livekitConfiguration.status !== 'ready' && (
+          <div role="status" className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3.5 py-3 text-xs text-amber-100/80">
+            <Radio className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <p>
+              The LiveKit server stream is initializing. Your interview selections are safe;
+              retry shortly if the session does not begin after deployment finishes.
+            </p>
+          </div>
         )}
 
         {/* Action Controls */}

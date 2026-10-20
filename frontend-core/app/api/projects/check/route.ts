@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
 import { getAutomationBaseUrl, serviceRequest } from '@/lib/backend-services';
-import { normalizeUserProfile } from '@/lib/profile-adapters';
+import { normalizeUserProfile, PROFILE_SELECT_COLUMNS } from '@/lib/profile-adapters';
 
 interface ProjectCheckBody { projectId?: string; }
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = createServerSessionClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data } = await supabase.from('profiles').select(PROFILE_SELECT_COLUMNS).eq('id', user.id).single();
     const profile = normalizeUserProfile(data as unknown);
     const project = profile?.projects.find((item) => item.id === body.projectId);
     if (!project?.liveUrl) return NextResponse.json({ error: 'This owned project has no live URL.' }, { status: 404 });

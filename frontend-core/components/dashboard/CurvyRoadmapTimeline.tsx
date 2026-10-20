@@ -34,8 +34,8 @@ const CATEGORY_PRESENTATION: Record<RoadmapCategory, CategoryPresentation> = {
   co_curricular: { icon: Award, color: '#FBBF24' },
 };
 
-const DESKTOP_PATH = 'M500 0 C360 150 640 250 500 400 C360 550 640 650 500 800 C360 950 640 1050 500 1200 C360 1350 640 1450 500 1600 C360 1750 640 1850 500 2000 C360 2150 640 2250 500 2400';
-const MOBILE_PATH = 'M40 0 C12 150 68 250 40 400 C12 550 68 650 40 800 C12 950 68 1050 40 1200 C12 1350 68 1450 40 1600 C12 1750 68 1850 40 2000 C12 2150 68 2250 40 2400';
+const DESKTOP_PATH = 'M500 0 C360 150 640 250 500 400 C360 550 640 650 500 800 C360 950 640 1050 500 1200 C360 1350 640 1450 500 1600 C360 1750 640 1850 500 2000';
+const MOBILE_PATH = 'M40 0 C12 150 68 250 40 400 C12 550 68 650 40 800 C12 950 68 1050 40 1200 C12 1350 68 1450 40 1600 C12 1750 68 1850 40 2000';
 
 function formatPoints(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -69,15 +69,15 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
       </header>
 
       <div className="relative">
-        <RoadPath id="mobile" path={MOBILE_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute bottom-0 left-0 top-0 w-20 md:hidden" viewBox="0 0 80 2400" />
-        <RoadPath id="desktop" path={DESKTOP_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute inset-0 hidden h-full w-full md:block" viewBox="0 0 1000 2400" />
+        <RoadPath id="mobile" path={MOBILE_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute bottom-0 left-0 top-0 w-20 md:hidden" viewBox="0 0 80 2000" />
+        <RoadPath id="desktop" path={DESKTOP_PATH} progress={scrollYProgress} reduceMotion={Boolean(reduceMotion)} className="absolute inset-0 hidden h-full w-full md:block" viewBox="0 0 1000 2000" />
 
         <div className="relative z-10 space-y-20 md:space-y-28">
           {nodes.map((node, index) => {
             const presentation = CATEGORY_PRESENTATION[node.category];
             const Icon = presentation.icon;
             const selected = activeNode === node.category;
-            const reached = reduceMotion || scrollProgress >= index / Math.max(nodes.length, 1) - 0.08;
+            const reached = reduceMotion || scrollProgress >= index / Math.max(nodes.length - 1, 1) - 0.08;
             const meterWidth = (node.weightedPoints / node.maxPoints) * 100;
 
             return (

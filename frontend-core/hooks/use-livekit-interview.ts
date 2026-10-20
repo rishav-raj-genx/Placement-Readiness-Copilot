@@ -20,6 +20,7 @@ import type {
   LiveKitEventName,
   LiveKitTranscriptEntry,
 } from '@/types';
+import { resolveLiveKitConnectionUrl } from '@/lib/livekit-session';
 
 interface UseLiveKitInterviewOptions {
   onGreeting?: (payload: LiveKitGreetingPayload) => void;
@@ -184,28 +185,15 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
 
       let room: Room | null = null;
       try {
-        const configuredServerUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim().replace(/\/+$/, '');
+        const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || process.env.LIVEKIT_URL;
+        const configuredServerUrl = resolveLiveKitConnectionUrl(sessionData.serverUrl, livekitUrl);
         const participantToken = sessionData.token?.trim();
 
-        if (!configuredServerUrl) {
-          throw new Error('NEXT_PUBLIC_LIVEKIT_URL is not configured in the browser deployment.');
-        }
-        const protocol = new URL(configuredServerUrl).protocol;
-        if (protocol !== 'wss:' && protocol !== 'ws:') {
-          throw new Error('NEXT_PUBLIC_LIVEKIT_URL must use ws:// or wss://.');
-        }
         if (!participantToken) {
           throw new Error('The interview service returned an empty LiveKit token.');
         }
         if (participantToken.split('.').length !== 3) {
           throw new Error('The interview service returned a malformed LiveKit token.');
-        }
-
-        const responseServerUrl = sessionData.serverUrl.trim().replace(/\/+$/, '');
-        if (responseServerUrl && responseServerUrl !== configuredServerUrl) {
-          throw new Error(
-            'LiveKit server configuration mismatch: the token and browser URL target different servers.',
-          );
         }
 
         room = new Room({

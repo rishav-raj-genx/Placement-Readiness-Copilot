@@ -3,16 +3,10 @@
 import { create } from 'zustand';
 import type { UserProfile } from '@/types';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
-import { normalizeUserProfile } from '@/lib/profile-adapters';
+import { normalizeUserProfile, PROFILE_SELECT_COLUMNS } from '@/lib/profile-adapters';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 
 export type SignUpResult = 'authenticated' | 'confirmation_required' | 'failed';
-
-const PROFILE_COLUMNS = [
-  'id', 'email', 'display_name', 'role', 'created_at', 'target_role', 'target_locations',
-  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path',
-  'projects', 'co_curricular', 'onboarding_completed_at', 'updated_at',
-].join(',');
 
 interface AuthState {
   user: UserProfile | null;
@@ -29,7 +23,7 @@ interface AuthState {
 async function fetchProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select(PROFILE_COLUMNS)
+    .select(PROFILE_SELECT_COLUMNS)
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;

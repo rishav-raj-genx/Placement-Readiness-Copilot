@@ -27,13 +27,14 @@ describe('backend service URL resolution', () => {
 });
 
 describe('local readiness calculation fallback', () => {
-  it('matches the canonical six-category weighting contract', () => {
+  it('matches the canonical seven-category weighting contract', () => {
     const result = calculateReadinessLocally({
       student_id: 'student-1',
       resume: { score: 80 },
       projects: [{ live_link_score: 90, code_quality_score: 80, documentation_score: 70 }],
       interview_session_result: { contract_version: 'v0', interview_score: 85 },
       github: { score: 75 },
+      coding_practice: { score: 75 },
       linkedin: { score: 90 },
       co_curricular: { score: 60 },
     });
@@ -45,8 +46,9 @@ describe('local readiness calculation fallback', () => {
       projects: { weighted_points: 20.5, present: true },
       mock_interview: { weighted_points: 17, present: true },
       github: { weighted_points: 7.5, present: true },
-      linkedin: { weighted_points: 9, present: true },
-      co_curricular: { weighted_points: 6, present: true },
+      coding_practice: { weighted_points: 7.5, present: true },
+      linkedin: { weighted_points: 4.5, present: true },
+      co_curricular: { weighted_points: 3, present: true },
     });
     expect(result.is_provisional).toBe(false);
     expect(result.readiness_level).toBe('Placement ready');
@@ -63,7 +65,7 @@ describe('local readiness calculation fallback', () => {
       co_curricular: null,
     });
 
-    expect(result.missing_components).toEqual(['projects', 'mock_interview', 'linkedin', 'co_curricular']);
+    expect(result.missing_components).toEqual(['projects', 'mock_interview', 'coding_practice', 'linkedin', 'co_curricular']);
     expect(result.category_scores.mock_interview).toMatchObject({ raw_score: 0, present: false });
     expect(result.is_provisional).toBe(true);
   });

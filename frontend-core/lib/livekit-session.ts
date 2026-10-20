@@ -5,6 +5,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+export interface LiveKitClientConfiguration {
+  url: string | null;
+  status: 'ready' | 'missing' | 'invalid';
+}
+
 function normalizeLiveKitUrl(value: string): string {
   const normalized = value.trim().replace(/\/+$/, '');
   try {
@@ -16,6 +21,44 @@ function normalizeLiveKitUrl(value: string): string {
   return normalized;
 }
 
+function tryNormalizeLiveKitUrl(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null;
+  try {
+    return normalizeLiveKitUrl(value);
+  } catch {
+    return null;
+  }
+}
+
+export function getLiveKitClientConfiguration(): LiveKitClientConfiguration {
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || process.env.LIVEKIT_URL;
+  if (!livekitUrl?.trim()) return { url: null, status: 'missing' };
+  const normalizedUrl = tryNormalizeLiveKitUrl(livekitUrl);
+  return normalizedUrl
+    ? { url: normalizedUrl, status: 'ready' }
+    : { url: null, status: 'invalid' };
+}
+
+export function resolveLiveKitConnectionUrl(
+  fallbackServerUrl?: string,
+  configuredServerUrl?: string,
+): string {
+  const livekitUrl = configuredServerUrl
+    ?? process.env.NEXT_PUBLIC_LIVEKIT_URL
+    ?? process.env.LIVEKIT_URL;
+  const configuredUrl = tryNormalizeLiveKitUrl(livekitUrl);
+  const fallbackUrl = tryNormalizeLiveKitUrl(fallbackServerUrl);
+
+  if (configuredUrl && fallbackUrl && configuredUrl !== fallbackUrl) {
+    throw new Error(
+      'LiveKit server configuration mismatch: the session token and browser URL target different servers.',
+    );
+  }
+  if (configuredUrl) return configuredUrl;
+  if (fallbackUrl) return fallbackUrl;
+  throw new Error('The LiveKit server stream is initializing. Please try again shortly.');
+}
+
 export function readLiveKitApiError(payload: unknown, status: number): string {
   if (isRecord(payload) && typeof payload.error === 'string' && payload.error.trim()) {
     return payload.error.trim();
@@ -25,7 +68,7 @@ export function readLiveKitApiError(payload: unknown, status: number): string {
 
 export function parseLiveKitSessionResponse(
   payload: unknown,
-  configuredServerUrl: string,
+  configuredServerUrl?: string,
 ): LiveKitSessionResponse {
   if (!isRecord(payload)) {
     throw new Error('The interview service returned an invalid response.');
@@ -44,12 +87,7 @@ export function parseLiveKitSessionResponse(
     throw new Error('The interview service response is missing the room or interview ID.');
   }
 
-  const publicServerUrl = normalizeLiveKitUrl(configuredServerUrl);
-  if (responseServerUrl && normalizeLiveKitUrl(responseServerUrl) !== publicServerUrl) {
-    throw new Error(
-      'LiveKit server configuration mismatch: the session token and browser URL target different servers.',
-    );
-  }
+  const publicServerUrl = resolveLiveKitConnectionUrl(responseServerUrl, configuredServerUrl);
 
   return {
     token,
@@ -62,11 +100,7 @@ export function parseLiveKitSessionResponse(
 export async function createInterviewSession(
   requestBody: LiveKitSessionRequest,
 ): Promise<LiveKitSessionResponse> {
-  const configuredLiveKitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim();
-  if (!configuredLiveKitUrl) {
-    throw new Error('NEXT_PUBLIC_LIVEKIT_URL is not configured in the browser deployment.');
-  }
-  normalizeLiveKitUrl(configuredLiveKitUrl);
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || process.env.LIVEKIT_URL;
 
   const {
     data: { session },
@@ -107,5 +141,5 @@ export async function createInterviewSession(
     throw new Error(readLiveKitApiError(payload, response.status));
   }
 
-  return parseLiveKitSessionResponse(payload, configuredLiveKitUrl);
+  return parseLiveKitSessionResponse(payload, livekitUrl);
 }

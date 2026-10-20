@@ -215,10 +215,14 @@ export default function DashboardHomePage() {
           <div className="rounded-3xl border border-white/10 bg-[#0E1728]/80 p-6 backdrop-blur-xl sm:p-7">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300">Weighted evidence</p><h2 id="breakdown-heading" className="mt-1 text-xl font-bold text-white">Readiness breakdown</h2></div>
-              <p className="text-xs text-white/40">Six categories · 100 total points</p>
+              <p className="text-xs text-white/40">Five categories · 100 total points</p>
             </div>
             <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
-              {READINESS_CATEGORY_LABELS.map(({ key, label }) => <BreakdownMeter key={key} label={label} value={readiness?.breakdown[key]} />)}
+              {READINESS_CATEGORY_LABELS.map(({ key, label }) => (
+                <div key={key} className={key === 'mock_interview' ? 'md:col-span-2' : undefined}>
+                  <BreakdownMeter label={label} value={readiness?.breakdown[key]} />
+                </div>
+              ))}
             </div>
           </div>
 

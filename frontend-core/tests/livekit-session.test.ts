@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseLiveKitSessionResponse,
   readLiveKitApiError,
+  resolveLiveKitConnectionUrl,
 } from '@/lib/livekit-session';
 
 const configuredUrl = 'wss://hireable.livekit.cloud';
@@ -42,6 +43,16 @@ describe('LiveKit session response validation', () => {
       interviewId: 'intv_1',
       serverUrl: 'wss://different.livekit.cloud',
     }, configuredUrl)).toThrow('different servers');
+  });
+
+  it('falls back to the session server while public configuration initializes', () => {
+    expect(resolveLiveKitConnectionUrl(configuredUrl, '')).toBe(configuredUrl);
+    expect(parseLiveKitSessionResponse({
+      token: 'header.payload.signature',
+      roomName: 'interview_student_1',
+      interviewId: 'intv_1',
+      serverUrl: configuredUrl,
+    })).toMatchObject({ serverUrl: configuredUrl });
   });
 
   it('preserves a specific backend error message', () => {

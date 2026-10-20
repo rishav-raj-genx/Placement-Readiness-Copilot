@@ -2,13 +2,18 @@ import type {
   CandidateProfileReview,
   CandidateProfileReviewRecord,
   CandidateProject,
-  CoCurricularProfile,
   ProfileAnalysisStatus,
   UserProfile,
   UserRole,
 } from '@/types';
 
 type UnknownRecord = Record<string, unknown>;
+
+export const PROFILE_SELECT_COLUMNS = [
+  'id', 'email', 'display_name', 'role', 'created_at', 'target_role', 'target_locations',
+  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path', 'projects',
+  'onboarding_completed_at', 'updated_at',
+].join(',');
 
 export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -37,17 +42,6 @@ function normalizeProject(value: unknown): CandidateProject | null {
     repositoryUrl,
     liveUrl: readString(value.liveUrl) || undefined,
     description,
-  };
-}
-
-function normalizeCoCurricular(value: unknown): CoCurricularProfile | undefined {
-  if (!isRecord(value)) return undefined;
-  const hackathonsCount = Number(value.hackathonsCount);
-  const certificationsCount = Number(value.certificationsCount);
-  return {
-    hackathonsCount: Number.isFinite(hackathonsCount) ? Math.max(0, Math.floor(hackathonsCount)) : 0,
-    certificationsCount: Number.isFinite(certificationsCount) ? Math.max(0, Math.floor(certificationsCount)) : 0,
-    clubLeadership: value.clubLeadership === true,
   };
 }
 
@@ -80,7 +74,6 @@ export function normalizeUserProfile(value: unknown): UserProfile | null {
     resumePdfPath: readString(value.resume_pdf_path) || undefined,
     linkedinPdfPath: readString(value.linkedin_pdf_path) || undefined,
     projects,
-    coCurricular: normalizeCoCurricular(value.co_curricular),
     onboardingCompletedAt: readString(value.onboarding_completed_at) || undefined,
     updatedAt: readString(value.updated_at) || undefined,
   };
