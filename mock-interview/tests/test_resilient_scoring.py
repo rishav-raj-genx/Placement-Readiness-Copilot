@@ -67,3 +67,33 @@ def test_parse_scoring_result_corrupted_payload_fallback():
     assert len(result.improvement_areas) >= 1
     assert result.dimensions["technical_depth"].score >= 50
     assert "PostgreSQL" in result.summary or "PostgreSQL" in result.strengths[1] or result.dimensions["technical_depth"].score > 0
+
+
+def test_resilient_llm_fallback_on_primary_failure():
+    from agent.providers import HTTPProviderError, ResilientLLM
+
+    class FailingLLM:
+        def __init__(self):
+            self.attempts = 0
+
+        def complete(self, sys: str, user: str) -> object:
+            self.attempts += 1
+            raise HTTPProviderError("Primary provider rate limited (429)")
+
+    class BackupLLM:
+        def __init__(self):
+            self.called = False
+
+        def complete(self, sys: str, user: str) -> object:
+            self.called = True
+            return '{"interview_score": 85}'
+
+    failing = FailingLLM()
+    backup = BackupLLM()
+    resilient = ResilientLLM(primary=failing, fallback=backup, max_retries=2)
+
+    res = resilient.complete("system", "user")
+    assert failing.attempts == 2
+    assert backup.called is True
+    assert res == '{"interview_score": 85}'
+

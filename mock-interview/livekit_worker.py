@@ -29,7 +29,7 @@ from livekit.agents.llm import ChatMessage
 from agent.context_adapter import adapt_resume
 from agent.finalizer import InterviewFinalizer
 from agent.livekit_events import encode_event, results_event
-from agent.providers import GroqLLM
+from agent.providers import GroqLLM, OllamaLLM, ResilientLLM
 from agent.session import build_question_plan
 from scoring.result_store import SupabaseInterviewSessionStore
 from scoring.schemas import InterviewContext, SessionConfig
@@ -69,17 +69,32 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     instructions = _interview_instructions(context, session_config)
 
+    # Selectable hosted vs local Ollama mode with resilient fallback
+    mode = str(metadata.get("mode") or os.getenv("INTERVIEW_MODE", "hosted_api"))
+    if mode == "ollama_local":
+        interview_model = os.getenv("LIVEKIT_INTERVIEW_MODEL", "ollama/llama-3.1")
+        scoring_llm = ResilientLLM(
+            primary=OllamaLLM(),
+            fallback=GroqLLM() if os.getenv("GROQ_API_KEY") else None,
+        )
+    else:
+        interview_model = os.getenv("LIVEKIT_INTERVIEW_MODEL", "groq/llama-3.1-8b-instant")
+        scoring_llm = ResilientLLM(
+            primary=GroqLLM(),
+            fallback=OllamaLLM(),
+        )
+
     session = AgentSession(
         stt=inference.STT(
             os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-3"),
             language="en",
         ),
-        llm=inference.LLM(os.getenv("LIVEKIT_INTERVIEW_MODEL", "groq/llama-3.1-8b-instant")),
+        llm=inference.LLM(interview_model),
         tts=inference.TTS(os.getenv("LIVEKIT_TTS_MODEL", "deepgram/aura-2-thalia-en")),
     )
     finalizer = InterviewFinalizer(
         context=context,
-        llm=GroqLLM(),
+        llm=scoring_llm,
         result_store=SupabaseInterviewSessionStore() if interview_id else None,
         interview_id=interview_id,
     )

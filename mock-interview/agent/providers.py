@@ -109,9 +109,75 @@ class GroqLLM:
         return content
 
 
-def _json_request(req: request.Request) -> dict[str, object]:
+class OllamaLLM:
+    """Local Ollama LLM provider for zero-cost offline/local execution."""
+
+    def __init__(self, base_url: str | None = None, model: str | None = None, timeout: int = 45):
+        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")).rstrip("/")
+        self.model = model or os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+        self.timeout = timeout
+
+    def complete(self, system_prompt: str, user_prompt: str) -> object:
+        url = f"{self.base_url}/api/chat"
+        req = request.Request(
+            url,
+            data=json.dumps(
+                {
+                    "model": self.model,
+                    "stream": False,
+                    "format": "json",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        data = _json_request(req, timeout=self.timeout)
+        message = data.get("message")
+        if isinstance(message, Mapping) and isinstance(message.get("content"), str):
+            return message["content"]
+        raise HTTPProviderError("Ollama returned an invalid response structure")
+
+
+class ResilientLLM:
+    """Wraps primary and fallback LLMs with bounded retries and graceful degradation."""
+
+    def __init__(
+        self,
+        primary: InterviewLLM,
+        fallback: InterviewLLM | None = None,
+        max_retries: int = 2,
+    ):
+        self.primary = primary
+        self.fallback = fallback
+        self.max_retries = max(1, max_retries)
+
+    def complete(self, system_prompt: str, user_prompt: str) -> object:
+        last_error: Exception | None = None
+        for _ in range(self.max_retries):
+            try:
+                return self.primary.complete(system_prompt, user_prompt)
+            except (HTTPProviderError, RuntimeError, OSError, TimeoutError, ValueError) as exc:
+                last_error = exc
+
+        if self.fallback is not None:
+            try:
+                return self.fallback.complete(system_prompt, user_prompt)
+            except (HTTPProviderError, RuntimeError, OSError, TimeoutError, ValueError) as fallback_exc:
+                raise HTTPProviderError(
+                    f"Primary provider failed ({last_error}) and fallback provider also failed: {fallback_exc}"
+                ) from fallback_exc
+
+        raise HTTPProviderError(f"Primary provider failed after {self.max_retries} attempts: {last_error}") from last_error
+
+
+
+def _json_request(req: request.Request, timeout: int = 30) -> dict[str, object]:
     try:
-        with request.urlopen(req, timeout=30) as response:
+        with request.urlopen(req, timeout=timeout) as response:
             data = json.loads(response.read())
     except Exception as exc:
         raise HTTPProviderError("provider request failed") from exc

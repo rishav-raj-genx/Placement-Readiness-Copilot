@@ -103,3 +103,22 @@ def test_coding_endpoints_via_testclient():
         },
     )
     assert unauth_resp.status_code == 401
+
+
+def test_evaluate_sandboxed_execution():
+    code = """
+def two_sum(nums, target):
+    seen = {}
+    for i, num in enumerate(nums):
+        diff = target - num
+        if diff in seen:
+            return [seen[diff], i]
+        seen[num] = i
+    return []
+"""
+    result = evaluate_coding_submission("two_sum", "python", code, run_sandbox=True)
+    assert result.evaluation_mode == "isolated_sandbox_execution"
+    assert result.test_execution_status == "passed"
+    assert result.passed_tests == 3
+    assert result.overall_score >= 85
+
