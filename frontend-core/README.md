@@ -32,6 +32,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 SUPABASE_JWT_SECRET=<jwt-secret>
 
 NEXT_PUBLIC_LIVEKIT_URL=wss://<project>.livekit.cloud
+LIVEKIT_URL=wss://<project>.livekit.cloud
 LIVEKIT_API_KEY=<api-key>
 LIVEKIT_API_SECRET=<api-secret>
 

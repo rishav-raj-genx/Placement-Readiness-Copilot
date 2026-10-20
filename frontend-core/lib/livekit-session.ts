@@ -1,16 +1,79 @@
-import type {
-  LiveKitSessionRequest,
-  LiveKitSessionResponse,
-} from '@/types';
+import type { LiveKitSessionRequest, LiveKitSessionResponse } from '@/types';
 import { supabase } from '@/lib/supabase-client';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeLiveKitUrl(value: string): string {
+  const normalized = value.trim().replace(/\/+$/, '');
+  try {
+    const protocol = new URL(normalized).protocol;
+    if (protocol !== 'wss:' && protocol !== 'ws:') throw new Error();
+  } catch {
+    throw new Error('NEXT_PUBLIC_LIVEKIT_URL must be a valid ws:// or wss:// URL.');
+  }
+  return normalized;
+}
+
+export function readLiveKitApiError(payload: unknown, status: number): string {
+  if (isRecord(payload) && typeof payload.error === 'string' && payload.error.trim()) {
+    return payload.error.trim();
+  }
+  return `Interview session creation failed (${status}).`;
+}
+
+export function parseLiveKitSessionResponse(
+  payload: unknown,
+  configuredServerUrl: string,
+): LiveKitSessionResponse {
+  if (!isRecord(payload)) {
+    throw new Error('The interview service returned an invalid response.');
+  }
+
+  const token = typeof payload.token === 'string' ? payload.token.trim() : '';
+  const roomName = typeof payload.roomName === 'string' ? payload.roomName.trim() : '';
+  const interviewId = typeof payload.interviewId === 'string' ? payload.interviewId.trim() : '';
+  const responseServerUrl = typeof payload.serverUrl === 'string' ? payload.serverUrl.trim() : '';
+
+  if (!token) throw new Error('The interview service returned an empty LiveKit token.');
+  if (token.split('.').length !== 3) {
+    throw new Error('The interview service returned a malformed LiveKit token.');
+  }
+  if (!roomName || !interviewId) {
+    throw new Error('The interview service response is missing the room or interview ID.');
+  }
+
+  const publicServerUrl = normalizeLiveKitUrl(configuredServerUrl);
+  if (responseServerUrl && normalizeLiveKitUrl(responseServerUrl) !== publicServerUrl) {
+    throw new Error(
+      'LiveKit server configuration mismatch: the session token and browser URL target different servers.',
+    );
+  }
+
+  return {
+    token,
+    roomName,
+    interviewId,
+    serverUrl: publicServerUrl,
+  };
+}
+
 export async function createInterviewSession(
-  requestBody: LiveKitSessionRequest
+  requestBody: LiveKitSessionRequest,
 ): Promise<LiveKitSessionResponse> {
+  const configuredLiveKitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim();
+  if (!configuredLiveKitUrl) {
+    throw new Error('NEXT_PUBLIC_LIVEKIT_URL is not configured in the browser deployment.');
+  }
+  normalizeLiveKitUrl(configuredLiveKitUrl);
+
   const {
     data: { session },
+    error: sessionError,
   } = await supabase.auth.getSession();
 
+  if (sessionError) throw new Error(`Unable to verify your session: ${sessionError.message}`);
   if (!session?.access_token) {
     throw new Error('You must be signed in to start a LiveKit interview.');
   }
@@ -23,26 +86,26 @@ export async function createInterviewSession(
 
   const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/interview-session`;
 
-  const response = await fetch(functionUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-      apikey: supabaseAnonKey,
-    },
-    body: JSON.stringify(requestBody),
-  });
+  let response: Response;
+  try {
+    response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network request failed';
+    throw new Error(`Could not reach the interview service: ${message}`);
+  }
 
+  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(errorData.error || `Session creation failed (${response.status})`);
+    throw new Error(readLiveKitApiError(payload, response.status));
   }
 
-  const data: LiveKitSessionResponse = await response.json();
-
-  if (!data.serverUrl || !data.roomName || !data.token || !data.interviewId) {
-    throw new Error('Invalid session response from server.');
-  }
-
-  return data;
+  return parseLiveKitSessionResponse(payload, configuredLiveKitUrl);
 }

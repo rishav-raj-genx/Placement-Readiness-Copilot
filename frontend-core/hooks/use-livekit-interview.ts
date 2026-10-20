@@ -182,35 +182,61 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
       setCurrentGreeting(null);
       setCurrentQuestion(null);
 
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
-      roomRef.current = room;
-
-      room.on(RoomEvent.DataReceived, handleDataReceived);
-      room.on(RoomEvent.ConnectionQualityChanged, handleConnectionQualityChanged);
-      room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
-      room.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
-      room.on(RoomEvent.Disconnected, handleDisconnected);
-
-      // Also track existing remote participants (worker may already be in the room)
-      room.remoteParticipants.forEach((participant) => {
-        handleParticipantConnected(participant);
-      });
-
+      let room: Room | null = null;
       try {
-        await room.connect(sessionData.serverUrl, sessionData.token);
+        const configuredServerUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim().replace(/\/+$/, '');
+        const participantToken = sessionData.token?.trim();
 
-        // Enable microphone
+        if (!configuredServerUrl) {
+          throw new Error('NEXT_PUBLIC_LIVEKIT_URL is not configured in the browser deployment.');
+        }
+        const protocol = new URL(configuredServerUrl).protocol;
+        if (protocol !== 'wss:' && protocol !== 'ws:') {
+          throw new Error('NEXT_PUBLIC_LIVEKIT_URL must use ws:// or wss://.');
+        }
+        if (!participantToken) {
+          throw new Error('The interview service returned an empty LiveKit token.');
+        }
+        if (participantToken.split('.').length !== 3) {
+          throw new Error('The interview service returned a malformed LiveKit token.');
+        }
+
+        const responseServerUrl = sessionData.serverUrl.trim().replace(/\/+$/, '');
+        if (responseServerUrl && responseServerUrl !== configuredServerUrl) {
+          throw new Error(
+            'LiveKit server configuration mismatch: the token and browser URL target different servers.',
+          );
+        }
+
+        room = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+        roomRef.current = room;
+
+        room.on(RoomEvent.DataReceived, handleDataReceived);
+        room.on(RoomEvent.ConnectionQualityChanged, handleConnectionQualityChanged);
+        room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
+        room.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
+        room.on(RoomEvent.Disconnected, handleDisconnected);
+
+        room.remoteParticipants.forEach((participant) => {
+          handleParticipantConnected(participant);
+        });
+
+        await room.connect(configuredServerUrl, participantToken);
+
         await room.localParticipant.setMicrophoneEnabled(true);
         setIsMicrophoneEnabled(true);
-
         setStatus('connected');
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to connect to interview room';
+      } catch (error) {
+        if (roomRef.current === room) roomRef.current = null;
+        if (room) await room.disconnect().catch(() => undefined);
+        const detail = error instanceof Error ? error.message : 'Unknown connection error';
+        const message = `LiveKit connection failed: ${detail}`;
         setError(message);
         setStatus('error');
+        throw new Error(message);
       }
     },
     [handleDataReceived, handleConnectionQualityChanged, handleParticipantConnected, handleActiveSpeakersChanged, handleDisconnected]

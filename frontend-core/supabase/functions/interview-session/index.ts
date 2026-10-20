@@ -51,6 +51,13 @@ interface RoomMetadata {
   config: SessionRequest;
 }
 
+function hasWrappingQuotes(value: string): boolean {
+  return (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  );
+}
+
 // Ambient declaration for IDE TypeScript language services
 // Supabase Edge Functions run natively on Deno runtime where 'Deno' is globally available.
 declare const Deno: {
@@ -224,6 +231,51 @@ Deno.serve(async (req: Request) => {
 
     const metadataJson = JSON.stringify(roomMetadata);
 
+    // Validate the credentials used by the active room-creation path before
+    // inserting a session record, so configuration failures cannot orphan rows.
+    const rawLivekitUrl = Deno.env.get("LIVEKIT_URL");
+    const rawLiveKitApiKey = Deno.env.get("LIVEKIT_API_KEY");
+    const rawLiveKitApiSecret = Deno.env.get("LIVEKIT_API_SECRET");
+
+    if (!rawLivekitUrl?.trim() || !rawLiveKitApiKey?.trim() || !rawLiveKitApiSecret?.trim()) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: LiveKit environment variables are missing." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const livekitUrl = rawLivekitUrl.trim();
+    const liveKitApiKey = rawLiveKitApiKey.trim();
+    const liveKitApiSecret = rawLiveKitApiSecret.trim();
+
+    console.log(`DEBUG: LIVEKIT_API_KEY loaded, length: ${liveKitApiKey.length}`);
+    console.log(`DEBUG: LIVEKIT_API_SECRET loaded, length: ${liveKitApiSecret.length}`);
+
+    if (
+      rawLivekitUrl !== livekitUrl ||
+      rawLiveKitApiKey !== liveKitApiKey ||
+      rawLiveKitApiSecret !== liveKitApiSecret
+    ) {
+      console.warn("Surrounding whitespace was removed from LiveKit configuration.");
+    }
+
+    if (hasWrappingQuotes(liveKitApiKey) || hasWrappingQuotes(liveKitApiSecret)) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: LiveKit credentials must not include wrapping quotes." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    try {
+      const protocol = new URL(livekitUrl).protocol;
+      if (protocol !== "wss:" && protocol !== "ws:") throw new Error("Invalid protocol");
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: LIVEKIT_URL must use ws:// or wss://." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // --- Create the interview session record in the database ---
     const { error: insertError } = await serviceClient
       .from("interview_sessions")
@@ -248,6 +300,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // --- Create LiveKit room and generate participant token ---
     // Generate LiveKit access token using the server SDK
     const {
       AccessToken: LiveKitAccessToken,
