@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import contextlib
 import os
 from collections.abc import Mapping
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from agent.auth import AuthenticationError, authenticate_student
 from agent.context_adapter import adapt_resume
@@ -21,7 +23,19 @@ from agent.providers import (
     TextToSpeech,
 )
 from agent.session import InterviewSession
+from scoring.coding_evaluator import (
+    CODING_PROBLEM_BANK,
+    evaluate_coding_submission,
+)
 from scoring.result_store import ResultStore, SupabaseResultStore
+
+
+class CodingSubmissionPayload(BaseModel):
+    problem_id: str
+    language: str = "javascript"
+    code: str
+    client_test_passed: int | None = None
+    client_test_total: int | None = None
 
 
 def create_app(
@@ -51,6 +65,44 @@ def create_app(
             "scoring": "deterministic" if runtime_mode == "e2e" else "groq",
             "target_duration_minutes": InterviewSession.TARGET_DURATION_MINUTES,
             "max_duration_minutes": InterviewSession.MAX_DURATION_MINUTES,
+            "rounds_supported": ["theoretical_technical", "dsa_webdev_ide"],
+        }
+
+    @app.get("/api/interview/coding-problems")
+    async def list_coding_problems() -> dict[str, object]:
+        """Return the curated problem bank for Round 2 DSA and Web Dev IDE tests."""
+        return {
+            "status": "ok",
+            "problems": [
+                {
+                    "id": p.id,
+                    "title": p.title,
+                    "category": p.category,
+                    "difficulty": p.difficulty,
+                    "description": p.description,
+                    "constraints": p.constraints,
+                    "starter_code": p.starter_code,
+                    "test_cases": p.test_cases,
+                    "optimal_time_complexity": p.optimal_time_complexity,
+                    "optimal_space_complexity": p.optimal_space_complexity,
+                }
+                for p in CODING_PROBLEM_BANK.values()
+            ],
+        }
+
+    @app.post("/api/interview/coding-evaluate")
+    async def evaluate_coding(submission: CodingSubmissionPayload) -> dict[str, object]:
+        """Evaluate submitted candidate code against benchmarks and produce AI feedback."""
+        result = evaluate_coding_submission(
+            problem_id=submission.problem_id,
+            language=submission.language,
+            code=submission.code,
+            client_test_passed=submission.client_test_passed,
+            client_test_total=submission.client_test_total,
+        )
+        return {
+            "status": "ok",
+            "result": result.model_dump(),
         }
 
     @app.websocket("/ws/interview")
@@ -82,6 +134,7 @@ def create_app(
                         raise ValueError("answer.text must be a string")
                     session.accept_answer(text)
                     await _send_next_question(websocket, session, text_to_speech)
+
                 elif event == "audio_answer":
                     if session is None:
                         raise ValueError("send a start event before answering")
@@ -111,8 +164,10 @@ def create_app(
                     raise ValueError("event must be start, answer, audio_answer, or finish")
         except WebSocketDisconnect:
             return
-        except (AuthenticationError, TypeError, ValueError, RuntimeError) as exc:
-            await websocket.send_json({"event": "error", "message": str(exc)})
+        except (AuthenticationError, TypeError, ValueError, RuntimeError, OSError) as exc:
+            with contextlib.suppress(Exception):
+                await websocket.send_json({"event": "error", "message": str(exc)})
+
 
     return app
 

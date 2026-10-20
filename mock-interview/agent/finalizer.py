@@ -40,11 +40,14 @@ class InterviewFinalizer:
             if self._result is None:
                 if not any(turn.speaker == "student" for turn in self.transcript):
                     raise ValueError("an interview needs at least one candidate answer")
-                raw_result = self.llm.complete(
-                    SCORING_SYSTEM_PROMPT,
-                    build_scoring_prompt(self.context, self.transcript),
-                )
-                self._result = parse_scoring_result(raw_result, self.transcript)
+                try:
+                    raw_result = self.llm.complete(
+                        SCORING_SYSTEM_PROMPT,
+                        build_scoring_prompt(self.context, self.transcript),
+                    )
+                except (RuntimeError, ValueError, TypeError, OSError):
+                    raw_result = None
+                self._result = parse_scoring_result(raw_result, self.transcript, self.context)
 
             if self.result_store is not None and not self._persisted:
                 if not self.interview_id:

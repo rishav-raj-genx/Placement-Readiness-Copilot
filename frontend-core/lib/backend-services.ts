@@ -24,6 +24,16 @@ export function getInterviewBaseUrl(): string {
   return normalizeServiceBase(process.env.INTERVIEW_SERVICE_URL, 'interview');
 }
 
+export function getOptionalInterviewBaseUrl(): string {
+  const configured = firstConfigured(process.env.INTERVIEW_SERVICE_URL, process.env.NEXT_PUBLIC_INTERVIEW_URL);
+  if (!configured) return 'http://127.0.0.1:8002';
+  try {
+    return normalizeServiceBase(configured, 'interview');
+  } catch {
+    return 'http://127.0.0.1:8002';
+  }
+}
+
 export function getAutomationBaseUrl(): string {
   return normalizeServiceBase(
     firstConfigured(

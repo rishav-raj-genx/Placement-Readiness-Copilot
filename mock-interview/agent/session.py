@@ -40,7 +40,18 @@ class InterviewSession:
         if not self.has_more_questions:
             raise ValueError("all interview questions have been asked; finish the session")
         self.question_number += 1
-        text = self.questions[self.question_number - 1]
+        base_question = self.questions[self.question_number - 1]
+
+        # Generate an adaptive conversational acknowledgment if this is a follow-up turn
+        acknowledgment = ""
+        if self.question_number > 1 and self.transcript:
+            last_student_turn = next(
+                (turn.text for turn in reversed(self.transcript) if turn.speaker == "student"),
+                "",
+            )
+            acknowledgment = _generate_conversational_acknowledgment(last_student_turn)
+
+        text = f"{acknowledgment} {base_question}".strip() if acknowledgment else base_question
         self.transcript.append(TranscriptTurn(speaker="ai", text=text))
         return text
 
@@ -61,10 +72,13 @@ class InterviewSession:
     def finish(self) -> InterviewResult:
         if not any(turn.speaker == "student" for turn in self.transcript):
             raise ValueError("an interview needs at least one candidate answer")
-        raw = self.llm.complete(
-            SCORING_SYSTEM_PROMPT, build_scoring_prompt(self.context, self.transcript)
-        )
-        return parse_scoring_result(raw, self.transcript)
+        try:
+            raw = self.llm.complete(
+                SCORING_SYSTEM_PROMPT, build_scoring_prompt(self.context, self.transcript)
+            )
+        except (RuntimeError, ValueError, TypeError, OSError):
+            raw = None
+        return parse_scoring_result(raw, self.transcript, self.context)
 
 
 def _build_question_plan(context: InterviewContext) -> tuple[str, ...]:
@@ -106,3 +120,84 @@ def _build_question_plan(context: InterviewContext) -> tuple[str, ...]:
 def _shorten(value: str, limit: int = 180) -> str:
     compact = " ".join(value.split()).rstrip(" .,:;")
     return compact if len(compact) <= limit else f"{compact[: limit - 1].rstrip()}…"
+
+
+def _generate_conversational_acknowledgment(answer: str) -> str:
+    """Produce an empathetic, content-aware transition acknowledging candidate input."""
+    clean = answer.strip().lower()
+    if not clean:
+        return ""
+
+    # 1. Candidate is unsure, passed, or lacks specific exposure
+    unsure_phrases = [
+        "i don't know", "dont know", "not sure", "no idea", "pass", "skip",
+        "can't say", "cannot say", "haven't used", "have not used", "never used",
+    ]
+    if any(phrase in clean for phrase in unsure_phrases):
+        return (
+            "Understood, that's completely fair! In engineering, knowing the bounds of your "
+            "experience is valuable. Let's explore another area."
+        )
+
+    # 2. Scalability, caching, and distributed systems
+    scale_keywords = [
+        "scale", "scaling", "traffic", "throughput", "latency", "redis", "kafka",
+        "rabbitmq", "sharding", "replication", "partition", "caching", "cache",
+        "rate limit", "load balancer", "cdn", "elasticsearch", "queue",
+    ]
+    if any(kw in clean for kw in scale_keywords):
+        return "That's a thoughtful approach to handling throughput, data flow, and system scalability."
+
+    # 3. Backend architectures, APIs, and data layers
+    backend_keywords = [
+        "fastapi", "postgresql", "postgres", "django", "node", "express", "go", "golang",
+        "python", "graphql", "rest", "idempotency", "transactions", "microservices",
+        "sql", "nosql", "mongodb", "database", "orm", "prisma", "sqlalchemy", "jwt",
+    ]
+    matched_backend = [kw for kw in backend_keywords if kw in clean]
+    if matched_backend:
+        tech_name = matched_backend[0].capitalize() if matched_backend[0] not in {"fastapi", "postgresql"} else matched_backend[0]
+        return f"I like how you structured the engineering around {tech_name} and clean data contracts."
+
+    # 4. Frontend, user interface, and client state
+    frontend_keywords = [
+        "react", "next.js", "vue", "angular", "redux", "zustand", "tailwind",
+        "css", "dom", "component", "hydration", "ssr", "responsive", "monaco",
+    ]
+    if any(kw in clean for kw in frontend_keywords):
+        return "That gives clear insight into how you manage client state, component hierarchy, and user experience."
+
+    # 5. Testing, reliability, observability, and DevOps
+    reliability_keywords = [
+        "test", "testing", "pytest", "jest", "mock", "docker", "kubernetes",
+        "k8s", "ci/cd", "pipeline", "sentry", "monitoring", "telemetry", "prometheus",
+        "grafana", "defect", "bug", "debugging", "isolation", "logs",
+    ]
+    if any(kw in clean for kw in reliability_keywords):
+        return "Excellent emphasis on verification, observability, and defensive engineering."
+
+    # 6. Algorithms, complexity, and data structures
+    dsa_keywords = [
+        "complexity", "o(n)", "o(1)", "o(log n)", "binary search", "hash map",
+        "tree", "graph", "dynamic programming", "space complexity", "time complexity",
+    ]
+    if any(kw in clean for kw in dsa_keywords):
+        return "That is a sound breakdown of algorithmic trade-offs and complexity constraints."
+
+    # 7. Team collaboration, feedback, and leadership
+    behavioral_keywords = [
+        "team", "feedback", "manager", "disagreed", "agreed", "collaborated",
+        "mentor", "sprint", "agile", "stakeholder", "retrospective", "priority",
+    ]
+    if any(kw in clean for kw in behavioral_keywords):
+        return "I appreciate you sharing that real-world perspective on team dynamics and constructive alignment."
+
+    # 8. Brief response
+    words = clean.split()
+    if len(words) < 6:
+        return "Got it, thanks for that initial summary. Let's build on that."
+
+    # 9. General thoughtful response
+    return "Thank you for walking me through that approach."
+
+

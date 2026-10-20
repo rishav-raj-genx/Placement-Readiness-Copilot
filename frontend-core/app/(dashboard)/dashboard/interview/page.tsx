@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Loader2, Plus, X } from 'lucide-react';
+import { ArrowRight, Check, Code2, Loader2, Mic2, Plus, Sparkles, Terminal, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,6 +45,7 @@ export default function ConfigureInterviewPage() {
   const profile = useProfileStore((state) => state.profile);
   const { startInterview, setCreating, setCreateError, isCreating, createError } = useLiveKitInterviewStore();
 
+  const [roundType, setRoundType] = useState<'round1' | 'round2' | 'both'>('round1');
   const [targetRole, setTargetRole] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [topicInput, setTopicInput] = useState('');
@@ -78,6 +79,11 @@ export default function ConfigureInterviewPage() {
   };
 
   const begin = async () => {
+    if (roundType === 'round2') {
+      router.push('/dashboard/interview/coding');
+      return;
+    }
+
     if (!user || !targetRole.trim() || topics.length === 0) {
       toast.error('Add a target role and at least one focus topic.');
       return;
@@ -120,8 +126,64 @@ export default function ConfigureInterviewPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Interview Studio"
-        description="Your profile evidence is already connected. Tune the session and begin when ready."
+        description="Choose your interview track. Practice theoretical system design viva or live coding with IDE."
       />
+
+      {/* Round Selection Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setRoundType('round1')}
+          className={`flex flex-col rounded-2xl border p-5 text-left transition-all ${
+            roundType === 'round1'
+              ? 'border-indigo-400/50 bg-gradient-to-br from-indigo-950/60 to-slate-900 shadow-lg ring-1 ring-indigo-400/30'
+              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/20 text-indigo-300">
+                <Mic2 className="h-4 w-4" />
+              </span>
+              <div>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-indigo-300">Round 1</span>
+                <h3 className="text-sm font-bold text-white">Technical Viva</h3>
+              </div>
+            </div>
+            {roundType === 'round1' && <Check className="h-4 w-4 text-indigo-400" />}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-white/60">
+            15–20 min voice/text technical viva covering fundamentals, system architecture, trade-offs, and HR.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setRoundType('round2')}
+          className={`flex flex-col rounded-2xl border p-5 text-left transition-all ${
+            roundType === 'round2'
+              ? 'border-cyan-400/50 bg-gradient-to-br from-cyan-950/60 to-slate-900 shadow-lg ring-1 ring-cyan-400/30'
+              : 'border-white/10 bg-slate-900/40 hover:border-white/20'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-500/20 text-cyan-300">
+                <Code2 className="h-4 w-4" />
+              </span>
+              <div>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">Round 2</span>
+                <h3 className="text-sm font-bold text-white">DSA + Web Dev IDE</h3>
+              </div>
+            </div>
+            {roundType === 'round2' && <Check className="h-4 w-4 text-cyan-400" />}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-white/60">
+            Interactive in-browser Monaco IDE testing algorithm efficiency (O(N) vs O(N²)) and web architecture.
+          </p>
+        </button>
+      </div>
+
       <section className="glass-panel rounded-2xl p-5 md:p-7">
         <div className="grid gap-6 md:grid-cols-2">
           {/* Target Role with Searchable Combobox */}
@@ -269,8 +331,17 @@ export default function ConfigureInterviewPage() {
           </p>
           <Button onClick={() => void begin()} disabled={isCreating}>
             {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Begin interview
-            <ArrowRight className="ml-2 h-4 w-4" />
+            {roundType === 'round2' ? (
+              <>
+                <Code2 className="mr-2 h-4 w-4" />
+                Launch Coding IDE (Round 2)
+              </>
+            ) : (
+              <>
+                Begin Technical Viva (Round 1)
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
           </Button>
         </div>
       </section>

@@ -1,15 +1,20 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
   BriefcaseBusiness,
+  CheckCircle2,
+  Code2,
   Files,
+  KanbanSquare,
   Loader2,
   Mic2,
   RefreshCw,
+  Send,
   Sparkles,
+  Trophy,
 } from 'lucide-react';
 import { CurvyRoadmapTimeline } from '@/components/dashboard/CurvyRoadmapTimeline';
 import { LogoFillBackground } from '@/components/dashboard/LogoFillBackground';
@@ -23,11 +28,14 @@ import {
 } from '@/lib/dashboard-readiness';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
+import { useApplicationStore } from '@/stores/application-store';
 
 const QUICK_LINKS = [
-  { href: '/dashboard/interview', label: 'Interview', description: 'Start a 15-minute AI viva', icon: Mic2 },
-  { href: '/dashboard/jobs', label: 'Jobs', description: 'Open role matches and official jobs', icon: BriefcaseBusiness },
-  { href: '/dashboard/profile', label: 'Profile', description: 'Manage identity and documents', icon: Files },
+  { href: '/dashboard/interview', label: 'Interview Studio', description: 'Round 1 technical viva & speech practice', icon: Mic2 },
+  { href: '/dashboard/interview/coding', label: 'Coding IDE', description: 'Round 2 DSA & web dev challenge', icon: Code2 },
+  { href: '/dashboard/tracker', label: 'Applications', description: 'Internshala-style ATS pipeline tracker', icon: KanbanSquare },
+  { href: '/dashboard/jobs', label: 'Jobs & Internships', description: 'Verified role matches & 1-click apply', icon: BriefcaseBusiness },
+  { href: '/dashboard/profile', label: 'Profile Evidence', description: 'Manage resume, GitHub, and credentials', icon: Files },
 ] as const;
 
 function formatUpdatedAt(value?: string): string {
@@ -45,6 +53,17 @@ export default function DashboardHomePage() {
   const isAnalyzing = useProfileStore((state) => state.isAnalyzing);
   const error = useProfileStore((state) => state.error);
   const analyze = useProfileStore((state) => state.analyze);
+
+  const applications = useApplicationStore((state) => state.applications);
+  const isHydrated = useApplicationStore((state) => state.isHydrated);
+  const hydrateApplications = useApplicationStore((state) => state.hydrate);
+
+  useEffect(() => {
+    if (user?.id && !isHydrated) {
+      void hydrateApplications(user.id);
+    }
+  }, [hydrateApplications, isHydrated, user?.id]);
+
   const roadmap = useMemo(() => buildDashboardRoadmap(readiness), [readiness]);
   const nextBestActions = useMemo(() => buildNextBestActions(readiness), [readiness]);
   const score = readiness?.totalScore;
@@ -53,10 +72,21 @@ export default function DashboardHomePage() {
   const targetRole = profile?.targetRole ?? user?.targetRole ?? 'your target role';
   const status = review?.status ?? (isAnalyzing ? 'processing' : 'pending');
 
+  const appCounts = useMemo(() => {
+    return {
+      total: applications.length,
+      applied: applications.filter((a) => a.status === 'applied').length,
+      shortlisted: applications.filter((a) => a.status === 'shortlisted').length,
+      interviewing: applications.filter((a) => a.status === 'interviewing').length,
+      offer: applications.filter((a) => a.status === 'offer').length,
+    };
+  }, [applications]);
+
   return (
     <div className="relative min-h-screen">
       <LogoFillBackground />
       <div className="relative z-10 space-y-10 pb-24">
+        {/* Welcome Command Center Banner */}
         <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#111A2D]/95 via-[#0E1728]/95 to-[#091521]/95 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:p-9">
           <div aria-hidden="true" className="absolute -right-24 -top-28 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_auto]">
@@ -81,6 +111,102 @@ export default function DashboardHomePage() {
             <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-black/15 p-5 sm:p-7">
               <ReadinessRing score={score} level={tier} />
               <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">{formatUpdatedAt(readiness?.updatedAt ?? review?.updatedAt)}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Internshala-Style Student Application Pipeline Metric Bar */}
+        <section aria-labelledby="pipeline-metrics" className="rounded-3xl border border-white/10 bg-[#0E1728]/80 p-5 backdrop-blur-xl sm:p-6 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-indigo-300">Internshala-Style Application Tracker</p>
+              <h2 id="pipeline-metrics" className="mt-0.5 text-lg font-bold text-white">Your Placement Activity</h2>
+            </div>
+            <Link href="/dashboard/tracker" className="inline-flex items-center text-xs text-cyan-300 hover:text-cyan-200 font-semibold">
+              View Application Pipeline <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="rounded-2xl border border-white/5 bg-slate-950/40 p-3.5 text-center">
+              <span className="text-[11px] text-white/50">Total Applied</span>
+              <p className="mt-1 font-mono text-xl font-bold text-white">{appCounts.total}</p>
+            </div>
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-3.5 text-center">
+              <span className="text-[11px] text-blue-300/80">In Review</span>
+              <p className="mt-1 font-mono text-xl font-bold text-blue-300">{appCounts.applied}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5 text-center">
+              <span className="text-[11px] text-amber-300/80">Shortlisted</span>
+              <p className="mt-1 font-mono text-xl font-bold text-amber-300">{appCounts.shortlisted}</p>
+            </div>
+            <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-3.5 text-center">
+              <span className="text-[11px] text-purple-300/80">Interviews</span>
+              <p className="mt-1 font-mono text-xl font-bold text-purple-300">{appCounts.interviewing}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 text-center">
+              <span className="text-[11px] text-emerald-300/80">Offers Received</span>
+              <p className="mt-1 font-mono text-xl font-bold text-emerald-300">{appCounts.offer}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* 2-Round Mock Interview Center Banner */}
+        <section aria-labelledby="interview-hub-heading" className="space-y-4">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300">Mock Interview Studio</p>
+              <h2 id="interview-hub-heading" className="mt-1 text-xl font-bold text-white">Two-Round Mock Interview System</h2>
+            </div>
+            <p className="text-xs text-white/40">Adaptive AI interviewer & live code comparison</p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* Round 1 Card */}
+            <div className="flex flex-col justify-between rounded-3xl border border-indigo-400/30 bg-gradient-to-br from-indigo-950/40 via-[#0E1728] to-[#0A111E] p-6 shadow-xl backdrop-blur-xl">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 font-mono text-xs font-bold text-indigo-300">
+                    <Mic2 className="h-3.5 w-3.5" /> Round 1: Technical Viva
+                  </span>
+                  <span className="text-xs text-white/40">15–20 Mins</span>
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-white">Theoretical & Architectural Viva</h3>
+                <p className="mt-2 text-xs leading-relaxed text-white/60">
+                  Voice or text technical interview evaluating your conceptual foundation, system architecture, trade-offs, and HR questions with real-time adaptive follow-ups.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <span className="font-mono text-xs text-indigo-200">Grounded in your resume</span>
+                <Link href="/dashboard/interview">
+                  <button className="flex items-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-indigo-600 transition-colors">
+                    Start Round 1 <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Round 2 Card */}
+            <div className="flex flex-col justify-between rounded-3xl border border-cyan-400/30 bg-gradient-to-br from-cyan-950/40 via-[#0E1728] to-[#0A111E] p-6 shadow-xl backdrop-blur-xl">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 font-mono text-xs font-bold text-cyan-300">
+                    <Code2 className="h-3.5 w-3.5" /> Round 2: DSA + Web Dev IDE
+                  </span>
+                  <span className="text-xs text-white/40">Interactive IDE</span>
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-white">Algorithms & Web Component Challenge</h3>
+                <p className="mt-2 text-xs leading-relaxed text-white/60">
+                  Integrated in-browser Monaco IDE. Write algorithms, execute test cases, and receive instant AI analysis comparing your solution against the optimal benchmark.
+                </p>
+              </div>
+              <div className="mt-6 flex items-center justify-between">
+                <span className="font-mono text-xs text-cyan-200">O(N) Complexity Analyzer</span>
+                <Link href="/dashboard/interview/coding">
+                  <button className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-cyan-600 hover:to-indigo-600 transition-colors">
+                    Open Coding IDE <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </Link>
+              </div>
             </div>
           </div>
         </section>
