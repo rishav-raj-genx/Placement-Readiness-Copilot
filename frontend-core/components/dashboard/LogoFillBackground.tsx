@@ -15,27 +15,27 @@ export function LogoFillBackground() {
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 z-[-1] flex items-center justify-center pointer-events-none select-none overflow-hidden"
+      className="fixed inset-0 -z-10 flex items-center justify-center pointer-events-none select-none overflow-hidden"
     >
-      <div className="relative flex items-center justify-center">
-        {/* Layer 1 (The Faded Base): faint outline before scrolling */}
+      <div className="relative -z-10 flex items-center justify-center pointer-events-none">
+        {/* Layer 1 (The Faded Base): subtle muted watermark before scrolling */}
         <img
           src="/brand-mark.png"
           alt=""
           aria-hidden="true"
-          className="h-[460px] w-auto max-w-[85vw] object-contain opacity-10 grayscale sm:h-[580px] xl:h-[680px]"
+          className="h-[460px] w-auto max-w-[85vw] object-contain opacity-5 grayscale blur-[2px] sm:h-[580px] xl:h-[680px]"
         />
 
-        {/* Layer 2 (The Vibrant Fill): revealed from bottom to top via clip-path */}
+        {/* Layer 2 (The Vibrant Fill): subtle watermark reveal blended softly into background */}
         <motion.div
           style={{ clipPath }}
-          className="absolute inset-0 flex items-center justify-center"
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
           <img
             src="/brand-mark.png"
             alt=""
             aria-hidden="true"
-            className="h-[460px] w-auto max-w-[85vw] object-contain opacity-100 drop-shadow-[0_0_30px_rgba(99,102,241,0.5)] sm:h-[580px] xl:h-[680px]"
+            className="h-[460px] w-auto max-w-[85vw] object-contain opacity-[0.18] mix-blend-screen sm:h-[580px] xl:h-[680px]"
           />
         </motion.div>
       </div>
