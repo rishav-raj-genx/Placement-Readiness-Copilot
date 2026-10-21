@@ -1,0 +1,32 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="i-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#28201E"/>
+      <stop offset="100%" stopColor="#1a1310"/>
+    </linearGradient>
+    <linearGradient id="i-lava" x1="12" y1="12" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#D93829"/>
+      <stop offset="100%" stopColor="#EA580C"/>
+    </linearGradient>
+    <linearGradient id="i-amber" x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#EA580C"/>
+      <stop offset="100%" stopColor="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Background badge rounded squircle -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#i-bg)" stroke="#382D2A" stroke-width="2"/>
+
+  <!-- Left: Microphone Viva Icon -->
+  <rect x="18" y="18" width="8" height="15" rx="4" fill="#28201E" stroke="url(#i-amber)" stroke-width="2"/>
+  <path d="M14 26C14 31 18 35 22 35C26 35 30 31 30 26" stroke="url(#i-amber)" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="22" y1="35" x2="22" y2="40" stroke="url(#i-amber)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="17" y1="40" x2="27" y2="40" stroke="url(#i-amber)" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Center connecting arc with arrow -->
+  <path d="M30 28C34 25 38 25 41 28" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="2 2"/>
+
+  <!-- Right: Code Terminal Brackets Icon -->
+  <rect x="36" y="20" width="16" height="22" rx="4" fill="#1a1310" stroke="url(#i-lava)" stroke-width="2"/>
+  <path d="M40 28L43 31L40 34" stroke="#D93829" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="45" y1="34" x2="49" y2="34" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

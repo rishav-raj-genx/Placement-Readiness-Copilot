@@ -1,0 +1,40 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="l-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#28201E"/>
+      <stop offset="100%" stopColor="#1a1310"/>
+    </linearGradient>
+    <linearGradient id="l-lava" x1="16" y1="12" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#D93829"/>
+      <stop offset="50%" stopColor="#EA580C"/>
+      <stop offset="100%" stopColor="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="l-trail" x1="32" y1="42" x2="32" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#F59E0B"/>
+      <stop offset="100%" stopColor="#D93829" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Background badge rounded squircle -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#l-bg)" stroke="#382D2A" stroke-width="2"/>
+
+  <!-- Rocket Ship -->
+  <!-- Exhaust flames -->
+  <path d="M28 44C28 44 32 54 32 54C32 54 36 44 36 44" fill="url(#l-trail)" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Rocket Body -->
+  <path d="M32 14C27 21 26 31 26 38H38C38 31 37 21 32 14Z" fill="#1a1310" stroke="url(#l-lava)" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Rocket Porthole with molten rim -->
+  <circle cx="32" cy="27" r="4" fill="#28201E" stroke="#EA580C" stroke-width="1.8"/>
+  <circle cx="32" cy="27" r="1.5" fill="#F59E0B"/>
+
+  <!-- Left Fin -->
+  <path d="M26 33L20 38V41L26 38" fill="#28201E" stroke="#D93829" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- Right Fin -->
+  <path d="M38 33L44 38V41L38 38" fill="#28201E" stroke="#D93829" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- "3" Free rounds badge in corner -->
+  <circle cx="48" cy="18" r="7" fill="#D93829" stroke="#F59E0B" stroke-width="1.5"/>
+  <text x="48" y="21.5" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#ffffff" text-anchor="middle">3</text>
+</svg>

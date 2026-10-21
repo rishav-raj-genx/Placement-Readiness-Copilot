@@ -1,28 +1,47 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { IntroSequence } from "@/components/IntroSequence";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { IntroSequence } from '@/components/IntroSequence';
+import { useAuthStore } from '@/stores/auth-store';
+import { isTourCompleted } from '@/lib/tour-storage';
 
 export default function Home() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const hydrate = useAuthStore((state) => state.hydrate);
   const [showIntro, setShowIntro] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const hasSeen = localStorage.getItem("has_seen_intro");
-    if (hasSeen) {
-      router.push("/dashboard");
+    if (!isHydrated) {
+      hydrate();
+    }
+  }, [hydrate, isHydrated]);
+
+  useEffect(() => {
+    if (!mounted || !isHydrated) return;
+
+    const completed = isTourCompleted({
+      userId: user?.id,
+      onboardingCompletedAt: user?.onboardingCompletedAt,
+    });
+
+    if (completed) {
+      router.replace('/dashboard');
     } else {
       setShowIntro(true);
     }
-  }, [router]);
+  }, [isHydrated, mounted, router, user]);
 
-  if (!mounted) return <div className="min-h-screen bg-stone-950" />;
+  if (!mounted || !isHydrated) {
+    return <div className="min-h-screen bg-[#1a1310]" />;
+  }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-stone-950">
+    <main className="flex min-h-screen items-center justify-center bg-[#1a1310]">
       {showIntro && <IntroSequence />}
     </main>
   );
