@@ -116,10 +116,11 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   const questionPlanRef = useRef<VoicePlanItem[]>([]);
   const currentPlanIndexRef = useRef<number>(0);
   const currentInterviewIdRef = useRef<string>('');
+  const hasCheckedMicPermissionRef = useRef(false);
 
   const [status, setStatus] = useState<LiveKitSessionStatus>('idle');
   const [connectionQuality, setConnectionQuality] = useState<ConnectionQuality | null>(null);
-  const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
+  const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(true);
   const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
   const [isAudioPlaybackBlocked, setIsAudioPlaybackBlocked] = useState(false);
   const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
@@ -176,13 +177,25 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     });
   }, []);
 
-  const startListeningToCandidate = useCallback(() => {
+  const startListeningToCandidate = useCallback(async () => {
     if (!sttRef.current) return;
     if (!sttRef.current.isSupported()) {
       setIsSpeechRecognitionSupported(false);
       return;
     }
     setIsSpeechRecognitionSupported(true);
+
+    // Ensure browser microphone permission is actively requested/granted without locking the device
+    if (!hasCheckedMicPermissionRef.current && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        hasCheckedMicPermissionRef.current = true;
+      } catch (e) {
+        console.warn('Microphone permission check notice:', e);
+      }
+    }
+
     sttRef.current.start(
       (text: string, isFinal: boolean) => {
         setCurrentCandidateAnswerState(text);
@@ -282,6 +295,15 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   const activateBrowserVoiceInterviewer = useCallback(() => {
     if (hasRemoteInterviewerRef.current) return;
     if (currentQuestion !== null) return;
+
+    // Enable microphone by default for oral viva round
+    setIsMicrophoneEnabled(true);
+    if (!hasCheckedMicPermissionRef.current && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      void navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        stream.getTracks().forEach((track) => track.stop());
+        hasCheckedMicPermissionRef.current = true;
+      }).catch(() => undefined);
+    }
 
     const targetRole = optionsRef.current.targetRole || 'Software Engineer';
     const topics = optionsRef.current.topics || [];
@@ -520,12 +542,20 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     const newState = !isMicrophoneEnabled;
     if (roomRef.current) {
       await roomRef.current.localParticipant.setMicrophoneEnabled(newState);
+    } else if (newState && !hasCheckedMicPermissionRef.current && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        hasCheckedMicPermissionRef.current = true;
+      } catch (e) {
+        console.warn('Microphone permission request error:', e);
+      }
     }
     setIsMicrophoneEnabled(newState);
     if (!newState) {
       stopListeningToCandidate();
     } else if (!isInterviewerSpeaking) {
-      startListeningToCandidate();
+      void startListeningToCandidate();
     }
   }, [isInterviewerSpeaking, isMicrophoneEnabled, startListeningToCandidate, stopListeningToCandidate]);
 

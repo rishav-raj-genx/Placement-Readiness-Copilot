@@ -725,9 +725,9 @@ export class BrowserSpeechRecognizer {
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
   private onErrorCallback: ((error: string) => void) | null = null;
   private restartTimeout: number | null = null;
-  private sessionPrefix = '';
+  private accumulatedFinalText = '';
   private currentFullTranscript = '';
-  private consecutiveNetworkErrors = 0;
+  private consecutiveErrors = 0;
 
   constructor() {
     this.initRecognition();
@@ -743,63 +743,76 @@ export class BrowserSpeechRecognizer {
 
     try {
       this.recognition = new SpeechRecognitionCtor();
-      // Single-utterance discrete mode with auto-restart is far more resilient in Chrome
-      // than persistent WebSocket streaming which frequently throws 'network' errors
-      this.recognition.continuous = false;
+      // True continuous mode ensures the browser does not shut down speech recognition between sentences
+      this.recognition.continuous = true;
       this.recognition.interimResults = true;
-      // 'en-US' is the universal, most stable speech model on Google cloud STT endpoints
-      this.recognition.lang = 'en-US';
+      this.recognition.maxAlternatives = 1;
+      const clientLang = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
+      this.recognition.lang = clientLang && clientLang.startsWith('en') ? clientLang : 'en-US';
 
       this.recognition.onresult = (event: SpeechRecognitionResultEvent) => {
-        this.consecutiveNetworkErrors = 0;
-        let finalChunk = '';
-        let interimChunk = '';
+        this.consecutiveErrors = 0;
+        let interimText = '';
+        let newFinalText = '';
 
-        for (let i = 0; i < event.results.length; ++i) {
+        const startIdx = typeof event.resultIndex === 'number' ? event.resultIndex : 0;
+        for (let i = startIdx; i < event.results.length; ++i) {
           const item = event.results[i];
           const text = item[0]?.transcript || '';
           if (item.isFinal) {
-            finalChunk += (finalChunk ? ' ' : '') + text.trim();
+            newFinalText += (newFinalText ? ' ' : '') + text.trim();
           } else {
-            interimChunk += (interimChunk ? ' ' : '') + text.trim();
+            interimText += (interimText ? ' ' : '') + text.trim();
           }
         }
 
-        // Combine with previously accumulated text
-        const base = this.sessionPrefix ? this.sessionPrefix + ' ' : '';
-        const completeText = (base + finalChunk + (interimChunk ? ' ' + interimChunk : '')).trim();
+        if (newFinalText) {
+          this.accumulatedFinalText = (this.accumulatedFinalText ? this.accumulatedFinalText + ' ' : '') + newFinalText;
+        }
 
+        const completeText = (this.accumulatedFinalText + (interimText ? ' ' + interimText : '')).trim();
         this.currentFullTranscript = completeText;
 
         if (this.onTranscriptCallback && completeText) {
-          this.onTranscriptCallback(completeText, interimChunk.length === 0);
+          this.onTranscriptCallback(completeText, Boolean(newFinalText && !interimText));
         }
       };
 
       this.recognition.onerror = (event: { error: string }) => {
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          console.warn('Speech recognition notice:', event.error);
-          this.onErrorCallback?.(event.error);
+        const err = event.error;
+        if (err === 'no-speech' || err === 'aborted') {
+          // Normal pause when candidate is listening or thinking
+          return;
         }
-        if (event.error === 'network') {
-          this.consecutiveNetworkErrors++;
-          // Backoff and re-initialize to clear any stale socket
-          const delay = Math.min(1000 * Math.pow(1.5, this.consecutiveNetworkErrors), 5000);
-          this.scheduleRestart(delay);
-        } else if (event.error === 'no-speech') {
-          this.scheduleRestart(250);
+
+        console.warn('Speech recognition notice:', err);
+        this.consecutiveErrors++;
+
+        // If network error occurred, discard the instance so a fresh WebSocket is created next time
+        if (err === 'network') {
+          try {
+            this.recognition?.abort();
+          } catch {
+            // Safe ignore
+          }
+          this.recognition = null;
+        }
+
+        // Only alert on persistent permission or fatal issues
+        if (err === 'not-allowed' || this.consecutiveErrors >= 3) {
+          this.onErrorCallback?.(err);
+        }
+
+        if (this.isListening && err !== 'not-allowed') {
+          this.scheduleRestart(err === 'network' ? 1200 : 400);
         }
       };
 
       this.recognition.onend = () => {
         this.isRecognitionActive = false;
-        // Commit what was finalized so the next utterance continues appending seamlessly
-        if (this.currentFullTranscript) {
-          this.sessionPrefix = this.currentFullTranscript;
-        }
-
-        if (this.isListening) {
-          this.scheduleRestart(150);
+        // If not already waiting for an error backoff, schedule restart
+        if (this.isListening && this.restartTimeout === null) {
+          this.scheduleRestart(300);
         }
       };
     } catch (e) {
@@ -807,9 +820,10 @@ export class BrowserSpeechRecognizer {
     }
   }
 
-  private scheduleRestart(delayMs = 250): void {
+  private scheduleRestart(delayMs = 300): void {
     if (this.restartTimeout !== null && typeof window !== 'undefined') {
       window.clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
     }
     if (typeof window !== 'undefined') {
       this.restartTimeout = window.setTimeout(() => {
@@ -822,7 +836,11 @@ export class BrowserSpeechRecognizer {
   }
 
   private tryStartNative(): boolean {
+    if (!this.recognition) {
+      this.initRecognition();
+    }
     if (!this.recognition) return false;
+    if (this.isRecognitionActive) return true;
     try {
       this.recognition.start();
       this.isRecognitionActive = true;
@@ -833,24 +851,28 @@ export class BrowserSpeechRecognizer {
         this.isRecognitionActive = true;
         return true;
       }
-      // Re-initialize recognition instance if previous instance crashed
+      // If start failed due to stale or invalid state, recreate fresh instance and retry once
       try {
+        this.recognition = null;
         this.initRecognition();
         this.recognition?.start();
         this.isRecognitionActive = true;
         return true;
-      } catch {
+      } catch (inner) {
+        console.warn('SpeechRecognition retry failed:', inner);
         return false;
       }
     }
   }
 
   public isSupported(): boolean {
-    return Boolean(this.recognition);
+    if (typeof window === 'undefined') return false;
+    const windowRef = window as unknown as Record<string, unknown>;
+    return Boolean(windowRef.SpeechRecognition || windowRef.webkitSpeechRecognition);
   }
 
   public resetTranscript(seedText = ''): void {
-    this.sessionPrefix = seedText.trim();
+    this.accumulatedFinalText = seedText.trim();
     this.currentFullTranscript = seedText.trim();
   }
 
@@ -862,7 +884,7 @@ export class BrowserSpeechRecognizer {
     onTranscript: (text: string, isFinal: boolean) => void,
     onError?: (error: string) => void
   ): boolean {
-    this.consecutiveNetworkErrors = 0;
+    this.consecutiveErrors = 0;
     this.onTranscriptCallback = onTranscript;
     if (onError) this.onErrorCallback = onError;
     this.isListening = true;

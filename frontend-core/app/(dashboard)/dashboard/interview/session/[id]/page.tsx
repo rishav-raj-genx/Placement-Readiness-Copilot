@@ -89,6 +89,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
   const {
     status: recordingStatus,
+    chunks: recordingChunks,
     startRecording,
     stopAndUpload,
     setCaptureEnabled,
@@ -97,6 +98,38 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     userId: user?.id,
     onError: handleRecordingError,
   });
+
+  const [isTranscribingChunk, setIsTranscribingChunk] = useState(false);
+
+  const handleTranscribeRecordedAudio = useCallback(async () => {
+    if (!recordingChunks || recordingChunks.length === 0) {
+      toast.info('No audio chunks captured yet. Please speak into your microphone first.');
+      return;
+    }
+    setIsTranscribingChunk(true);
+    toast.info('Processing audio with AI Whisper...');
+    try {
+      const audioBlob = new Blob(recordingChunks, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'candidate_response.webm');
+
+      const res = await fetch('/api/interview/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = (await res.json()) as { success?: boolean; text?: string; error?: string };
+      if (data.success && data.text) {
+        livekit.setCurrentCandidateAnswer((prev) => (prev ? `${prev} ${data.text}` : data.text || ''));
+        toast.success('Audio transcribed successfully with AI Whisper!');
+      } else {
+        toast.info(data.error || 'Speech transcription complete.');
+      }
+    } catch {
+      toast.error('Failed to communicate with transcription service.');
+    } finally {
+      setIsTranscribingChunk(false);
+    }
+  }, [livekit, recordingChunks]);
 
   const finalizeRecording = useCallback(async () => {
     try {
@@ -310,23 +343,26 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   const currentQuestion = livekit.currentQuestion || currentInterview?.currentQuestion;
   const transcripts = livekit.transcripts.length > 0 ? livekit.transcripts : currentInterview?.transcripts || [];
 
+  const startListening = livekit.startListeningToCandidate;
+  const isInterviewerSpeaking = livekit.isInterviewerSpeaking;
+  const isMicrophoneEnabled = livekit.isMicrophoneEnabled;
+  const hasCurrentQuestion = Boolean(currentQuestion);
+
   useEffect(() => {
     if (
       isLiveKitId &&
-      livekit.status === 'connected' &&
-      !livekit.isInterviewerSpeaking &&
-      currentQuestion &&
-      livekit.isMicrophoneEnabled
+      !isInterviewerSpeaking &&
+      hasCurrentQuestion &&
+      isMicrophoneEnabled
     ) {
-      livekit.startListeningToCandidate();
+      void startListening();
     }
   }, [
     isLiveKitId,
-    livekit.status,
-    livekit.isInterviewerSpeaking,
-    currentQuestion,
-    livekit.isMicrophoneEnabled,
-    livekit,
+    isInterviewerSpeaking,
+    hasCurrentQuestion,
+    isMicrophoneEnabled,
+    startListening,
   ]);
 
   // Only persisted LiveKit session IDs are valid.
@@ -645,11 +681,29 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-stone-400 font-mono">
-                    {livekit.currentCandidateAnswer
-                      ? `${livekit.currentCandidateAnswer.split(/\s+/).filter(Boolean).length} words`
-                      : 'Speak or type to answer'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={isTranscribingChunk || !recordingChunks || recordingChunks.length === 0}
+                      onClick={handleTranscribeRecordedAudio}
+                      className="h-6 text-[10px] text-stone-300 hover:text-white border border-stone-800 bg-stone-900/60 hover:bg-stone-800 px-2"
+                      title="Transcribe recorded candidate audio with AI Whisper"
+                    >
+                      {isTranscribingChunk ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin text-amber-400" />
+                      ) : (
+                        <Sparkles className="mr-1 h-3 w-3 text-amber-400" />
+                      )}
+                      Sync Voice (Whisper AI)
+                    </Button>
+                    <span className="text-[10px] text-stone-400 font-mono">
+                      {livekit.currentCandidateAnswer
+                        ? `${livekit.currentCandidateAnswer.split(/\s+/).filter(Boolean).length} words`
+                        : 'Speak or type to answer'}
+                    </span>
+                  </div>
                 </div>
 
                 <textarea
