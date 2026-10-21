@@ -59,6 +59,8 @@ export function TextInterviewChat({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<LiveKitTranscriptEntry[]>([]);
   messagesRef.current = messages;
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -164,7 +166,7 @@ export function TextInterviewChat({
         };
 
         ws.onclose = () => {
-          if (!isCancelled && status !== 'finishing') {
+          if (!isCancelled && statusRef.current !== 'finishing') {
             setStatus('error');
           }
         };

@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "provision:admin": "node scripts/provision-staff-admin.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

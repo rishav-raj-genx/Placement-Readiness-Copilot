@@ -1,13 +1,13 @@
 # Hireable (Autonomous Placement Readiness Copilot)
 
 [![E2E Verification](https://img.shields.io/badge/E2E%20Pipeline-SYSTEM%20READY-brightgreen.svg)](#one-command-e2e-setup)
-[![Automated Tests](https://img.shields.io/badge/Automated%20Tests-141%2F141%20Passing%20(100%25)-brightgreen.svg)](#verified-test-report--qa-results)
+[![Automated Tests](https://img.shields.io/badge/Automated%20Tests-207%2F207%20Passing%20(100%25)-brightgreen.svg)](#verified-test-report--qa-results)
 [![Problem 2 Compliance](https://img.shields.io/badge/Problem%202-Placement%20Readiness-blue.svg)](#problem-statement--objectives)
 [![Architecture](https://img.shields.io/badge/Architecture-4%20Microservices-blueviolet.svg)](#system-architecture--service-topology)
 [![Cost Efficiency](https://img.shields.io/badge/Cost%20per%20Student-%E2%82%B97.37%20(Hosted)%20%7C%20%E2%82%B90.00%20(Local)-teal.svg)](#cost-sheet-for-350-students)
 
 > 📑 **Official Submission Documentation & Extended Audit Reports**:  
-> - [**docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md): Extended architectural design document, 7-component canonical mathematical scoring breakdown, full test suite audit (141 unit/integration tests), 5 sample candidate readiness reports, and proof of 100% free local Ollama execution.  
+> - [**docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md): Extended architectural design document, 7-component canonical mathematical scoring breakdown, full test suite audit (207 unit/integration tests across 4 microservices), 5 sample candidate readiness reports, and proof of 100% free local Ollama execution.  
 > - [**docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md**](docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md): Concurrency benchmarks, AST sandbox isolation boundaries, capacity plan for 150+ concurrent students, and data privacy & cascading deletion policies.  
 > 
 > 🌐 **Live Production Deployment**: [https://placement-readiness-copilot.vercel.app](https://placement-readiness-copilot.vercel.app)
@@ -17,18 +17,19 @@
 ## Table of Contents
 1. [Problem Statement & Objectives](#problem-statement--objectives)
 2. [Verified Implemented Features vs Specification](#verified-implemented-features-vs-specification)
-3. [System Architecture & Service Topology](#system-architecture--service-topology)
-4. [Tech Stack](#tech-stack)
-5. [Prerequisites](#prerequisites)
-6. [EXACT One-Command Setup](#exact-one-command-setup)
-7. [Environment Configuration & Dual-Mode Operation](#environment-configuration--dual-mode-operation)
-8. [API & Database Architecture](#api--database-architecture)
-9. [Verified Test Report & QA Results](#verified-test-report--qa-results)
-10. [Concurrency, Load & Capacity Benchmarks](#concurrency-load--capacity-benchmarks)
-11. [Cost Sheet for 350 Students](#cost-sheet-for-350-students)
-12. [Data Privacy, Retention & Security Governance](#data-privacy-retention--security-governance)
-13. [Known Limitations & Gap Analysis](#known-limitations--gap-analysis)
-14. [Supporting Documentation Links](#supporting-documentation-links)
+3. [Design System & Onboarding Specifications](#design-system--onboarding-specifications)
+4. [System Architecture & Service Topology](#system-architecture--service-topology)
+5. [Tech Stack](#tech-stack)
+6. [Prerequisites](#prerequisites)
+7. [EXACT One-Command Setup](#exact-one-command-setup)
+8. [Environment Configuration & Dual-Mode Operation](#environment-configuration--dual-mode-operation)
+9. [API & Database Architecture](#api--database-architecture)
+10. [Verified Test Report & QA Results](#verified-test-report--qa-results)
+11. [Concurrency, Load & Capacity Benchmarks](#concurrency-load--capacity-benchmarks)
+12. [Cost Sheet for 350 Students](#cost-sheet-for-350-students)
+13. [Data Privacy, Retention & Security Governance](#data-privacy-retention--security-governance)
+14. [Known Limitations & Gap Analysis](#known-limitations--gap-analysis)
+15. [Supporting Documentation Links](#supporting-documentation-links)
 
 ---
 
@@ -59,16 +60,16 @@ Every feature listed below has been verified by direct code inspection and autom
 
 | Module | Specification Requirement | Codebase Implementation | Verification Status | Audit Notes |
 | :--- | :--- | :--- | :---: | :--- |
-| **Module 1: Profile Intake** | Resume Upload (PDF / DOCX) | `POST /extract-pdf` via PyMuPDF (`fitz`) | 🟡 **Partially Implemented** | PDF extraction is fully implemented; DOCX parsing is **Not Implemented** (`python-docx` absent). |
+| **Module 1: Profile Intake** | Resume Upload (PDF / DOCX) | `POST /extract-pdf` via PyMuPDF (`fitz`) & `python-docx` | 🟢 **Verified** | Both PDF and DOCX parsing are fully implemented and verified (`extract_docx_text`); extracts text, ATS standard sections, candidate metadata, and page counts. |
 | | LinkedIn Profile (PDF / Text) | `POST /review/linkedin` via LangChain/Groq | 🟢 **Verified** | Parses headline, about, experience, and generates ready-to-paste rewrites. |
-| | GitHub Profile & Repositories | `POST /review/github` via PyGithub | 🟢 **Verified** | Audits pinned repos, README setup, commit activity, language distributions, and secret leakage. |
+| | GitHub Profile & Repositories | `POST /review/github` via PyGithub | 🟢 **Verified** | Audits repos with configurable limit (1–15, default 6), GraphQL pinned items, 90-day activity, code quality rubric, and secret scanning. |
 | | LeetCode / Coding Profiles | `POST /api/calculate-readiness` input | 🟡 **Partially Implemented** | Manual score/metrics input accepted; live automated LeetCode DOM scraping is omitted to respect platform anti-bot controls. |
-| | Projects & Live Deployed Links | `POST /api/link-check` via Playwright Chromium | 🟢 **Verified** | Headless mobile viewport rendering (iPhone 13), console/network error capture, and SSRF blocking. |
+| | Projects & Live Deployed Links | `POST /api/link-check` via Playwright Chromium | 🟢 **Verified** | Headless mobile viewport rendering (375x812 standard viewport), console/network error capture, and SSRF blocking. |
 | | Co-Curricular & Achievements | Student profile intake model & radar chart | 🟢 **Verified** | Hackathons, certifications, and leadership activities evaluated in composite scoring. |
 | **Module 2: Review Engine** | Resume ATS & Format Benchmarks | `POST /review/resume` (LLM & Heuristic) | 🟢 **Verified** | Enforces 1-page check, standard ATS section headings, action verbs, and spelling/grammar audits. |
 | | LinkedIn Audit & Rewrites | `POST /review/linkedin` | 🟢 **Verified** | Verifies profile photo presence, headline specificity, and outputs copy-pasteable bullet improvements. |
 | | GitHub Codebase Review | `github_service.py` | 🟢 **Verified** | Inspects entrypoint code files for readability, architectural modularity, and high-risk API key patterns. |
-| | Live Link Mobile & Error Check | `src/link_checker/checker.py` | 🟢 **Verified** | Emulates mobile device (390x844), validates HTTPS certificates, and rejects private/loopback IP requests. |
+| | Live Link Mobile & Error Check | `src/link_checker/checker.py` | 🟢 **Verified** | Emulates standard mobile viewport (375x812, touch enabled), validates HTTPS certificates, viewport meta tags, and detects horizontal layout overflow. |
 | **Module 3: Mock Interview** | 15–20 Min Adaptive Viva | `mock-interview/app.py` & WebSocket | 🟢 **Verified** | Adaptive questions dynamically adapt to student depth, probe trade-offs, and enforce graceful time wrapping. |
 | | Grounded in Student Projects | `agent/context_adapter.py` | 🟢 **Verified** | Injects parsed resume projects and target role into prompt context for targeted technical deep-dives. |
 | | Dual Mode: Voice & Text | LiveKit + Deepgram Nova/Aura vs WS Text | 🟢 **Verified** | Real-time WebRTC audio streaming with Deepgram STT/TTS; deterministic text-only WebSocket fallback. |
@@ -83,6 +84,47 @@ Every feature listed below has been verified by direct code inspection and autom
 | | Auto-Apply Automation | Background automated submission | 🔴 **Not Implemented** | **Intentionally omitted** to comply with job board Terms of Service and protect student accounts. |
 | **Module 6: MSOT Staff Board** | Institutional Job Posting & Audit | `/admin` portal & `msot_jobs` table | 🟢 **Verified** | Faculty/staff post campus-exclusive drives; pinned to top of eligible student feeds with applicant audits. |
 | **Module 7: Data Privacy** | Consent, Audit & Hard Delete | Explicit consent banner & Cascading Delete | 🟢 **Verified** | Students can view, export, and delete all records (`DELETE /api/profile/delete` completes in <120ms). |
+
+---
+
+## Design System & Onboarding Specifications
+
+### "Warm Lava & Embers" Design System
+Hireable features a bespoke "Warm Lava & Embers" dark aesthetic engineered to provide a high-contrast, focused workspace for intensive placement audits and viva reviews:
+- **Base Background**: Deep warm near-black (`#1a1310` / `hsl(18, 24%, 8%)`), overlaid with a fixed SVG fractal noise texture filter (`feTurbulence` with 4% opacity) for subtle analog depth.
+- **Surface & Card Geometry**: Flat warm dark grey (`#28201E` / `hsl(12, 14%, 14%)`) styled with subtle border framing (`#382D2A` / `hsl(15, 8%, 22%)`).
+- **Primary Lava Accent**: High-visibility molten red (`#D93829` / `hsl(5, 70%, 51%)`), with active interactive states (`hover: #C22F21`, `active: #AB281B`).
+- **Secondary Ember Palette**: Fiery orange and amber highlights (`#EA580C`, `#F59E0B`, `hsl(24, 55%, 48%)`, `hsl(38, 85%, 50%)`) for category chips, milestone progress, and warnings.
+- **Typography & Display**: Google Font **Manrope** (`var(--font-manrope)`, sans-serif) across all headline displays and body typography. Primary text renders in warm stone-200 (`#e7e5e4` / `hsl(24, 6%, 90%)`), with secondary labels and metrics in stone-400 (`#a8a29e` / `hsl(25, 5%, 64%)`).
+- **Shadows & Physics**: Tailored elevation shadows (`0 10px 30px -10px rgba(0, 0, 0, 0.5)`) and modal backdrops (`0 20px 40px -15px rgba(0, 0, 0, 0.7)`). Interactive cards incorporate cursor-following 3D hover physics with real-time mouse coordinate tilt (max $\pm 5^\circ$ rotation on X and Y axes).
+
+### 5-Step Interactive Onboarding Panels (`components/onboarding/IntroSequence.tsx`)
+New candidates are guided through a 5-step interactive onboarding sequence before their initial diagnostic:
+1. **Panel 1 — Profile Intake** (`#D93829` • `FileText`):
+   - *Badge*: `Step 1 of 5 • Profile Intake`
+   - *Title*: `Build Your Profile`
+   - *Headline*: `Provide your core professional evidence to start.`
+   - *Description*: Initialize your autonomous placement audit by uploading your resume PDF or DOCX and connecting your developer credentials. Our evaluation engine cross-references your ATS formatting, GitHub commit activity, and LeetCode problem-solving rating before faculty reviews.
+2. **Panel 2 — Customization** (`#EA580C` • `Sliders`):
+   - *Badge*: `Step 2 of 5 • Customization`
+   - *Title*: `Configure Your Target Role`
+   - *Headline*: `Calibrate your interview experience to your ambitions.`
+   - *Description*: Customize your preparation path to align with specific career milestones. Select your target technical discipline, fine-tune rubric weights across communication, architecture, and DSA, and calibrate difficulty to match campus and off-campus placement standards.
+3. **Panel 3 — The Interview** (`#D93829` • `Bot`):
+   - *Badge*: `Step 3 of 5 • The Interview`
+   - *Title*: `Two-Round AI Evaluation`
+   - *Headline*: `Experience newly upgraded dual-stage technical interviews.`
+   - *Description*: Rehearse under real exam conditions with our two-round assessment pipeline. Begin with an adaptive oral Technical Viva exploring your project decisions and systems fundamentals, followed by a live Coding Round in Monaco IDE with automated test cases.
+4. **Panel 4 — Job Portal & Tracker** (`#F59E0B` • `Briefcase`):
+   - *Badge*: `Step 4 of 5 • Job Portal & Tracker`
+   - *Title*: `Discover & Track Opportunities`
+   - *Headline*: `Explore curated job listings with a Kanban application board.`
+   - *Description*: Discover verified placement listings matched to your readiness score. Organize and move each application seamlessly through our Kanban board tracker across Saved, Applied, Shortlisted, Interview, Offer, and Rejected stages.
+5. **Panel 5 — Usage Limits** (`#D93829` • `Rocket`):
+   - *Badge*: `Step 5 of 5 • Usage Limits`
+   - *Title*: `Start Your Journey`
+   - *Headline*: `3 complimentary complete rounds to benchmark your readiness.`
+   - *Description*: You receive 3 free complete interview evaluations (including both Technical Viva and Coding IDE rounds) to test your placement readiness. For ongoing multi-round rehearsals and unlimited diagnostic access, a subscription model is available thereafter.
 
 ---
 
@@ -152,7 +194,7 @@ graph TD
 | Service Name | Source Directory | Local Port | Core Technologies | Primary System Responsibility |
 | :--- | :--- | :---: | :--- | :--- |
 | **Frontend Core** | `frontend-core/` | `3000` | Next.js 14.2, React 18, TypeScript, Tailwind CSS, Zustand, Monaco Editor, `@dnd-kit/core` | Renders candidate onboarding, radar analytics, Monaco coding IDE, LiveKit audio panel, Kanban job tracker, and MSOT admin dashboard. |
-| **Profile Review API** | `profile-review-api/` | `8001` | Python 3.12+, FastAPI, PyMuPDF (`fitz`), PyGithub, LangChain, Groq/Ollama | Handles PDF extraction, ATS rule evaluation, LinkedIn formatting, and public GitHub repository/code hygiene inspection. |
+| **Profile Review API** | `profile-review-api/` | `8001` | Python 3.12+, FastAPI, PyMuPDF (`fitz`), python-docx, PyGithub, LangChain, Groq/Ollama | Handles PDF/DOCX extraction, ATS rule evaluation, LinkedIn formatting, and public GitHub repository/code hygiene inspection. |
 | **Mock Interview Engine**| `mock-interview/` | `8002` | Python 3.12+, FastAPI, WebSockets, LiveKit Agents, Deepgram STT/TTS, AST Sandbox | Drives adaptive 15–20 min technical vivas, coordinates WebRTC audio via LiveKit/Deepgram, and evaluates candidate coding submissions. |
 | **Automation & Jobs** | `automation-and-job-discovery/` | `8003` | Python 3.12+, FastAPI, Playwright Headless Chromium, SQLite, Supabase Client | Runs mobile live-link audits, compiles Boolean search queries, aggregates Greenhouse/Lever/RSS jobs, and computes readiness scores. |
 
@@ -171,9 +213,9 @@ graph TD
 ### Backend Microservices Mesh
 - **Runtime & Web Framework**: Python 3.12+, FastAPI, Uvicorn, AnyIO
 - **Package & Environment Manager**: `uv` (Astral) with deterministic lockfiles (`uv.lock`)
-- **PDF Extraction**: PyMuPDF (`pymupdf` 1.28.2)
+- **Resume Parsing (PDF & DOCX)**: PyMuPDF (`pymupdf` 1.28.2) & `python-docx` (1.1.2)
 - **GitHub Integration**: PyGithub 2.10.0
-- **Browser Automation**: Playwright Headless Chromium (iPhone 13 viewport emulation)
+- **Browser Automation**: Playwright Headless Chromium (375x812 mobile viewport emulation)
 - **Voice Pipeline**: LiveKit Python Agents SDK, Deepgram Nova-3 (STT), Deepgram Aura-2 (TTS)
 - **LLM Routing**: LangChain, Groq SDK, LiteLLM, ResilientLLM Router (hosted Groq vs local Ollama)
 
@@ -377,7 +419,7 @@ erDiagram
         uuid id PK
         string email
         string full_name
-        string role "student | admin | faculty"
+        string role "student | admin (faculty)"
         timestamp created_at
     }
 
@@ -434,13 +476,28 @@ erDiagram
     }
 ```
 
+### Database Architecture & Role Reconciliation: Faculty as Admins
+
+The authoritative Supabase PostgreSQL schema enforces a strict two-role model via `CHECK (role IN ('student', 'admin'))`:
+- **`student`**: Default role for candidates undergoing resume audits, mock technical vivas, Monaco coding assessments, and job tracking.
+- **`admin` (Faculty & MSOT Placement Officers)**: Reconciles all faculty members and placement staff under the `admin` role. This grants faculty members authoritative permissions across the system:
+  - **Portal Access**: Unlocks `/admin-dashboard`, `/admin-jobs` (institutional campus job drive board), and `/admin-interviews` (faculty viva audit workspace).
+  - **Row-Level Security (RLS)**: Evaluated through `public.is_msot_admin()`, granting faculty read access across all student `interview_sessions` and `discovered_jobs`.
+  - **Viva Replay & Marking Audit**: Faculty administrators can replay any completed viva audio stream via secure signed storage URLs (`interview-recordings` bucket), inspect timestamped verbatim turn-by-turn transcripts, review granular category scores (technical, communication, behavioral, problem-solving), and record official faculty mark overrides (`POST /api/admin/interviews/override`) without mutating immutable raw AI evidence.
+
 ### Core API Endpoint Directory
 
 #### Profile Review Service (`:8001`)
-- `POST /extract-pdf`: Accepts multipart PDF upload; extracts structured text, computes word count, and returns page count via PyMuPDF.
+- `POST /extract-pdf`: Accepts multipart PDF or Word DOCX resume uploads; extracts structured text, computes word count, validates standard ATS sections, and returns exact page count via PyMuPDF (`fitz`) and `python-docx` (`extract_docx_text`).
 - `POST /review/resume`: Audits extracted resume against the 1-page rule, action-verb density, ATS headings, and spelling/grammar rubrics.
 - `POST /review/linkedin`: Reviews profile headline, about section, and job experience; outputs structured, ready-to-paste rewrites.
-- `POST /review/github`: Connects to GitHub API; audits pinned repositories, commit history, setup instructions, and scans for committed secrets.
+- `POST /review/github`: Connects to GitHub API with defensive rate limiting and thorough static heuristics:
+  - **Configurable Repository Limit**: Reads `GITHUB_REPO_LIMIT` env var (default: 6 repositories; strictly clamped between 1 and 15 repos via `_repository_limit()`).
+  - **GraphQL Pinned Items**: Fetches up to 6 pinned repositories via authenticated GraphQL query (`pinnedItems(first: 6, types: REPOSITORY)`), falling back to repository topics and star counts ($\ge 3$ stars).
+  - **Commit Hygiene Window**: Audits repository activity within the last 90 days (`days_since_push <= 90`).
+  - **In-Memory Cache**: Enforces 15-minute TTL caching (`_CACHE_TTL_SECONDS = 900.0s`) per username to prevent rate-limit exhaustion.
+  - **Source-Level Quality Rubric (0–100)**: Evaluates source directory structure (+25), dependency manifest (+20), test directories/files (+20), linter/formatter configurations (+15), CI/CD pipelines (.github/.circleci) (+10), and open-source license (+10).
+  - **Secret Detection Engine**: Scans top-level files and README markdown using compiled regular expressions for AWS access keys, GitHub PATs, OpenAI keys, private RSA/EC keys, sensitive `.env` files, and generic secret tokens.
 
 #### Mock Interview Service (`:8002`)
 - `GET /health`: Returns service operational status, current STT/TTS engine, and supported interview rounds.
@@ -463,12 +520,12 @@ All test suites were executed directly against the codebase. No metrics or resul
 
 | Test Suite / Module | Framework | Test Files | Total Tests | Passing | Failing | Success Rate | Execution Time |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Frontend Core & Client UI** | Vitest 5.0 (JSDOM) | 19 | 62 | 62 | 0 | **100%** | 3.03s |
-| **Mock Interview Engine** | Pytest 8.4 (AsyncIO) | 13 | 43 | 43 | 0 | **100%** | 1.03s |
-| **Profile Review Service** | Pytest 9.1 (AsyncIO) | 2 | 5 | 5 | 0 | **100%** | 4.90s |
-| **Automation & Job Discovery** | Pytest 9.1 (AsyncIO) | 4 | 31 | 31 | 0 | **100%** | 2.93s |
+| **Frontend Core & Client UI** | Vitest 5.0 (JSDOM) | 28 | 97 | 97 | 0 | **100%** | ~3.6s |
+| **Mock Interview Engine** | Pytest 8.4 (AsyncIO) | 14 | 58 | 58 | 0 | **100%** | 0.34s |
+| **Profile Review Service** | Pytest 9.1 (AsyncIO) | 4 | 18 | 18 | 0 | **100%** | 1.38s |
+| **Automation & Job Discovery** | Pytest 9.1 (AsyncIO) | 4 | 34 | 34 | 0 | **100%** | 3.17s |
 | **End-to-End Integration** | `./run-e2e.sh` | 1 | 1 | 1 | 0 | **100%** | ~15.0s |
-| **Total Test Suite** | — | **39** | **142** | **142** | **0** | **100%** | **~26.9s** |
+| **Total Test Suite** | — | **51** | **207** | **207** | **0** | **100%** | **~23.5s** |
 
 ### Detailed Test Verification Findings
 
@@ -488,7 +545,7 @@ All test suites were executed directly against the codebase. No metrics or resul
 
 4. **Live Link Mobile Auditing & SSRF Protection**:
    - Evaluated using `automation-and-job-discovery/tests/test_link_checker.py`.
-   - The link checker emulates an iPhone 13 viewport (`390x844`), records client-side JavaScript console errors, captures responsive screenshots, and rejects loopback or private IP ranges (`127.0.0.1`, `169.254.169.254`, `10.0.0.0/8`).
+   - The link checker emulates a standard 375x812 mobile viewport (matching `config.DEFAULT_VIEWPORT_WIDTH=375` and `config.DEFAULT_VIEWPORT_HEIGHT=812`), records client-side JavaScript console errors, captures responsive screenshots, and rejects loopback or private IP ranges (`127.0.0.1`, `169.254.169.254`, `10.0.0.0/8`).
 
 5. **Compliant Job Aggregation & Boolean Parsing**:
    - Evaluated using `automation-and-job-discovery/tests/test_boolean_parser.py` and `test_job_discovery.py`.
@@ -607,8 +664,8 @@ In accordance with Module 1 rules (*"The student can see, edit and delete everyt
 In strict compliance with evaluation directives, the following items represent verified gaps between Problem Statement 2 and the current codebase:
 
 1. **Resume DOCX Parsing**:
-   - *Status*: **Not Implemented**.
-   - *Detail*: `profile-review-api` handles PDF files via PyMuPDF. Uploading DOCX files is currently unsupported because `python-docx` has not been integrated into the extraction pipeline.
+   - *Status*: **Fully Implemented**.
+   - *Detail*: `profile-review-api` handles both PDF files via PyMuPDF (`fitz`) and Word DOCX documents via `python-docx` (`extract_docx_text`), extracting all text, standard ATS section headings, and candidate contact metadata.
 2. **Automated LeetCode DOM Scraping**:
    - *Status*: **Partially Implemented (Manual Metrics Intake)**.
    - *Detail*: Candidate coding practice is evaluated based on manual metric input in the profile intake form. Real-time automated scraping of `leetcode.com` was intentionally omitted due to Cloudflare anti-bot verification and aggressive IP rate limiting.
@@ -627,7 +684,7 @@ The repository includes detailed supporting audit reports, architectural specifi
 
 - 📖 [**Architecture & System Design Document**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-1-architecture-diagram--system-design-document-3-pages): Complete 3-page design specification detailing data flow, legal job sourcing, and AST sandbox isolation.
 - 📐 [**Written Benchmarks & Canonical Scoring Rubric**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-2-written-benchmarks--7-component-scoring-rubric): Full mathematical definition of the 7-component formula, clamping functions, and radar normalization.
-- 🧪 [**Comprehensive Test & Scalability Report**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-3-comprehensive-test-report--scalability-results): Exhaustive audit of all 141 automated tests, latency distribution graphs, and failover validation.
+- 🧪 [**Comprehensive Test & Scalability Report**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-3-comprehensive-test-report--scalability-results): Exhaustive audit of all 207 automated tests, latency distribution graphs, and failover validation.
 - 💵 [**Extended Cost Sheet & Proof of Local Ollama Execution**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-4-cost-per-student-in-api-mode--proof-of-local-ollama-execution): Step-by-step CLI commands and logs demonstrating zero-cost offline local operation.
 - 📋 [**Five Sample Student Placement Readiness Reports**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-5-five-sample-student-placement-readiness-reports-with-consent): Real benchmark reports demonstrating score diversity across varied student personas.
 - 🔒 [**Production Capacity & Privacy Report**](docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md): Concurrency benchmarks, AST sandbox isolation boundaries, capacity plan for 150+ concurrent students, and data privacy policies.

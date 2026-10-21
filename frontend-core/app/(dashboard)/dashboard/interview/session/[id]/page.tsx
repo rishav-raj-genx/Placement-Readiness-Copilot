@@ -308,7 +308,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
         toast.error(message);
       }
     })();
-  }, [isLiveKitId, connectionAttempted, user, livekit, liveKitStore]);
+  }, [isLiveKitId, connectionAttempted, isTextMode, user, livekit, liveKitStore]);
 
   const currentInterview = liveKitStore.currentInterview;
   const status = livekit.status;

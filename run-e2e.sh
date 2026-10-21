@@ -54,5 +54,5 @@ done
 cat "$ORCHESTRATOR_LOG"
 (
   cd "$ROOT_DIR/mock-interview"
-  uv run --locked python "$ROOT_DIR/scripts/e2e_simulation.py"
+  INTERNAL_SERVICE_KEY="${INTERNAL_SERVICE_KEY:-e2e-internal-token}" uv run --locked python "$ROOT_DIR/scripts/e2e_simulation.py"
 )

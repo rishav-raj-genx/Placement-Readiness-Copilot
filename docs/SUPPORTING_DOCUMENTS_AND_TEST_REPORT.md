@@ -15,7 +15,7 @@ Hireable is an end-to-end, autonomous Placement Readiness Copilot engineered to 
 
 | Verification Dimension | Standard / Specification | Measured Result | Audit Status |
 | :--- | :--- | :--- | :---: |
-| **All Automated Tests** | Frontend Vitest + 3 Python Pytest Suites | **122 / 122 Tests Passing (100%)** | 🟢 **PASS** |
+| **All Automated Tests** | Frontend Vitest + 3 Python Pytest Suites | **207 / 207 Tests Passing (100%)** | 🟢 **PASS** |
 | **System E2E Pipeline** | `./run-e2e.sh --install` Full Pipeline Simulation | **`SYSTEM READY` Output** | 🟢 **PASS** |
 | **Scoring Formula** | 7-Component Deterministic Math ($S \in [0, 100]$) | **Max Spread: $\pm 1.0$ pts (Mean Dev: 0.0)** | 🟢 **PASS** |
 | **100% Free Local Mode** | Self-Hosted Offline Execution (Ollama + SQLite) | **$0.00 / Student (Zero Tokens)** | 🟢 **PASS** |
@@ -580,6 +580,6 @@ Hireable (Placement Readiness Copilot) fulfills all criteria specified in **Prob
 
 - [x] **Architecture & Design Document (Part 1)**: Microservice decoupling, directory table, dual cloud vs. free local Ollama mode, compliant job search, and privacy consent.
 - [x] **Benchmarks & 7-Component Mathematical Formula (Part 2)**: Standardized check IDs (`RES-01..08`, `LNK-01..04`, `GH-01..03`, `PRJ-01..06`), 100-point module weightings, copy-pasteable rewrite examples, and sensitivity-based ROI action rankings.
-- [x] **Empirical Test Evidence (Part 3)**: 122 automated test suite passes, 20-resume human vs. AI confusion matrix, 10-repo live-link testing, 150-user scalability load metrics, and cascading delete proof.
+- [x] **Empirical Test Evidence (Part 3)**: 207 automated test suite passes, 20-resume human vs. AI confusion matrix, 10-repo live-link testing, 150-user scalability load metrics, and cascading delete proof.
 - [x] **Cost & Local Proof (Part 4)**: Two-tier cost model ($0.0198 text / $0.0878 voice / ₹1.66 per student) vs. $0.000 local Ollama mode, with real terminal log ending in `SYSTEM READY`.
 - [x] **Five Sample Consented Reports (Part 5)**: Complete mathematical reports spanning Placement Ready (84.0, 78.2), Almost Ready (66.0, 58.0), and Not Ready (42.0) with zero arithmetic error and full 7-row calculation tables.

@@ -6,7 +6,12 @@
 -- ====================================================================
 
 -- --------------------------------------------------------------------
--- 0. User Profiles Table (Student & Admin Roles)
+-- 0. User Profiles Table (Student & Admin/Faculty Roles)
+-- Reconciled Role Definition:
+--   - 'student': Standard candidate account for intake, mock vivas, and applications.
+--   - 'admin': Campus placement officers and faculty members. Defining faculty as 'admin'
+--     authorizes them server-side to replay any viva recording, inspect audio transcripts,
+--     audit candidate marks, and log score overrides across all student cohorts.
 -- --------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -297,6 +302,13 @@ DROP POLICY IF EXISTS "Students can read own interview sessions" ON interview_se
 CREATE POLICY "Students can only view their own interviews"
     ON interview_sessions FOR SELECT
     USING (auth.uid() = student_id OR auth.uid()::text = student_id::text OR auth.uid() = user_id);
+
+-- Faculty / MSOT Admin Policy: Faculty defined as admins can replay any viva and audit marks
+DROP POLICY IF EXISTS "MSOT admins can read interview sessions" ON interview_sessions;
+CREATE POLICY "MSOT admins can read interview sessions"
+    ON interview_sessions FOR SELECT
+    TO authenticated
+    USING (public.is_msot_admin());
 
 DROP POLICY IF EXISTS "Students can insert own interview sessions" ON interview_sessions;
 CREATE POLICY "Students can insert own interview sessions"
