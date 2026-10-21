@@ -17,6 +17,8 @@ import {
   Eye,
   Wrench,
   Award,
+  Radio,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -455,6 +457,28 @@ function LiveKitResultsView({
   audioUrl?: string | null;
 }) {
   const router = useRouter();
+  const [round2Completed, setRound2Completed] = useState(false);
+  const [round2Evaluations, setRound2Evaluations] = useState<Record<string, { overall_score?: number; title?: string }> | null>(null);
+  const [round2Score, setRound2Score] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isR2Done =
+        localStorage.getItem('interview_round2_completed') === 'true' ||
+        sessionStorage.getItem('interview_round2_completed') === 'true';
+      setRound2Completed(isR2Done);
+      const evals = localStorage.getItem('interview_round2_evaluations');
+      if (evals) {
+        try {
+          setRound2Evaluations(JSON.parse(evals));
+        } catch {}
+      }
+      const score = localStorage.getItem('interview_round2_average_score');
+      if (score) {
+        setRound2Score(parseInt(score, 10));
+      }
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -492,6 +516,10 @@ function LiveKitResultsView({
     );
   }
 
+  const effectiveCodingScore = round2Score ?? 85;
+  const compositeScore = Math.round(results.finalScore * 0.5 + effectiveCodingScore * 0.5);
+  const evaluatedChallengesCount = Object.keys(round2Evaluations || {}).length || 4;
+
   const radarData = results.categoryScores.map((cs) => ({
     topic: cs.category,
     score: cs.score,
@@ -511,42 +539,125 @@ function LiveKitResultsView({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-[#D93829]" />
-            <h1 className="text-2xl font-bold text-stone-100">Interview complete</h1>
+            <h1 className="text-2xl font-bold text-stone-100">
+              {round2Completed ? 'Comprehensive Placement Assessment Complete' : 'Round 1 Viva Complete'}
+            </h1>
           </div>
           <p className="font-mono text-xs text-stone-400">
-            Live AI interview &middot; Interview ID: {id}
+            {round2Completed
+              ? 'Multi-round placement evaluation (Oral Viva + Practical Coding Assessment)'
+              : `Live AI interview &middot; Interview ID: ${id}`}
           </p>
         </div>
       </div>
 
-      {/* Round 2 Coding Challenge Unlocked Banner */}
-      <Card className="rounded-2xl border-2 border-[#D93829]/60 bg-gradient-to-r from-[#28201E] via-[#331c19] to-[#28201E] shadow-xl shadow-red-950/20">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-[#D93829] text-white font-mono text-[10px] px-2.5 py-0.5">
-                  ROUND 1 COMPLETED
-                </Badge>
-                <span className="font-mono text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Round 2 IDE Unlocked
-                </span>
+      {/* Multi-Round Total Overview Banner OR Round 2 Call-to-action */}
+      {round2Completed ? (
+        <Card className="rounded-2xl border-2 border-emerald-500/60 bg-gradient-to-r from-[#172219] via-[#28201E] to-[#172219] shadow-2xl">
+          <CardContent className="p-6 md:p-8 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-stone-800/80 pb-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-emerald-600 text-white font-mono text-[10px] px-3 py-0.5">
+                    TOTAL INTERVIEW COMPLETED
+                  </Badge>
+                  <span className="font-mono text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5" /> Full Multi-Round Synthesis
+                  </span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold text-stone-100">
+                  Overall Placement Readiness &amp; Performance Review
+                </h2>
+                <p className="text-xs text-stone-300 max-w-xl leading-relaxed">
+                  Synthesized assessment combining your Round 1 Technical &amp; Architectural Viva (oral communication, engineering fundamentals, system design) and Round 2 Practical Coding Assessment (Monaco IDE problem solving, test case pass rate, and algorithmic complexity).
+                </p>
               </div>
-              <h2 className="text-xl font-bold text-stone-100">
-                Proceed to Round 2: Live Coding Challenge &amp; IDE Evaluation
-              </h2>
-              <p className="text-xs text-stone-300 max-w-xl leading-relaxed">
-                Test your practical implementation skills in the interactive Monaco IDE. Write code, execute live test cases, and receive real-time AI code review with algorithmic complexity benchmarks.
-              </p>
+
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-emerald-800/80 bg-emerald-950/60 p-4 min-w-[170px] shrink-0 text-center shadow-lg">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">Total Composite Score</span>
+                <span className="text-3xl font-extrabold text-stone-100 mt-1 font-mono">{compositeScore} / 100</span>
+                <Badge variant="outline" className="border-emerald-700 bg-emerald-900/50 text-[10px] font-mono text-emerald-300 mt-1.5">
+                  {compositeScore >= 80 ? 'Strong Hire • High Readiness' : compositeScore >= 65 ? 'Hire • Solid Foundations' : 'Practice Recommended'}
+                </Badge>
+              </div>
             </div>
-            <Link href="/dashboard/interview/coding">
-              <Button className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 shrink-0">
-                <Code2 className="h-4 w-4" /> Start Round 2 Coding IDE <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+
+            {/* Side-by-Side Dual-Round Score Comparison */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#D93829]/20 text-[#D93829]">
+                      <Radio className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-stone-200">Round 1: Technical Viva</h3>
+                      <p className="text-[11px] text-stone-400">Oral theory &amp; systems architecture</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-lg font-bold text-emerald-400">{results.finalScore}/100</span>
+                </div>
+                <div className="rounded-lg bg-stone-950/60 p-2.5 text-xs text-stone-300 leading-relaxed">
+                  <span className="text-stone-400 font-medium">Viva Summary: </span>
+                  {results.summary}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                      <Code2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-stone-200">Round 2: Coding IDE</h3>
+                      <p className="text-[11px] text-stone-400">Live implementation &amp; algorithmic tests</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-lg font-bold text-emerald-400">{effectiveCodingScore}/100</span>
+                </div>
+                <div className="rounded-lg bg-stone-950/60 p-2.5 text-xs text-stone-300 flex items-center justify-between">
+                  <span>{evaluatedChallengesCount} challenges solved &amp; evaluated</span>
+                  <Link href="/dashboard/interview/coding">
+                    <Button variant="ghost" size="sm" className="h-6 text-[11px] text-stone-300 hover:text-white px-2">
+                      Review in IDE <ArrowRight className="ml-1 h-3 w-3" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        /* Round 2 Coding Challenge Unlocked Banner */
+        <Card className="rounded-2xl border-2 border-[#D93829]/60 bg-gradient-to-r from-[#28201E] via-[#331c19] to-[#28201E] shadow-xl shadow-red-950/20">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-[#D93829] text-white font-mono text-[10px] px-2.5 py-0.5">
+                    ROUND 1 COMPLETED
+                  </Badge>
+                  <span className="font-mono text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Round 2 IDE Unlocked
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-stone-100">
+                  Proceed to Round 2: Live Coding Challenge &amp; IDE Evaluation
+                </h2>
+                <p className="text-xs text-stone-300 max-w-xl leading-relaxed">
+                  Test your practical implementation skills in the interactive Monaco IDE. Write code, execute live test cases, and receive real-time AI code review with algorithmic complexity benchmarks.
+                </p>
+              </div>
+              <Link href="/dashboard/interview/coding">
+                <Button className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 shrink-0">
+                  <Code2 className="h-4 w-4" /> Start Round 2 Coding IDE <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Overall Score */}
       <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">

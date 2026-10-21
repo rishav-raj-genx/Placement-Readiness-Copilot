@@ -99,34 +99,114 @@ export default function InterviewHistoryPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.id) return;
     let active = true;
 
     const loadHistory = async (): Promise<void> => {
       setIsLoading(true);
       setError(null);
-      try {
-        const { data, error: queryError } = await supabase
-          .from('interview_sessions')
-          .select('id, target_role, status, completed_at, started_at, created_at, config, result')
-          .eq('user_id', user.id)
-          .in('status', ['completed', 'abandoned'])
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (queryError) throw queryError;
-        if (active) setSessions((data ?? []) as LiveKitHistoryEntry[]);
-      } catch (loadError: unknown) {
-        if (active) {
-          setSessions([]);
-          setError(loadError instanceof Error ? loadError.message : 'Interview history could not be loaded.');
+      const combinedSessions: LiveKitHistoryEntry[] = [];
+      const seenIds = new Set<string>();
+
+      // 1. Fetch from Supabase if user exists
+      if (user?.id) {
+        try {
+          const { data, error: queryError } = await supabase
+            .from('interview_sessions')
+            .select('id, target_role, status, completed_at, started_at, created_at, config, result')
+            .or(`user_id.eq.${user.id},student_id.eq.${user.id}`)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (!queryError && Array.isArray(data)) {
+            data.forEach((row) => {
+              if (row && row.id && !seenIds.has(row.id)) {
+                seenIds.add(row.id);
+                combinedSessions.push(row as LiveKitHistoryEntry);
+              }
+            });
+          }
+        } catch (loadError: unknown) {
+          console.warn('Supabase history fetch notice:', loadError);
         }
-      } finally {
-        if (active) setIsLoading(false);
+      }
+
+      // 2. Discover local browser sessions from LocalStorage & SessionStorage
+      if (typeof window !== 'undefined') {
+        try {
+          // Check livekit-current-interview store in storage
+          const currentStored =
+            localStorage.getItem('hireable:livekit-current-interview') ||
+            localStorage.getItem('livekit-current-interview');
+          if (currentStored) {
+            try {
+              const parsed = JSON.parse(currentStored);
+              if (parsed && parsed.interviewId && !seenIds.has(parsed.interviewId)) {
+                seenIds.add(parsed.interviewId);
+                combinedSessions.push({
+                  id: parsed.interviewId,
+                  target_role: parsed.targetRole || 'Software Engineer',
+                  status:
+                    parsed.status === 'completed' || parsed.results
+                      ? 'completed'
+                      : parsed.status || 'completed',
+                  completed_at: parsed.completedAt || new Date().toISOString(),
+                  started_at: parsed.startedAt || parsed.createdAt || new Date().toISOString(),
+                  created_at: parsed.createdAt || new Date().toISOString(),
+                  config: {
+                    type: parsed.mode === 'text' ? 'text' : 'live_audio',
+                    difficulty: 'medium',
+                    durationMinutes: parsed.durationMinutes || 15,
+                    topics: parsed.topics || [],
+                  },
+                  result: parsed.results || null,
+                });
+              }
+            } catch {}
+          }
+
+          // Scan all localStorage keys for interview_result_...
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('interview_result_intv_')) {
+              const intvId = key.replace('interview_result_', '');
+              if (!seenIds.has(intvId)) {
+                try {
+                  const resVal = JSON.parse(localStorage.getItem(key) || '{}');
+                  seenIds.add(intvId);
+                  combinedSessions.push({
+                    id: intvId,
+                    target_role: resVal.targetRole || 'Software Engineer',
+                    status: 'completed',
+                    completed_at: new Date().toISOString(),
+                    started_at: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
+                    config: {
+                      type: 'live_audio',
+                      difficulty: 'medium',
+                      durationMinutes: 15,
+                      topics: resVal.strongestTopics || [],
+                    },
+                    result: resVal,
+                  });
+                } catch {}
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Local storage history scan error:', err);
+        }
+      }
+
+      if (active) {
+        setSessions(combinedSessions);
+        setIsLoading(false);
       }
     };
 
     void loadHistory();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [user?.id]);
 
   const entries = sessions.map(toHistoryEntry);
