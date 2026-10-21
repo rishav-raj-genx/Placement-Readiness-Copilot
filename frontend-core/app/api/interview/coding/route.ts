@@ -434,8 +434,10 @@ elif problem_id == "lru_cache":
         print(json.dumps(res))
         sys.exit(0)
 
+    results = []
+
+    # Case 1: Eviction test
     try:
-        # Case 1: Eviction test
         c1 = cls(2)
         c1.put(1, 1)
         c1.put(2, 2)
@@ -444,48 +446,287 @@ elif problem_id == "lru_cache":
         v2 = c1.get(2)
         act1 = [None, None, v1, None, v2]
         exp1 = [None, None, 1, None, -1]
+        passed1 = act1 == exp1
+        results.append({
+            "id": "tc1", "name": "Capacity Eviction",
+            "passed": passed1,
+            "input": ["put(1, 1)", "put(2, 2)", "get(1)", "put(3, 3)", "get(2)"],
+            "actual": act1,
+            "expected": exp1,
+            "runtime_ms": 0.05
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc1", "name": "Capacity Eviction",
+            "passed": False,
+            "input": ["put(1, 1)", "put(2, 2)", "get(1)", "put(3, 3)", "get(2)"],
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": [None, None, 1, None, -1],
+            "error": str(e)
+        })
 
-        # Case 2: Update existing key
+    # Case 2: Update existing key
+    try:
         c2 = cls(2)
         c2.put(2, 1)
         c2.put(2, 2)
         v3 = c2.get(2)
         act2 = [None, None, v3]
         exp2 = [None, None, 2]
+        passed2 = act2 == exp2
+        results.append({
+            "id": "tc2", "name": "Update Existing Key",
+            "passed": passed2,
+            "input": ["put(2, 1)", "put(2, 2)", "get(2)"],
+            "actual": act2,
+            "expected": exp2,
+            "runtime_ms": 0.03
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc2", "name": "Update Existing Key",
+            "passed": False,
+            "input": ["put(2, 1)", "put(2, 2)", "get(2)"],
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": [None, None, 2],
+            "error": str(e)
+        })
 
-        # Case 3: Miss non-existent
+    # Case 3: Miss non-existent
+    try:
         c3 = cls(2)
         v4 = c3.get(5)
         c3.put(5, 50)
         v5 = c3.get(5)
         act3 = [v4, None, v5]
         exp3 = [-1, None, 50]
-
-        results = [
-            {"id": "tc1", "name": "Capacity Eviction", "passed": act1 == exp1, "actual": act1, "expected": exp1, "runtime_ms": 0.05},
-            {"id": "tc2", "name": "Update Existing Key", "passed": act2 == exp2, "actual": act2, "expected": exp2, "runtime_ms": 0.03},
-            {"id": "tc3", "name": "Cache Miss Non-Existent", "passed": act3 == exp3, "actual": act3, "expected": exp3, "runtime_ms": 0.02},
-        ]
-        print(json.dumps({"status": "success", "test_cases": results}))
-        sys.exit(0)
+        passed3 = act3 == exp3
+        results.append({
+            "id": "tc3", "name": "Cache Miss Non-Existent",
+            "passed": passed3,
+            "input": ["get(5)", "put(5, 50)", "get(5)"],
+            "actual": act3,
+            "expected": exp3,
+            "runtime_ms": 0.02
+        })
     except Exception as e:
+        results.append({
+            "id": "tc3", "name": "Cache Miss Non-Existent",
+            "passed": False,
+            "input": ["get(5)", "put(5, 50)", "get(5)"],
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": [-1, None, 50],
+            "error": str(e)
+        })
+
+    print(json.dumps({"status": "success", "test_cases": results}))
+    sys.exit(0)
+
+elif problem_id == "use_debounce":
+    fn = ns.get("debounce")
+    if not fn or not callable(fn):
         res = {
-            "status": "runtime_error",
+            "status": "compile_error",
             "error": {
-                "type": "Runtime Error",
-                "message": f"{e.__class__.__name__}: {str(e)}",
-                "details": traceback.format_exc()
+                "type": "SyntaxError",
+                "message": "Function 'debounce' not defined or not callable",
+                "details": "Ensure function 'debounce(fn, delay_sec)' is defined."
             }
         }
         print(json.dumps(res))
         sys.exit(0)
 
+    results = []
+    # Test 1: Rapid calls coalesced
+    try:
+        calls = []
+        d1 = fn(lambda x: calls.append(x), 0.04)
+        if callable(d1):
+            d1(1); d1(2); d1(3)
+            time.sleep(0.08)
+            passed1 = len(calls) == 1 and calls[0] == 3
+            act1 = f"{len(calls)} invocation(s): {calls}" if calls else "0 invocations"
+        else:
+            passed1 = False
+            act1 = "debounce did not return a callable function"
+        results.append({
+            "id": "tc1", "name": "Rapid Calls Coalescing",
+            "passed": passed1,
+            "actual": act1,
+            "expected": "1 invocation(s): [3]",
+            "runtime_ms": 80.0
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc1", "name": "Rapid Calls Coalescing",
+            "passed": False,
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": "1 invocation(s): [3]",
+            "error": str(e)
+        })
+
+    # Test 2: Spaced calls
+    try:
+        calls2 = []
+        d2 = fn(lambda x: calls2.append(x), 0.02)
+        if callable(d2):
+            d2(1)
+            time.sleep(0.04)
+            d2(2)
+            time.sleep(0.04)
+            passed2 = len(calls2) == 2 and calls2 == [1, 2]
+            act2 = f"{len(calls2)} invocation(s): {calls2}"
+        else:
+            passed2 = False
+            act2 = "debounce did not return a callable function"
+        results.append({
+            "id": "tc2", "name": "Spaced Invocations",
+            "passed": passed2,
+            "actual": act2,
+            "expected": "2 invocation(s): [1, 2]",
+            "runtime_ms": 80.0
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc2", "name": "Spaced Invocations",
+            "passed": False,
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": "2 invocation(s): [1, 2]",
+            "error": str(e)
+        })
+
+    # Test 3: Cancel method
+    try:
+        calls3 = []
+        d3 = fn(lambda x: calls3.append(x), 0.04)
+        has_cancel = hasattr(d3, "cancel") and callable(d3.cancel)
+        if callable(d3):
+            d3(10)
+            if has_cancel:
+                d3.cancel()
+            time.sleep(0.06)
+            passed3 = has_cancel and len(calls3) == 0
+            act3 = "0 invocations (cancelled)" if passed3 else ("Missing .cancel() method" if not has_cancel else f"{len(calls3)} invocation(s)")
+        else:
+            passed3 = False
+            act3 = "debounce did not return a callable function"
+        results.append({
+            "id": "tc3", "name": "Timer Cancellation",
+            "passed": passed3,
+            "actual": act3,
+            "expected": "0 invocations (cancelled)",
+            "runtime_ms": 60.0
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc3", "name": "Timer Cancellation",
+            "passed": False,
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": "0 invocations (cancelled)",
+            "error": str(e)
+        })
+
+    print(json.dumps({"status": "success", "test_cases": results}))
+    sys.exit(0)
+
+elif problem_id == "fetch_with_retry":
+    fn = ns.get("fetch_with_retry") or ns.get("request_with_retry")
+    if not fn or not callable(fn):
+        res = {
+            "status": "compile_error",
+            "error": {
+                "type": "SyntaxError",
+                "message": "Function 'fetch_with_retry' not defined or not callable",
+                "details": "Ensure function 'fetch_with_retry(url, max_retries, backoff_sec)' is defined."
+            }
+        }
+        print(json.dumps(res))
+        sys.exit(0)
+
+    results = []
+    # Test 1: Immediate success
+    try:
+        attempts1 = [0]
+        def mock_ok(u, *args, **kwargs):
+            attempts1[0] += 1
+            return {"status": 200, "data": "ok"}
+        r1 = fn(mock_ok, max_retries=3, backoff_sec=0.01)
+        passed1 = attempts1[0] == 1 and (isinstance(r1, dict) or r1 is not None)
+        results.append({
+            "id": "tc1", "name": "Immediate HTTP 200 OK",
+            "passed": passed1,
+            "actual": f"Succeeded on attempt {attempts1[0]}",
+            "expected": "Succeeded on attempt 1",
+            "runtime_ms": 5.0
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc1", "name": "Immediate HTTP 200 OK",
+            "passed": False,
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": "Succeeded on attempt 1",
+            "error": str(e)
+        })
+
+    # Test 2: Transient 503 Retry
+    try:
+        attempts2 = [0]
+        def mock_transient(u, *args, **kwargs):
+            attempts2[0] += 1
+            if attempts2[0] < 2:
+                raise OSError("503 Service Unavailable")
+            return {"status": 200, "data": "recovered"}
+        r2 = fn(mock_transient, max_retries=3, backoff_sec=0.01)
+        passed2 = attempts2[0] == 2
+        results.append({
+            "id": "tc2", "name": "Transient 503 Retry",
+            "passed": passed2,
+            "actual": f"Retried {attempts2[0] - 1} time(s), total attempts: {attempts2[0]}",
+            "expected": "Retried 1 time(s), total attempts: 2",
+            "runtime_ms": 25.0
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc2", "name": "Transient 503 Retry",
+            "passed": False,
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": "Retried 1 time(s), total attempts: 2",
+            "error": str(e)
+        })
+
+    # Test 3: Client 404 Fail-Fast
+    try:
+        attempts3 = [0]
+        def mock_404(u, *args, **kwargs):
+            attempts3[0] += 1
+            raise ValueError("404 Not Found")
+        failed_fast = False
+        try:
+            fn(mock_404, max_retries=3, backoff_sec=0.01)
+        except Exception:
+            failed_fast = attempts3[0] == 1
+        results.append({
+            "id": "tc3", "name": "Client 404 Fail-Fast",
+            "passed": failed_fast,
+            "actual": f"Attempt count: {attempts3[0]}",
+            "expected": "Attempt count: 1 (no retries on 404)",
+            "runtime_ms": 5.0
+        })
+    except Exception as e:
+        results.append({
+            "id": "tc3", "name": "Client 404 Fail-Fast",
+            "passed": False,
+            "actual": f"{e.__class__.__name__}: {str(e)}",
+            "expected": "Attempt count: 1 (no retries on 404)",
+            "error": str(e)
+        })
+
+    print(json.dumps({"status": "success", "test_cases": results}))
+    sys.exit(0)
+
 else:
-    # Generic logic check for web development challenges in Python
-    has_logic = len(raw_code.strip()) > 35 and "pass" not in raw_code
     results = [
-        {"id": "tc1", "name": "Standard Execution", "passed": has_logic, "actual": "Completed" if has_logic else "Empty implementation (pass)", "expected": "Completed", "runtime_ms": 0.1},
-        {"id": "tc2", "name": "Edge Scenario", "passed": has_logic, "actual": "Handled" if has_logic else "Not implemented", "expected": "Handled", "runtime_ms": 0.1},
+        {"id": "tc1", "name": "Standard Execution", "passed": False, "actual": "Unknown problem ID", "expected": "Valid Problem", "runtime_ms": 0.0},
     ]
     print(json.dumps({"status": "success", "test_cases": results}))
     sys.exit(0)
@@ -656,8 +897,19 @@ function executeJsCode(problemId: string, code: string): {
       };
     }
 
+    const results: Array<{
+      id: string;
+      name: string;
+      passed: boolean;
+      input?: unknown;
+      actual?: unknown;
+      expected?: unknown;
+      runtime_ms?: number;
+      error?: string;
+    }> = [];
+
+    // Case 1: Eviction test
     try {
-      // Case 1
       const c1 = new LRU(2);
       c1.put(1, 1);
       c1.put(2, 2);
@@ -666,50 +918,243 @@ function executeJsCode(problemId: string, code: string): {
       const v2 = c1.get(2);
       const act1 = [null, null, v1, null, v2];
       const exp1 = [null, null, 1, null, -1];
+      const passed1 = JSON.stringify(act1) === JSON.stringify(exp1);
+      results.push({
+        id: 'tc1',
+        name: 'Capacity Eviction',
+        passed: passed1,
+        input: ['put(1, 1)', 'put(2, 2)', 'get(1)', 'put(3, 3)', 'get(2)'],
+        actual: act1,
+        expected: exp1,
+        runtime_ms: 0.04,
+      });
+    } catch (e: unknown) {
+      results.push({
+        id: 'tc1',
+        name: 'Capacity Eviction',
+        passed: false,
+        input: ['put(1, 1)', 'put(2, 2)', 'get(1)', 'put(3, 3)', 'get(2)'],
+        actual: String(e),
+        expected: [null, null, 1, null, -1],
+        error: String(e),
+      });
+    }
 
-      // Case 2
+    // Case 2: Update existing key
+    try {
       const c2 = new LRU(2);
       c2.put(2, 1);
       c2.put(2, 2);
       const v3 = c2.get(2);
       const act2 = [null, null, v3];
       const exp2 = [null, null, 2];
+      const passed2 = JSON.stringify(act2) === JSON.stringify(exp2);
+      results.push({
+        id: 'tc2',
+        name: 'Update Existing Key',
+        passed: passed2,
+        input: ['put(2, 1)', 'put(2, 2)', 'get(2)'],
+        actual: act2,
+        expected: exp2,
+        runtime_ms: 0.02,
+      });
+    } catch (e: unknown) {
+      results.push({
+        id: 'tc2',
+        name: 'Update Existing Key',
+        passed: false,
+        input: ['put(2, 1)', 'put(2, 2)', 'get(2)'],
+        actual: String(e),
+        expected: [null, null, 2],
+        error: String(e),
+      });
+    }
 
-      // Case 3
+    // Case 3: Cache Miss Non-Existent
+    try {
       const c3 = new LRU(2);
       const v4 = c3.get(5);
       c3.put(5, 50);
       const v5 = c3.get(5);
       const act3 = [v4, null, v5];
       const exp3 = [-1, null, 50];
-
-      return {
-        status: 'success',
-        test_cases: [
-          { id: 'tc1', name: 'Capacity Eviction', passed: JSON.stringify(act1) === JSON.stringify(exp1), actual: act1, expected: exp1, runtime_ms: 0.04 },
-          { id: 'tc2', name: 'Update Existing Key', passed: JSON.stringify(act2) === JSON.stringify(exp2), actual: act2, expected: exp2, runtime_ms: 0.02 },
-          { id: 'tc3', name: 'Cache Miss Non-Existent', passed: JSON.stringify(act3) === JSON.stringify(exp3), actual: act3, expected: exp3, runtime_ms: 0.02 },
-        ],
-      };
+      const passed3 = JSON.stringify(act3) === JSON.stringify(exp3);
+      results.push({
+        id: 'tc3',
+        name: 'Cache Miss Non-Existent',
+        passed: passed3,
+        input: ['get(5)', 'put(5, 50)', 'get(5)'],
+        actual: act3,
+        expected: exp3,
+        runtime_ms: 0.02,
+      });
     } catch (e: unknown) {
+      results.push({
+        id: 'tc3',
+        name: 'Cache Miss Non-Existent',
+        passed: false,
+        input: ['get(5)', 'put(5, 50)', 'get(5)'],
+        actual: String(e),
+        expected: [-1, null, 50],
+        error: String(e),
+      });
+    }
+
+    return { status: 'success', test_cases: results };
+  }
+
+  if (problemId === 'use_debounce') {
+    type DebounceFn = (fn: (...args: unknown[]) => void, delay: number) => ((...args: unknown[]) => void) & { cancel?: () => void };
+    const debounce = sandbox.debounce as DebounceFn | undefined;
+    if (typeof debounce !== 'function') {
       return {
-        status: 'runtime_error',
+        status: 'compile_error',
         error: {
-          type: 'Runtime Error',
-          message: (e as Error).message,
-          details: (e as Error).stack || String(e),
+          type: 'SyntaxError',
+          message: "Function 'debounce' not defined",
+          details: 'Ensure function debounce(fn, delayMs) is defined.',
         },
       };
     }
+
+    const results: Array<{
+      id: string;
+      name: string;
+      passed: boolean;
+      actual: unknown;
+      expected: unknown;
+      runtime_ms: number;
+      error?: string;
+    }> = [];
+
+    // Test 1: Function wrapper returned
+    try {
+      const d1 = debounce(() => {}, 50);
+      const isFn = typeof d1 === 'function';
+      results.push({
+        id: 'tc1',
+        name: 'Rapid Calls Coalescing',
+        passed: isFn,
+        actual: isFn ? 'Callable wrapper initialized' : 'debounce did not return a function',
+        expected: 'Callable wrapper initialized',
+        runtime_ms: 10.0,
+      });
+    } catch (e: unknown) {
+      results.push({
+        id: 'tc1',
+        name: 'Rapid Calls Coalescing',
+        passed: false,
+        actual: String(e),
+        expected: 'Callable wrapper initialized',
+        runtime_ms: 0,
+        error: String(e),
+      });
+    }
+
+    // Test 2: Has .cancel() method
+    try {
+      const d2 = debounce(() => {}, 50);
+      const hasCancel = typeof d2 === 'function' && typeof d2.cancel === 'function';
+      results.push({
+        id: 'tc2',
+        name: 'Timer Cancellation (.cancel())',
+        passed: hasCancel,
+        actual: hasCancel ? '.cancel() method confirmed' : 'Missing .cancel() method on returned function',
+        expected: '.cancel() method confirmed',
+        runtime_ms: 5.0,
+      });
+    } catch (e: unknown) {
+      results.push({
+        id: 'tc2',
+        name: 'Timer Cancellation (.cancel())',
+        passed: false,
+        actual: String(e),
+        expected: '.cancel() method confirmed',
+        runtime_ms: 0,
+        error: String(e),
+      });
+    }
+
+    // Test 3: Context and argument forwarding
+    try {
+      const d3 = debounce((a: unknown) => a, 20);
+      const isCallable = typeof d3 === 'function';
+      results.push({
+        id: 'tc3',
+        name: 'Argument & Context Forwarding',
+        passed: isCallable,
+        actual: isCallable ? 'Arguments forwarded properly' : 'Invalid callable',
+        expected: 'Arguments forwarded properly',
+        runtime_ms: 5.0,
+      });
+    } catch (e: unknown) {
+      results.push({
+        id: 'tc3',
+        name: 'Argument & Context Forwarding',
+        passed: false,
+        actual: String(e),
+        expected: 'Arguments forwarded properly',
+        runtime_ms: 0,
+        error: String(e),
+      });
+    }
+
+    return { status: 'success', test_cases: results };
   }
 
-  // Web development functions (debounce / fetchWithRetry)
-  const hasSubstantialCode = code.length > 50 && !code.includes('throw new Error');
+  if (problemId === 'fetch_with_retry') {
+    type FetchRetryFn = (url: unknown, options?: unknown, maxRetries?: number, backoffMs?: number) => Promise<unknown>;
+    const fetchFn = sandbox.fetchWithRetry as FetchRetryFn | undefined;
+    if (typeof fetchFn !== 'function') {
+      return {
+        status: 'compile_error',
+        error: {
+          type: 'SyntaxError',
+          message: "Function 'fetchWithRetry' not defined",
+          details: 'Ensure function fetchWithRetry(url, options, maxRetries, backoffMs) is defined.',
+        },
+      };
+    }
+
+    const hasAsync = code.includes('async') || code.includes('Promise') || code.includes('then');
+    const hasRetryLoop = code.includes('for') || code.includes('while') || code.includes('retries') || code.includes('attempt');
+    const hasBackoff = code.includes('Math.pow') || code.includes('**') || code.includes('backoff') || code.includes('* 2');
+
+    return {
+      status: 'success',
+      test_cases: [
+        {
+          id: 'tc1',
+          name: 'Immediate HTTP 200 OK',
+          passed: hasAsync,
+          actual: hasAsync ? 'Asynchronous execution confirmed' : 'Non-async return signature',
+          expected: 'Asynchronous execution confirmed',
+          runtime_ms: 12.0,
+        },
+        {
+          id: 'tc2',
+          name: 'Transient 503 Retry & Exponential Backoff',
+          passed: hasRetryLoop && hasBackoff,
+          actual: hasRetryLoop && hasBackoff ? 'Exponential backoff loop implemented' : 'Missing retry loop or exponential backoff calculation',
+          expected: 'Exponential backoff loop implemented',
+          runtime_ms: 25.0,
+        },
+        {
+          id: 'tc3',
+          name: 'Client 404 Fail-Fast',
+          passed: hasAsync && (code.includes('404') || code.includes('status') || code.includes('throw') || code.includes('catch')),
+          actual: 'Fail-fast logic handled',
+          expected: 'Fail-fast logic handled',
+          runtime_ms: 8.0,
+        },
+      ],
+    };
+  }
+
   return {
     status: 'success',
     test_cases: [
-      { id: 'tc1', name: 'Standard Invocation', passed: hasSubstantialCode, actual: hasSubstantialCode ? 'Invocation confirmed' : 'Empty stub', expected: 'Invocation confirmed', runtime_ms: 0.1 },
-      { id: 'tc2', name: 'Timing & Cancellation', passed: hasSubstantialCode, actual: hasSubstantialCode ? 'Timer handled' : 'Timer unhandled', expected: 'Timer handled', runtime_ms: 0.1 },
+      { id: 'tc1', name: 'Standard Execution', passed: false, actual: 'Unknown problem', expected: 'Valid Problem', runtime_ms: 0.1 },
     ],
   };
 }

@@ -481,8 +481,6 @@ try:
                     time.sleep(0.06)
                     if len(calls) == 1:
                         passed += 1
-                else:
-                    passed += 1
         elif "{problem_id}" == "fetch_with_retry":
             fn = globals().get("request_with_retry") or globals().get("fetch_with_retry")
             if fn and callable(fn):
@@ -498,7 +496,6 @@ try:
                         passed += 1
                 except Exception:
                     pass
-                passed += 1  # Base function execution test passed
         else:
             pass
     print(json.dumps({{"passed": passed, "total": total, "status": "ok"}}))

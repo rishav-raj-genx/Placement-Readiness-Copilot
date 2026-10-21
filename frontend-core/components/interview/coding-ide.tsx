@@ -694,6 +694,7 @@ export function CodingIDE() {
               onChange={(val) => {
                 setCode(val || '');
                 if (compileError) setCompileError(null);
+                if (testOutput) setTestOutput(null);
               }}
               theme="vs-dark"
               options={{
@@ -947,7 +948,7 @@ export function CodingIDE() {
                     </div>
 
                     {/* Actual Output (if tests were executed) */}
-                    {testOutput && testOutput[selectedTestCaseIndex] && (
+                    {testOutput && testOutput[selectedTestCaseIndex] ? (
                       <div>
                         <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Actual Output</span>
                         <pre className={`mt-1.5 rounded-lg border p-3 whitespace-pre-wrap overflow-x-auto ${
@@ -961,6 +962,12 @@ export function CodingIDE() {
                             JSON.stringify(testOutput[selectedTestCaseIndex].actual, null, 2)
                           )}
                         </pre>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-stone-800 bg-stone-950/50 p-3.5 text-center">
+                        <p className="text-xs text-stone-400 font-sans">
+                          Click <span className="font-semibold text-stone-200">&quot;Run tests&quot;</span> or <span className="font-semibold text-stone-200">&quot;Run all tests&quot;</span> to execute this test case.
+                        </p>
                       </div>
                     )}
                   </div>
