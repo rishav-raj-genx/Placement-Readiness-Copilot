@@ -27,6 +27,11 @@ export function TopHeader() {
   const user = useAuthStore((state) => state.user);
   const readiness = useProfileStore((state) => state.readiness);
   const remainingInterviews = useInterviewStore((state) => state.getRemainingCount());
+  const profile = useProfileStore((state) => state.profile);
+  const isPremium = profile?.isPremium === true;
+  const credits = typeof profile?.interviewCredits === 'number'
+    ? profile.interviewCredits
+    : remainingInterviews;
   const score = readiness?.totalScore;
   const pageTitle = getPageTitle(pathname);
 
@@ -37,9 +42,16 @@ export function TopHeader() {
         <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-200">
           {user ? (typeof score === 'number' ? `${Math.round(score)}% ready` : 'Analysis pending') : 'Preview mode'}
         </span>
-        <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-300">
-          {user ? `${remainingInterviews} interviews left` : '3 free interviews'}
-        </span>
+        {isPremium ? (
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Premium Active
+          </span>
+        ) : (
+          <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-300">
+            {user ? `${credits} interviews left` : '3 free interviews'}
+          </span>
+        )}
         <NotificationBell />
       </div>
     </header>

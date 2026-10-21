@@ -138,14 +138,9 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
         >
           <HireableLogo size={36} withGlow priority />
           {!collapsed && (
-            <div className="min-w-0">
-              <p className="font-display text-lg font-bold text-stone-100">
-                Hireable
-              </p>
-              <p className="truncate text-xs text-stone-500">
-                Placement workspace
-              </p>
-            </div>
+            <span className="font-display text-lg font-bold text-stone-100">
+              Hireable
+            </span>
           )}
         </Link>
         {!collapsed && (

@@ -30,6 +30,8 @@ export interface UserProfile {
   linkedinPdfPath?: string;
   projects: CandidateProject[];
   coCurricular?: CoCurricularProfile;
+  interviewCredits?: number;
+  isPremium?: boolean;
   onboardingCompletedAt?: string;
   updatedAt?: string;
 }

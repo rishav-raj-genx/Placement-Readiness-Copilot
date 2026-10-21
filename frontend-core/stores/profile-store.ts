@@ -39,7 +39,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const [profileResponse, reviewResponse, readinessResponse] = await Promise.all([
-        supabase.from('profiles').select(PROFILE_SELECT_COLUMNS).eq('id', userId).maybeSingle(),
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
         supabase.from('candidate_profile_reviews').select('*').eq('student_id', userId).maybeSingle(),
         supabase.from('readiness_scores').select('*').eq('student_id', userId).maybeSingle(),
       ]);

@@ -74,6 +74,8 @@ export function normalizeUserProfile(value: unknown): UserProfile | null {
     resumePdfPath: readString(value.resume_pdf_path) || undefined,
     linkedinPdfPath: readString(value.linkedin_pdf_path) || undefined,
     projects,
+    interviewCredits: typeof value.interview_credits === 'number' ? value.interview_credits : 3,
+    isPremium: value.is_premium === true,
     onboardingCompletedAt: readString(value.onboarding_completed_at) || undefined,
     updatedAt: readString(value.updated_at) || undefined,
   };

@@ -73,6 +73,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Your session is invalid or expired.' }, { status: 401 });
     }
 
+    // ── Freemium Gatekeeper & Credits Check ──────────────────────────────
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const isPremium = userProfile?.is_premium === true;
+    let interviewCredits = typeof userProfile?.interview_credits === 'number'
+      ? userProfile.interview_credits
+      : null;
+
+    if (interviewCredits === null) {
+      const { count } = await supabase
+        .from('interview_sessions')
+        .select('id', { count: 'exact', head: true })
+        .or(`student_id.eq.${user.id},user_id.eq.${user.id}`)
+        .in('status', ['completed', 'active', 'in_progress']);
+
+      interviewCredits = Math.max(0, 3 - (count || 0));
+    }
+
+    if (!isPremium && interviewCredits <= 0) {
+      return NextResponse.json(
+        { error: 'Premium required. Out of credits.' },
+        { status: 403 }
+      );
+    }
+
     const payload: unknown = await request.json().catch(() => null);
     const body: LiveKitTokenRequest =
       typeof payload === 'object' && payload !== null && !Array.isArray(payload)
@@ -139,6 +168,18 @@ export async function POST(request: NextRequest) {
         { error: 'LiveKit token generation returned an empty token.' },
         { status: 500 },
       );
+    }
+
+    // Decrement credits for non-premium user
+    if (!isPremium) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ interview_credits: Math.max(0, interviewCredits - 1) })
+          .eq('id', user.id);
+      } catch (err) {
+        console.warn('[LiveKit Token] Failed to update interview_credits on profiles:', err);
+      }
     }
 
     return NextResponse.json({ token, livekitUrl: wsUrl });

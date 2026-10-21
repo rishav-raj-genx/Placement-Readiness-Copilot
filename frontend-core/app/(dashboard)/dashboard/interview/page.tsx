@@ -47,6 +47,10 @@ export default function ConfigureInterviewPage() {
   const profile = useProfileStore((state) => state.profile);
   const { startInterview, setCreating, setCreateError, isCreating, createError } = useLiveKitInterviewStore();
 
+  const isPremium = profile?.isPremium === true;
+  const interviewCredits = typeof profile?.interviewCredits === 'number' ? profile.interviewCredits : 3;
+  const isLocked = !isPremium && interviewCredits <= 0;
+
   const [roundType, setRoundType] = useState<'round1' | 'round2' | 'both'>('round1');
   const [isRound1Done, setIsRound1Done] = useState(false);
   const [targetRole, setTargetRole] = useState('');
@@ -91,6 +95,11 @@ export default function ConfigureInterviewPage() {
   }, []);
 
   const begin = async () => {
+    if (isLocked) {
+      toast.error('Out of Free Credits. Upgrade to Premium.');
+      return;
+    }
+
     if (roundType === 'round2') {
       router.push('/dashboard/interview/coding');
       return;
@@ -221,7 +230,26 @@ export default function ConfigureInterviewPage() {
         </button>
       </div>
 
-      <section className="rounded-2xl border border-stone-800 bg-[#28201E] p-5 md:p-7">
+      <section className="relative overflow-hidden rounded-2xl border border-stone-800 bg-[#28201E] p-5 md:p-7">
+        {isLocked && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl border border-amber-500/30 bg-[#1c1615]/90 p-6 text-center backdrop-blur-md">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 shadow-lg shadow-amber-500/20">
+              <Lock className="h-7 w-7" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold tracking-tight text-white md:text-xl">
+              Out of Free Credits. Upgrade to Premium.
+            </h3>
+            <p className="mt-2.5 max-w-lg text-xs leading-relaxed text-stone-300 md:text-sm">
+              You have used your 3 free AI mock interviews. Unlimited interviews, advanced analytics, and priority MSOT job matching require a Premium upgrade. Payment gateway integration is pending—please contact a platform Admin to verify your payment and manually unlock your account.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <div className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-orange-500/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-300 shadow-inner">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                Admin Verification Required
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid gap-6 md:grid-cols-2">
           {/* Target Role with Searchable Combobox */}
           <Field label="Target role">
@@ -386,21 +414,32 @@ export default function ConfigureInterviewPage() {
           </p>
           <Button
             onClick={() => void begin()}
-            disabled={isCreating}
-            className="rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]"
+            disabled={isCreating || isLocked}
+            className={
+              isLocked
+                ? 'rounded-lg border border-stone-700 bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-400 cursor-not-allowed'
+                : 'rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]'
+            }
           >
-            {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {roundType === 'round2' ? (
+            {isLocked ? (
+              <>
+                <Lock className="mr-2 h-4 w-4 text-amber-400" />
+                Out of Credits (Locked)
+              </>
+            ) : isCreating ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {!isLocked && roundType === 'round2' ? (
               <>
                 <Code2 className="mr-2 h-4 w-4" />
                 Launch coding IDE (Round 2)
               </>
-            ) : (
+            ) : !isLocked ? (
               <>
                 Begin technical viva (Round 1)
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
-            )}
+            ) : null}
           </Button>
         </div>
       </section>

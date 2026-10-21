@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS profiles (
     linkedin_url TEXT,
     resume_pdf_path TEXT,
     linkedin_pdf_path TEXT,
+    interview_credits INTEGER DEFAULT 3,
+    is_premium BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

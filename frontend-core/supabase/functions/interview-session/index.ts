@@ -157,12 +157,35 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await serviceClient
       .from("profiles")
-      .select("id, email, display_name, role, target_role, skills, github_username, resume_pdf_path, linkedin_pdf_path")
+      .select("id, email, display_name, role, target_role, skills, github_username, resume_pdf_path, linkedin_pdf_path, interview_credits, is_premium")
       .eq("id", jwtUserId)
       .maybeSingle();
 
     if (profile?.display_name) {
       studentName = profile.display_name;
+    }
+
+    // --- Freemium Gatekeeper Check ---
+    const isPremium = profile?.is_premium === true;
+    let interviewCredits = typeof profile?.interview_credits === "number"
+      ? profile.interview_credits
+      : null;
+
+    if (interviewCredits === null) {
+      const { count } = await serviceClient
+        .from("interview_sessions")
+        .select("id", { count: "exact", head: true })
+        .or(`student_id.eq.${jwtUserId},user_id.eq.${jwtUserId}`)
+        .in("status", ["completed", "active", "in_progress"]);
+
+      interviewCredits = Math.max(0, 3 - (count || 0));
+    }
+
+    if (!isPremium && interviewCredits <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Premium required. Out of credits." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // --- Fetch candidate projects to provide grounded structured context ---
@@ -331,6 +354,18 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "Failed to create interview session record" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // --- Decrement interview_credits for non-premium user ---
+    if (!isPremium) {
+      try {
+        await serviceClient
+          .from("profiles")
+          .update({ interview_credits: Math.max(0, interviewCredits - 1) })
+          .eq("id", jwtUserId);
+      } catch (err) {
+        console.warn("Failed to decrement interview_credits on profiles:", err);
+      }
     }
 
     // --- Create LiveKit room and generate participant token ---
