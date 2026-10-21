@@ -406,7 +406,7 @@ export default function ReviewDetailsPage() {
             <CardHeader className="border-b border-stone-800/80 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-lg border border-stone-800 bg-stone-900 text-blue-400">
+                  <span className="grid h-8 w-8 place-items-center rounded-lg border border-stone-800 bg-stone-900 text-orange-400">
                     <Linkedin className="h-4 w-4" />
                   </span>
                   <div>

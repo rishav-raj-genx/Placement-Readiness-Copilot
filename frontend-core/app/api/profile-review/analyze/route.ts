@@ -38,29 +38,52 @@ function requireOwnedPath(path: string | undefined, userId: string, label: strin
 
 export interface ProfileScores {
   resume: number;
-  github: number;
   projects: number;
-  linkedin: number;
   mock_interview: number;
+  github: number;
+  linkedin: number;
+  leetcode: number;
   coding_practice: number;
 }
 
 const CATEGORY_NAMES: Record<keyof ProfileScores, string> = {
   resume: 'Resume',
-  github: 'GitHub',
   projects: 'Projects',
-  linkedin: 'LinkedIn',
   mock_interview: 'Mock Interview',
-  coding_practice: 'Coding Practice',
+  github: 'GitHub',
+  linkedin: 'LinkedIn',
+  leetcode: 'LeetCode',
+  coding_practice: 'LeetCode & Coding',
 };
 
 const CATEGORY_RECOMMENDATIONS: Record<keyof ProfileScores, string> = {
   resume: 'Add quantified outcomes and role-specific keywords to your resume',
-  github: 'Pin representative repositories and improve their READMEs',
   projects: 'Add deployed projects with live links and complete documentation',
-  linkedin: 'Align your headline, skills, and experience with your target role',
   mock_interview: 'Complete a focused AI mock interview and review the feedback',
-  coding_practice: 'Solve more DSA problems on LeetCode/HackerRank to improve problem-solving speed',
+  github: 'Pin representative repositories and improve their READMEs',
+  linkedin: 'Align your headline, skills, and experience with your target role',
+  leetcode: 'Solve more problems on LeetCode with strong Medium/Hard ratio',
+  coding_practice: 'Solve more problems on LeetCode with strong Medium/Hard ratio',
+};
+
+const CATEGORY_WEIGHTS: Record<keyof ProfileScores, number> = {
+  resume: 0.25,
+  projects: 0.20,
+  mock_interview: 0.20,
+  github: 0.15,
+  linkedin: 0.10,
+  leetcode: 0.10,
+  coding_practice: 0.10,
+};
+
+const CATEGORY_MAX_POINTS: Record<keyof ProfileScores, number> = {
+  resume: 25,
+  projects: 20,
+  mock_interview: 20,
+  github: 15,
+  linkedin: 10,
+  leetcode: 10,
+  coding_practice: 10,
 };
 
 async function computeProjectsScore(
@@ -106,7 +129,7 @@ async function computeProjectsScore(
   try {
     const { data: linkChecks } = await admin
       .from('project_live_checks')
-      .select('is_live, quality_score, passed')
+      .select('is_live, quality_score, passed, console_errors, mobile_friendly')
       .eq('student_id', studentId)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -117,8 +140,18 @@ async function computeProjectsScore(
         (c) => c.passed || (c.is_live && (Number(c.quality_score) || 0) >= 60)
       );
       if (passing.length > 0) {
-        const avgQuality =
-          passing.reduce((sum, c) => sum + (Number(c.quality_score) || 60), 0) / passing.length;
+        let totalQuality = 0;
+        for (const c of passing) {
+          let q = Number(c.quality_score) || 60;
+          if (Array.isArray(c.console_errors) && c.console_errors.length > 0) {
+            q = Math.max(0, q - 20);
+          }
+          if (c.mobile_friendly === false) {
+            q = Math.max(0, q - 20);
+          }
+          totalQuality += q;
+        }
+        const avgQuality = totalQuality / passing.length;
         score += Math.round((avgQuality / 100) * 35);
       } else {
         score += 5;
@@ -135,6 +168,15 @@ async function computeProjectsScore(
   return Math.min(100, Math.max(0, score));
 }
 
+function extractLeetcodeUsername(raw: string): string {
+  const cleaned = raw.trim().split('?')[0].split('#')[0].replace(/\/+$/, '');
+  const match = cleaned.match(/leetcode\.com\/(?:u\/)?([a-zA-Z0-9_\-]+)/i);
+  if (match) return match[1];
+  const simple = cleaned.replace(/^@/, '');
+  if (/^[a-zA-Z0-9_\-]+$/.test(simple)) return simple;
+  return '';
+}
+
 async function computeCodingPracticeScore(
   leetcodeUrl: string | null | undefined,
   studentId: string,
@@ -143,17 +185,86 @@ async function computeCodingPracticeScore(
 ): Promise<number> {
   let score = 0;
 
-  // 1. Linking a valid LeetCode / Coding Profile URL (up to 40 points)
+  // 1. Fetch live LeetCode stats via microservice or direct public GraphQL
   if (leetcodeUrl && leetcodeUrl.trim().length > 0) {
-    const url = leetcodeUrl.trim().toLowerCase();
-    if (url.includes('leetcode.com') || url.includes('hackerrank.com') || url.includes('codeforces.com') || url.includes('github.com')) {
-      score += 40;
-    } else {
-      score += 20;
+    const username = extractLeetcodeUsername(leetcodeUrl);
+    if (username) {
+      try {
+        const res = await serviceRequest(
+          `${getProfileReviewBaseUrl()}/review/leetcode/${encodeURIComponent(username)}`,
+          { timeoutMs: 6_000 }
+        );
+        if (isRecord(res) && typeof res.score === 'number' && Number.isFinite(res.score)) {
+          score = Math.max(score, res.score);
+        }
+      } catch {
+        // Graceful direct GraphQL fallback if profile review API is unavailable
+        try {
+          const gqlRes = await fetch('https://leetcode.com/graphql', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+            },
+            body: JSON.stringify({
+              query: `query getUserProfile($username: String!) {
+                matchedUser(username: $username) {
+                  submitStats: submitStatsGlobal {
+                    acSubmissionNum { difficulty count }
+                  }
+                }
+                userContestRanking(username: $username) { rating }
+              }`,
+              variables: { username },
+            }),
+          });
+          if (gqlRes.ok) {
+            const json = (await gqlRes.json()) as {
+              data?: {
+                matchedUser?: {
+                  submitStats?: {
+                    acSubmissionNum?: Array<{ difficulty?: string; count?: number }>;
+                  };
+                };
+                userContestRanking?: { rating?: number };
+              };
+            };
+            const matched = json?.data?.matchedUser;
+            if (matched) {
+              let total = 0, med = 0, hard = 0;
+              for (const item of matched.submitStats?.acSubmissionNum ?? []) {
+                const diff = (item.difficulty || '').toLowerCase();
+                const count = Number(item.count || 0);
+                if (diff === 'all') total = count;
+                else if (diff === 'medium') med = count;
+                else if (diff === 'hard') hard = count;
+              }
+              const rating = Number(json?.data?.userContestRanking?.rating || 0);
+              if (total >= 300 && (med + hard) >= 150) {
+                score = Math.max(score, 100);
+              } else if (total > 0) {
+                const vol = Math.min(70, (total / 300) * 70);
+                const qual = Math.min(25, ((med + hard) / 150) * 20 + Math.min(5, hard / 4));
+                const bonus = rating >= 1850 ? 15 : rating >= 1650 ? 10 : rating >= 1500 ? 5 : (hard >= 10 ? 5 : 0);
+                score = Math.max(score, Math.min(100, Math.round(vol + qual + bonus)));
+              }
+            }
+          }
+        } catch {
+          // Profile does not exist or network unreachable: fails gracefully
+        }
+      }
+    }
+
+    if (score === 0) {
+      const url = leetcodeUrl.trim().toLowerCase();
+      if (url.includes('leetcode.com') || url.includes('hackerrank.com') || url.includes('codeforces.com')) {
+        score = 40;
+      }
     }
   }
 
-  // 2. Completed Round 2 Coding Practice sessions in interview_sessions (up to 60 points)
+  // 2. Completed Round 2 Coding Practice sessions in interview_sessions
   try {
     const { data: codingSessions } = await admin
       .from('interview_sessions')
@@ -179,7 +290,7 @@ async function computeCodingPracticeScore(
           return 75;
         })
       );
-      score += Math.round((bestSessionScore / 100) * 60);
+      score = Math.max(score, Math.round((bestSessionScore / 100) * 100));
     } else if (currentCodingScore > 0) {
       score = Math.max(score, currentCodingScore);
     }
@@ -203,10 +314,11 @@ async function fetchCurrentScores(
 ): Promise<ProfileScores> {
   const scores: ProfileScores = {
     resume: 0,
-    github: 0,
     projects: 0,
-    linkedin: 0,
     mock_interview: 0,
+    github: 0,
+    linkedin: 0,
+    leetcode: 0,
     coding_practice: 0,
   };
 
@@ -220,7 +332,15 @@ async function fetchCurrentScores(
 
     if (readinessData) {
       const breakdown = isRecord(readinessData.breakdown) ? readinessData.breakdown : {};
-      const categories: (keyof ProfileScores)[] = ['resume', 'github', 'projects', 'linkedin', 'mock_interview', 'coding_practice'];
+      const categories: (keyof ProfileScores)[] = [
+        'resume',
+        'projects',
+        'mock_interview',
+        'github',
+        'linkedin',
+        'leetcode',
+        'coding_practice',
+      ];
       for (const key of categories) {
         const item = breakdown[key];
         const raw = extractNumericScore(item);
@@ -241,6 +361,9 @@ async function fetchCurrentScores(
   } catch (err) {
     console.warn('Failed to load existing readiness scores:', err);
   }
+
+  if (scores.leetcode > 0 && !scores.coding_practice) scores.coding_practice = scores.leetcode;
+  if (scores.coding_practice > 0 && !scores.leetcode) scores.leetcode = scores.coding_practice;
 
   // 2. Fall back to candidate_profile_reviews if scores are still missing
   try {
@@ -452,7 +575,8 @@ export async function POST(request?: Request): Promise<NextResponse> {
       try {
         const form = new FormData();
         form.append('github_username', effectiveGithubUsername);
-        form.append('resume', resumeBlob, 'resume.pdf');
+        const isResumeDocx = validResumePath ? validResumePath.toLowerCase().endsWith('.docx') : false;
+        form.append('resume', resumeBlob, isResumeDocx ? 'resume.docx' : 'resume.pdf');
         if (linkedinDownloadData) {
           form.append('linkedin_pdf', linkedinDownloadData, 'linkedin.pdf');
         }
@@ -519,6 +643,10 @@ export async function POST(request?: Request): Promise<NextResponse> {
         ? newResumeScore
         : (currentScores.resume > 0 ? currentScores.resume : 0),
 
+      projects: currentScores.projects > 0 ? currentScores.projects : 0,
+
+      mock_interview: mockInterviewScore > 0 ? mockInterviewScore : 0,
+
       github: (typeof newGithubScore === 'number' && newGithubScore > 0)
         ? newGithubScore
         : (currentScores.github > 0 ? currentScores.github : 0),
@@ -527,11 +655,9 @@ export async function POST(request?: Request): Promise<NextResponse> {
         ? newLinkedinScore
         : (currentScores.linkedin > 0 ? currentScores.linkedin : 0),
 
-      mock_interview: mockInterviewScore > 0 ? mockInterviewScore : 0,
+      leetcode: currentScores.leetcode > 0 ? currentScores.leetcode : (currentScores.coding_practice > 0 ? currentScores.coding_practice : 0),
 
-      projects: currentScores.projects > 0 ? currentScores.projects : 0,
-
-      coding_practice: currentScores.coding_practice > 0 ? currentScores.coding_practice : 0,
+      coding_practice: currentScores.coding_practice > 0 ? currentScores.coding_practice : (currentScores.leetcode > 0 ? currentScores.leetcode : 0),
     };
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -556,60 +682,82 @@ export async function POST(request?: Request): Promise<NextResponse> {
       codingProfileUrl,
       studentId,
       admin,
-      currentScores.coding_practice
+      currentScores.coding_practice > 0 ? currentScores.coding_practice : currentScores.leetcode
     );
     updatedScores.coding_practice = codingPracticeScore;
+    updatedScores.leetcode = codingPracticeScore;
 
     // ──────────────────────────────────────────────────────────────────────────
-    // PHASE 3: GLOBAL READINESS SCORE SYNC (6 EVALUATION PILLARS)
-    // Formula: totalReadiness across all 6 categories
+    // PHASE 3: MASTER READINESS CALCULATION (REDISTRIBUTED 100-POINT MATRIX)
+    // Formula: (resume * 0.25) + (projects * 0.20) + (mock * 0.20) + (github * 0.15) + (linkedin * 0.10) + (leetcode * 0.10)
+    // Math explicitly caps LeetCode's contribution at 10 points.
     // ──────────────────────────────────────────────────────────────────────────
-    const totalReadiness = Math.round(
-      (updatedScores.resume +
-        updatedScores.github +
-        projectsScore +
-        updatedScores.linkedin +
-        updatedScores.mock_interview +
-        codingPracticeScore) / 6
+    const leetcodeContribution = Math.min(10, Math.max(0, updatedScores.leetcode * 0.10));
+
+    const totalReadiness = Math.min(
+      100,
+      Math.max(
+        0,
+        Math.round(
+          (updatedScores.resume * 0.25) +
+          (projectsScore * 0.20) +
+          (updatedScores.mock_interview * 0.20) +
+          (updatedScores.github * 0.15) +
+          (updatedScores.linkedin * 0.10) +
+          leetcodeContribution
+        )
+      )
     );
 
-    const categoryWeight = Number((1 / 6).toFixed(4));
-    const breakdown: Record<string, { raw_score: number; weight: number; weighted_points: number; present: boolean }> = {
+    const breakdown: Record<string, { raw_score: number; weight: number; weighted_points: number; max_points: number; present: boolean }> = {
       resume: {
         raw_score: updatedScores.resume,
-        weight: categoryWeight,
-        weighted_points: Math.round(updatedScores.resume * categoryWeight * 10) / 10,
+        weight: 0.25,
+        weighted_points: Math.round(updatedScores.resume * 0.25 * 10) / 10,
+        max_points: 25,
         present: updatedScores.resume > 0,
-      },
-      github: {
-        raw_score: updatedScores.github,
-        weight: categoryWeight,
-        weighted_points: Math.round(updatedScores.github * categoryWeight * 10) / 10,
-        present: updatedScores.github > 0,
       },
       projects: {
         raw_score: projectsScore,
-        weight: categoryWeight,
-        weighted_points: Math.round(projectsScore * categoryWeight * 10) / 10,
+        weight: 0.20,
+        weighted_points: Math.round(projectsScore * 0.20 * 10) / 10,
+        max_points: 20,
         present: projectsScore > 0,
-      },
-      linkedin: {
-        raw_score: updatedScores.linkedin,
-        weight: categoryWeight,
-        weighted_points: Math.round(updatedScores.linkedin * categoryWeight * 10) / 10,
-        present: updatedScores.linkedin > 0,
       },
       mock_interview: {
         raw_score: updatedScores.mock_interview,
-        weight: categoryWeight,
-        weighted_points: Math.round(updatedScores.mock_interview * categoryWeight * 10) / 10,
+        weight: 0.20,
+        weighted_points: Math.round(updatedScores.mock_interview * 0.20 * 10) / 10,
+        max_points: 20,
         present: updatedScores.mock_interview > 0,
       },
+      github: {
+        raw_score: updatedScores.github,
+        weight: 0.15,
+        weighted_points: Math.round(updatedScores.github * 0.15 * 10) / 10,
+        max_points: 15,
+        present: updatedScores.github > 0,
+      },
+      linkedin: {
+        raw_score: updatedScores.linkedin,
+        weight: 0.10,
+        weighted_points: Math.round(updatedScores.linkedin * 0.10 * 10) / 10,
+        max_points: 10,
+        present: updatedScores.linkedin > 0,
+      },
+      leetcode: {
+        raw_score: updatedScores.leetcode,
+        weight: 0.10,
+        weighted_points: Math.round(leetcodeContribution * 10) / 10,
+        max_points: 10,
+        present: updatedScores.leetcode > 0,
+      },
       coding_practice: {
-        raw_score: updatedScores.coding_practice,
-        weight: categoryWeight,
-        weighted_points: Math.round(updatedScores.coding_practice * categoryWeight * 10) / 10,
-        present: updatedScores.coding_practice > 0,
+        raw_score: updatedScores.leetcode,
+        weight: 0.10,
+        weighted_points: Math.round(leetcodeContribution * 10) / 10,
+        max_points: 10,
+        present: updatedScores.leetcode > 0,
       },
     };
 
@@ -621,20 +769,25 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
     const categories: (keyof ProfileScores)[] = [
       'resume',
-      'github',
       'projects',
-      'linkedin',
       'mock_interview',
-      'coding_practice',
+      'github',
+      'linkedin',
+      'leetcode',
     ];
 
     const missingComponents = categories.filter((cat) => (updatedScores[cat] ?? 0) <= 0);
 
     const topActions = categories
-      .map((cat) => ({
-        category: cat,
-        potentialPointGain: Math.round((100 - (updatedScores[cat] ?? 0)) * categoryWeight),
-      }))
+      .map((cat) => {
+        const weight = CATEGORY_WEIGHTS[cat];
+        const raw = updatedScores[cat] ?? 0;
+        const potentialPointGain = Math.round((100 - raw) * weight);
+        return {
+          category: cat,
+          potentialPointGain,
+        };
+      })
       .filter(({ potentialPointGain }) => potentialPointGain > 0)
       .sort((a, b) => b.potentialPointGain - a.potentialPointGain)
       .slice(0, 5)
@@ -643,7 +796,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         category: CATEGORY_NAMES[category],
         action: CATEGORY_RECOMMENDATIONS[category],
         potential_point_gain: potentialPointGain,
-        description: `${CATEGORY_NAMES[category]} currently contributes ${Math.round(updatedScores[category] * categoryWeight * 10) / 10} of ${Math.round(100 * categoryWeight * 10) / 10} points.`,
+        description: `${CATEGORY_NAMES[category]} currently contributes ${breakdown[category]?.weighted_points ?? 0} of ${breakdown[category]?.max_points ?? 0} points.`,
       }));
 
     const completedAt = new Date().toISOString();

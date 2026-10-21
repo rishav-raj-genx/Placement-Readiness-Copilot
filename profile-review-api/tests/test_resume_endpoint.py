@@ -92,3 +92,43 @@ def test_provider_toggle_and_ollama_fallback(monkeypatch: MonkeyPatch) -> None:
 
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
     assert get_provider_sequence() == ["ollama"]
+
+
+def create_docx_resume() -> bytes:
+    import io
+    import docx
+
+    doc = docx.Document()
+    doc.add_paragraph("EXPERIENCE")
+    doc.add_paragraph("Engineered distributed streaming pipeline handling 50k events/sec, reducing latency by 45%.")
+    doc.add_paragraph("SKILLS")
+    doc.add_paragraph("Python, React, TypeScript, Next.js, PostgreSQL, Docker, AWS, Git.")
+    doc.add_paragraph("PROJECTS")
+    doc.add_paragraph("Built GitHub portfolio at github.com/testuser/project with 99.9% uptime.")
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def test_review_resume_docx(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    docx_bytes = create_docx_resume()
+    response = client.post(
+        "/review/resume",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
+        files={
+            "file": (
+                "resume.docx",
+                docx_bytes,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page_count"] == 1
+    assert payload["is_one_page"] is True
+    assert payload["uses_action_verbs"] is True
+    assert payload["has_quantifiable_metrics"] is True
+

@@ -1,39 +1,34 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import {
-  ArrowLeft,
   ArrowRight,
+  Bot,
   CheckCircle2,
-  GitBranch,
+  Circle,
+  FileText,
   Loader2,
   Lock,
   Mail,
+  Paperclip,
+  Send,
+  Sparkles,
   User,
   ShieldCheck,
-  Code2,
-  Plus,
-  Trash2,
   ExternalLink,
-  Edit3,
-  FileText,
-  X,
-  FastForward,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
+import clsx from 'clsx';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 import {
   normalizeGithubUsername,
   signupAccountSchema,
-  signupProfileSchema,
   type SignupAccountValues,
-  type SignupProfileValues,
-  validatePdf,
   validateResumeFile,
 } from '@/lib/onboarding';
 import {
@@ -45,102 +40,81 @@ import {
   type PendingSignupDraft,
 } from '@/lib/signup-draft';
 import { useAuthStore } from '@/stores/auth-store';
-import { LinkedInPdfTooltip } from './LinkedInPdfTooltip';
-import { SignupPdfDropzone } from './SignupPdfDropzone';
-import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
+import { parseConversationalIntent } from '@/lib/intake-intent';
 import type { ProjectItem } from '@/types';
 
-interface SignUpWizardProps {
+export interface SignUpWizardProps {
   onToggleLogin: () => void;
 }
 
-interface AuthenticatedIdentity {
+interface ChatMessage {
   id: string;
-  email: string;
-}
-
-interface StoredProfile {
-  display_name: string | null;
-  target_role: string | null;
-  github_username: string | null;
-  leetcode_url?: string | null;
-  coding_profile_url?: string | null;
-  linkedin_text?: string | null;
-  projects?: ProjectItem[] | null;
-  resume_pdf_path: string | null;
-  linkedin_pdf_path: string | null;
-}
-
-interface DocumentProgress {
-  resume: number;
-  linkedin: number;
+  role: 'assistant' | 'user';
+  content: string;
+  timestamp: string;
+  fileAttachment?: {
+    name: string;
+    type: 'resume' | 'linkedin';
+  };
+  pillUpdate?: string;
 }
 
 const EMPTY_ACCOUNT: SignupAccountValues = { fullName: '', email: '', password: '' };
-const EMPTY_PROFILE: SignupProfileValues = { targetRole: '', github: '' };
 
-const slideVariants: Variants = {
-  enter: (direction: number) => ({ x: direction > 0 ? 30 : -30, opacity: 0 }),
-  center: { x: 0, opacity: 1, transition: { duration: 0.18, ease: 'easeOut' } },
-  exit: (direction: number) => ({
-    x: direction > 0 ? -30 : 30,
-    opacity: 0,
-    transition: { duration: 0.15, ease: 'easeIn' },
-  }),
-};
-
-const STEPS = [
-  { id: 1, title: 'Account', subtitle: 'Credentials' },
-  { id: 2, title: 'Roles & Profiles', subtitle: 'Target & Code' },
-  { id: 3, title: 'Projects', subtitle: 'Featured Work' },
-  { id: 4, title: 'Documents', subtitle: 'Resume & LinkedIn' },
+const QUICK_PROMPTS = [
+  'Here is my GitHub: https://github.com/rishav-raj-genx',
+  'Targeting Full Stack Engineer roles',
+  'My LeetCode is https://leetcode.com/u/candidate',
+  'I built an AI chatbot with Next.js & Python at https://github.com/demo/repo',
 ];
 
 export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
   const router = useRouter();
   const hydrate = useAuthStore((state) => state.hydrate);
-  const [step, setStep] = useState(1);
-  const [direction, setDirection] = useState(1);
-  const [identity, setIdentity] = useState<AuthenticatedIdentity | null>(null);
-  const [storedProfile, setStoredProfile] = useState<StoredProfile | null>(null);
-  const [accountValues, setAccountValues] = useState<SignupAccountValues>(EMPTY_ACCOUNT);
-  const [profileValues, setProfileValues] = useState<SignupProfileValues>(EMPTY_PROFILE);
+
+  // Identity & Credentials
+  const [identity, setIdentity] = useState<{ id: string; email: string } | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+
+  // Profile data
+  const [targetRole, setTargetRole] = useState('');
+  const [github, setGithub] = useState('');
   const [leetcodeUrl, setLeetcodeUrl] = useState('');
   const [linkedinText, setLinkedinText] = useState('');
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumePath, setResumePath] = useState<string | null>(null);
   const [linkedinFile, setLinkedinFile] = useState<File | null>(null);
-  const [resumeError, setResumeError] = useState<string | null>(null);
-  const [linkedinError, setLinkedinError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DocumentProgress>({ resume: 0, linkedin: 0 });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const submissionLockRef = useRef(false);
+  const [linkedinPath, setLinkedinPath] = useState<string | null>(null);
 
-  // Project Modal State
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [editingProjectIndex, setEditingProjectIndex] = useState<number | null>(null);
-  const [projectForm, setProjectForm] = useState<{
-    title: string;
-    repoUrl: string;
-    liveUrl: string;
-    description: string;
-  }>({ title: '', repoUrl: '', liveUrl: '', description: '' });
+  // Chat UI state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isAssistantTyping, setIsAssistantTyping] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const accountForm = useForm<SignupAccountValues>({
     resolver: zodResolver(signupAccountSchema),
     defaultValues: EMPTY_ACCOUNT,
     mode: 'onTouched',
   });
-  const profileForm = useForm<SignupProfileValues>({
-    resolver: zodResolver(signupProfileSchema),
-    defaultValues: EMPTY_PROFILE,
-    mode: 'onTouched',
-  });
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isAssistantTyping]);
+
+  // Initial restoration of draft & session
   useEffect(() => {
     let active = true;
 
@@ -152,8 +126,8 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         ]);
         if (!active) return;
 
-        setResumeFile(documents.resume);
-        setLinkedinFile(documents.linkedin);
+        if (documents.resume) setResumeFile(documents.resume);
+        if (documents.linkedin) setLinkedinFile(documents.linkedin);
 
         let authUser: SupabaseUser | null = null;
         if (isSupabaseConfigured) {
@@ -166,51 +140,46 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
 
         if (authUser?.email) {
           setIdentity({ id: authUser.id, email: authUser.email });
-          setStep(2);
+          setAccountCreated(true);
 
           const { data: profile } = await supabase
             .from('profiles')
-            .select('display_name, target_role, github_username, leetcode_url, coding_profile_url, linkedin_text, projects, resume_pdf_path, linkedin_pdf_path')
+            .select('display_name, target_role, github_username, leetcode_url, linkedin_text, projects, resume_pdf_path, linkedin_pdf_path')
             .eq('id', authUser.id)
             .maybeSingle();
 
           if (!active) return;
 
           if (profile) {
-            const typedProfile = profile as StoredProfile;
-            setStoredProfile(typedProfile);
-            profileForm.reset({
-              targetRole: typedProfile.target_role ?? draft?.targetRole ?? '',
-              github: typedProfile.github_username ?? draft?.githubUsername ?? '',
-            });
-            if (typedProfile.leetcode_url || draft?.leetcodeUrl) {
-              setLeetcodeUrl(typedProfile.leetcode_url ?? draft?.leetcodeUrl ?? '');
-            }
-            if (typedProfile.linkedin_text || draft?.linkedinText) {
-              setLinkedinText(typedProfile.linkedin_text ?? draft?.linkedinText ?? '');
-            }
-            if (typedProfile.projects && typedProfile.projects.length > 0) {
-              setProjects(typedProfile.projects);
-            } else if (draft?.projects && draft.projects.length > 0) {
-              setProjects(draft.projects);
-            }
-            return;
+            if (profile.display_name) setDisplayName(profile.display_name);
+            if (profile.target_role) setTargetRole(profile.target_role);
+            if (profile.github_username) setGithub(profile.github_username);
+            if (profile.leetcode_url) setLeetcodeUrl(profile.leetcode_url);
+            if (profile.linkedin_text) setLinkedinText(profile.linkedin_text);
+            if (profile.projects && Array.isArray(profile.projects)) setProjects(profile.projects);
+            if (profile.resume_pdf_path) setResumePath(profile.resume_pdf_path);
+            if (profile.linkedin_pdf_path) setLinkedinPath(profile.linkedin_pdf_path);
           }
-        }
-
-        if (draft) {
-          const restoredAccount = { fullName: draft.displayName, email: draft.email, password: '' };
-          const restoredProfile = { targetRole: draft.targetRole, github: draft.githubUsername };
-          setAccountValues(restoredAccount);
-          setProfileValues(restoredProfile);
-          accountForm.reset(restoredAccount);
-          profileForm.reset(restoredProfile);
+        } else if (draft) {
+          if (draft.displayName) setDisplayName(draft.displayName);
+          if (draft.targetRole) setTargetRole(draft.targetRole);
+          if (draft.githubUsername) setGithub(draft.githubUsername);
           if (draft.leetcodeUrl) setLeetcodeUrl(draft.leetcodeUrl);
           if (draft.linkedinText) setLinkedinText(draft.linkedinText);
           if (draft.projects && draft.projects.length > 0) setProjects(draft.projects);
+          accountForm.reset({ fullName: draft.displayName, email: draft.email, password: '' });
         }
+
+        // Initialize greeting message
+        const initialGreeting: ChatMessage = {
+          id: 'welcome-1',
+          role: 'assistant',
+          content: `Hi there! 👋 I am your Placement Readiness Copilot.\n\nI will help you benchmark your resume, connect your GitHub code, and get you ready for technical vivas.\n\nYou can chat with me naturally: paste your GitHub profile URL, upload your resume (.pdf or .docx), share your target role, or describe your projects. Where would you like to start?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages([initialGreeting]);
       } catch {
-        // Fallback to initial step on storage failure
+        // Fallback gracefully
       }
     };
 
@@ -219,169 +188,293 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
     return () => {
       active = false;
     };
-  }, [accountForm, profileForm]);
+  }, [accountForm]);
 
-  const persistDraft = (
-    nextAccount?: SignupAccountValues,
-    nextProfile?: SignupProfileValues,
-    nextLeetcode?: string,
-    nextLinkedinText?: string,
-    nextProjects?: ProjectItem[],
-  ) => {
-    const acc = nextAccount ?? accountValues;
-    const prof = nextProfile ?? profileValues;
+  // Persist Profile Record to Supabase and Local Draft in real-time
+  const updateProfileInDatabase = async (updates: {
+    targetRole?: string;
+    github?: string;
+    leetcodeUrl?: string;
+    linkedinText?: string;
+    projects?: ProjectItem[];
+    resumePath?: string;
+    linkedinPath?: string;
+    displayName?: string;
+  }) => {
+    const nextRole = updates.targetRole ?? targetRole;
+    const nextGithub = updates.github !== undefined ? updates.github : github;
+    const nextLeetcode = updates.leetcodeUrl !== undefined ? updates.leetcodeUrl : leetcodeUrl;
+    const nextLinkedinText = updates.linkedinText !== undefined ? updates.linkedinText : linkedinText;
+    const nextProjects = updates.projects !== undefined ? updates.projects : projects;
+    const nextResumePath = updates.resumePath !== undefined ? updates.resumePath : resumePath;
+    const nextLinkedinPath = updates.linkedinPath !== undefined ? updates.linkedinPath : linkedinPath;
+    const nextName = updates.displayName !== undefined ? updates.displayName : displayName;
+
+    // Persist draft locally
     const draft: PendingSignupDraft = {
-      displayName: acc.fullName,
-      email: acc.email,
-      targetRole: prof.targetRole,
-      githubUsername: prof.github,
-      leetcodeUrl: nextLeetcode ?? leetcodeUrl,
-      linkedinText: nextLinkedinText ?? linkedinText,
-      projects: nextProjects ?? projects,
+      displayName: nextName,
+      email: identity?.email ?? accountForm.getValues('email') ?? '',
+      targetRole: nextRole,
+      githubUsername: nextGithub,
+      leetcodeUrl: nextLeetcode,
+      linkedinText: nextLinkedinText,
+      projects: nextProjects,
     };
     savePendingSignupDraft(draft);
-  };
 
-  const goToStep = (targetStep: number) => {
-    if (targetStep === step) return;
-    setDirection(targetStep > step ? 1 : -1);
-    setStep(targetStep);
-  };
-
-  const handleAccountNext = accountForm.handleSubmit((values) => {
-    setAccountValues(values);
-    persistDraft(values);
-    setDirection(1);
-    setStep(2);
-  });
-
-  const handleProfileNext = profileForm.handleSubmit((values) => {
-    setProfileValues(values);
-    persistDraft(undefined, values, leetcodeUrl);
-    setDirection(1);
-    setStep(3);
-  });
-
-  const handlePrevious = () => {
-    const prev = Math.max(1, step - 1);
-    setDirection(-1);
-    setStep(prev);
-  };
-
-  const selectDocument = async (kind: 'resume' | 'linkedin', file: File) => {
-    const error = kind === 'resume' ? validateResumeFile(file) : validatePdf(file);
-    if (error) {
-      if (kind === 'resume') setResumeError(error);
-      else setLinkedinError(error);
-      return;
-    }
-
-    if (kind === 'resume') {
-      setResumeFile(file);
-      setResumeError(null);
-      await savePendingSignupDocuments({ resume: file, linkedin: linkedinFile });
-    } else {
-      setLinkedinFile(file);
-      setLinkedinError(null);
-      await savePendingSignupDocuments({ resume: resumeFile, linkedin: file });
+    // If user is authenticated, update database record in real-time
+    if (isSupabaseConfigured && identity?.id) {
+      try {
+        await supabase.from('profiles').upsert({
+          id: identity.id,
+          role: 'student',
+          display_name: nextName || 'Candidate',
+          target_role: nextRole || 'Software Engineer',
+          github_username: nextGithub ? normalizeGithubUsername(nextGithub) : null,
+          leetcode_url: nextLeetcode.trim() || null,
+          linkedin_text: nextLinkedinText.trim() || null,
+          projects: nextProjects.length > 0 ? nextProjects : null,
+          resume_pdf_path: nextResumePath || null,
+          linkedin_pdf_path: nextLinkedinPath || null,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {
+        // Ignored; local state preserves progress
+      }
     }
   };
 
-  const uploadDocument = async (userId: string, kind: 'resume' | 'linkedin', file: File): Promise<string> => {
-    const isDocx = file.name.toLowerCase().endsWith('.docx');
-    const ext = isDocx ? 'docx' : 'pdf';
-    const contentType = isDocx
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : 'application/pdf';
-    const path = `${userId}/${kind}.${ext}`;
-    setProgress((prev) => ({ ...prev, [kind]: 20 }));
-
-    const { error: uploadError } = await supabase.storage
-      .from('candidate-documents')
-      .upload(path, file, { upsert: true, contentType });
-
-    if (uploadError) {
-      throw new Error(`Failed to upload ${kind}: ${uploadError.message}`);
-    }
-
-    setProgress((prev) => ({ ...prev, [kind]: 100 }));
-    return path;
-  };
-
-  // Project Modal Actions
-  const openAddProjectModal = () => {
-    setEditingProjectIndex(null);
-    setProjectForm({ title: '', repoUrl: '', liveUrl: '', description: '' });
-    setIsProjectModalOpen(true);
-  };
-
-  const openEditProjectModal = (index: number) => {
-    const p = projects[index];
-    if (!p) return;
-    setEditingProjectIndex(index);
-    setProjectForm({
-      title: p.title || p.name || '',
-      repoUrl: p.repoUrl || p.githubUrl || '',
-      liveUrl: p.liveUrl || '',
-      description: p.description || '',
-    });
-    setIsProjectModalOpen(true);
-  };
-
-  const saveProject = () => {
-    if (!projectForm.title.trim() && !projectForm.description.trim()) {
-      toast.error('Please enter a project title or description.');
-      return;
-    }
-
-    const item: ProjectItem = {
-      title: projectForm.title.trim() || 'Untitled Project',
-      repoUrl: projectForm.repoUrl.trim() || undefined,
-      githubUrl: projectForm.repoUrl.trim() || undefined,
-      liveUrl: projectForm.liveUrl.trim() || undefined,
-      description: projectForm.description.trim(),
-    };
-
-    let updated: ProjectItem[];
-    if (editingProjectIndex !== null) {
-      updated = [...projects];
-      updated[editingProjectIndex] = item;
-    } else {
-      updated = [...projects, item];
-    }
-
-    setProjects(updated);
-    persistDraft(undefined, undefined, undefined, undefined, updated);
-    setIsProjectModalOpen(false);
-    toast.success(editingProjectIndex !== null ? 'Project updated.' : 'Project added.');
-  };
-
-  const deleteProject = (index: number) => {
-    const updated = projects.filter((_, i) => i !== index);
-    setProjects(updated);
-    persistDraft(undefined, undefined, undefined, undefined, updated);
-    toast.info('Project removed.');
-  };
-
-  // Final Submission (Flexible Any-Order, PDFs Optional)
-  const handleFinalSubmit = async () => {
-    if (submissionLockRef.current || isSubmitting) return;
-
-    // Check account requirements if user is not already logged in
-    if (!identity) {
-      const email = accountValues.email || accountForm.getValues('email');
-      const password = accountValues.password || accountForm.getValues('password');
-      if (!email || !password) {
-        toast.error('Please complete account credentials first.');
-        setDirection(-1);
-        setStep(1);
+  // Create initial account credentials if unauthenticated
+  const handleCreateAccount = accountForm.handleSubmit(async (values) => {
+    setIsCreatingAccount(true);
+    try {
+      if (!isSupabaseConfigured) {
+        setIdentity({ id: 'local-preview-user', email: values.email });
+        setDisplayName(values.fullName);
+        setAccountCreated(true);
+        toast.success('Account configured. Welcome!');
         return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            display_name: values.fullName,
+            role: 'student',
+          },
+        },
+      });
+
+      if (error) {
+        throw new Error(getAuthErrorMessage(error, 'sign_up'));
+      }
+
+      if (data.user && !data.session) {
+        setConfirmationEmail(values.email);
+        return;
+      }
+
+      if (data.user) {
+        setIdentity({ id: data.user.id, email: values.email });
+        setDisplayName(values.fullName);
+        setAccountCreated(true);
+        toast.success('Account created! Conversational assistant unlocked.');
+
+        // Initial sync of profile record
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          role: 'student',
+          display_name: values.fullName,
+          target_role: targetRole || 'Software Engineer',
+          github_username: github ? normalizeGithubUsername(github) : null,
+          leetcode_url: leetcodeUrl.trim() || null,
+          linkedin_text: linkedinText.trim() || null,
+          projects: projects.length > 0 ? projects : null,
+          resume_pdf_path: resumePath || null,
+          linkedin_pdf_path: linkedinPath || null,
+          updated_at: new Date().toISOString(),
+        });
+
+        // Add welcome message
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: `Welcome, ${values.fullName}! 🎉 Your account is set up. You can now send me your GitHub profile, upload your resume, or share your target role.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create account.';
+      toast.error(msg);
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  });
+
+  // Handle file uploads directly in chat
+  const handleFileUpload = async (file: File) => {
+    const error = validateResumeFile(file);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    const userMsgId = Date.now().toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: 'user',
+        content: `Uploaded resume: ${file.name} 📄`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        fileAttachment: { name: file.name, type: 'resume' },
+      },
+    ]);
+
+    setResumeFile(file);
+    await savePendingSignupDocuments({ resume: file, linkedin: linkedinFile });
+
+    let uploadedPath = resumePath;
+    if (isSupabaseConfigured && identity?.id) {
+      try {
+        const isDocx = file.name.toLowerCase().endsWith('.docx');
+        const ext = isDocx ? 'docx' : 'pdf';
+        const contentType = isDocx
+          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          : 'application/pdf';
+        const path = `${identity.id}/resume.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('candidate-documents')
+          .upload(path, file, { upsert: true, contentType });
+
+        if (!uploadError) {
+          uploadedPath = path;
+          setResumePath(path);
+        }
+      } catch {
+        // Storage upload fallback
       }
     }
 
-    submissionLockRef.current = true;
+    await updateProfileInDatabase({ resumePath: uploadedPath ?? undefined });
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Awesome! I've linked your resume **${file.name}** to your profile ✅.\n\nOur Review Engine will check for 1-page length, ATS friendliness, quantifiable metrics, and tech stack alignment. What role or GitHub profile would you like to link next?`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        pillUpdate: 'Resume ✅',
+      },
+    ]);
+  };
+
+  // Handle sending a message in the conversational chat
+  const handleSendMessage = async (textToSend?: string) => {
+    const content = (textToSend || inputMessage).trim();
+    if (!content || isAssistantTyping) return;
+
+    setInputMessage('');
+    const userMsgId = Date.now().toString();
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: 'user',
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+
+    setIsAssistantTyping(true);
+
+    try {
+      const result = await parseConversationalIntent(content, {
+        targetRole,
+        github,
+        leetcodeUrl,
+        linkedinText,
+        resumePath,
+        projectsCount: projects.length,
+      });
+
+      const { extracted, reply } = result;
+      const updates: {
+        targetRole?: string;
+        github?: string;
+        leetcodeUrl?: string;
+        linkedinText?: string;
+        displayName?: string;
+        projects?: ProjectItem[];
+      } = {};
+
+      if (extracted.displayName && !displayName) {
+        setDisplayName(extracted.displayName);
+        updates.displayName = extracted.displayName;
+      }
+      if (extracted.targetRole) {
+        setTargetRole(extracted.targetRole);
+        updates.targetRole = extracted.targetRole;
+      }
+      if (extracted.github) {
+        setGithub(extracted.github);
+        updates.github = extracted.github;
+      }
+      if (extracted.leetcodeUrl) {
+        setLeetcodeUrl(extracted.leetcodeUrl);
+        updates.leetcodeUrl = extracted.leetcodeUrl;
+      }
+      if (extracted.linkedinText || extracted.linkedinUrl) {
+        const textVal = extracted.linkedinText || `LinkedIn: ${extracted.linkedinUrl}`;
+        setLinkedinText(textVal);
+        updates.linkedinText = textVal;
+      }
+      if (extracted.project) {
+        const nextList = [...projects, extracted.project];
+        setProjects(nextList);
+        updates.projects = nextList;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await updateProfileInDatabase(updates);
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "I've saved your input! You can also paste your GitHub profile URL or upload your resume (.pdf or .docx) below.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } finally {
+      setIsAssistantTyping(false);
+    }
+  };
+
+  // Bypass: Ensure user can click "Go to Dashboard" at any time
+  const handleBypassToDashboard = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    setSubmissionError(null);
 
     try {
       let userId = identity?.id;
@@ -390,90 +483,58 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         if (!isSupabaseConfigured) {
           userId = 'local-preview-user';
         } else {
-          const { data, error: signUpError } = await supabase.auth.signUp({
-            email: accountValues.email || accountForm.getValues('email'),
-            password: accountValues.password || accountForm.getValues('password'),
-            options: {
-              data: {
-                display_name: accountValues.fullName || accountForm.getValues('fullName'),
-                role: 'student',
+          const formValues = accountForm.getValues();
+          if (formValues.email && formValues.password) {
+            const { data, error } = await supabase.auth.signUp({
+              email: formValues.email,
+              password: formValues.password,
+              options: {
+                data: {
+                  display_name: formValues.fullName || 'Candidate',
+                  role: 'student',
+                },
               },
-            },
-          });
-
-          if (signUpError) {
-            throw new Error(getAuthErrorMessage(signUpError, 'sign_up'));
-          }
-
-          if (data.user && !data.session) {
-            setConfirmationEmail(accountValues.email || accountForm.getValues('email'));
+            });
+            if (error) throw new Error(getAuthErrorMessage(error, 'sign_up'));
+            userId = data.user?.id;
+          } else {
+            toast.info('Opening candidate dashboard…');
+            router.replace('/dashboard');
             return;
           }
-
-          userId = data.user?.id;
         }
       }
 
-      if (!userId) throw new Error('Account identity could not be verified.');
-
-      let resumePath = storedProfile?.resume_pdf_path ?? null;
-      let linkedinPath = storedProfile?.linkedin_pdf_path ?? null;
-
-      if (isSupabaseConfigured) {
-        if (resumeFile) resumePath = await uploadDocument(userId, 'resume', resumeFile);
-        if (linkedinFile) linkedinPath = await uploadDocument(userId, 'linkedin', linkedinFile);
-      }
-
-      const rawGithub = profileValues.github || profileForm.getValues('github') || '';
-      const cleanGithub = rawGithub ? normalizeGithubUsername(rawGithub) : null;
-      const effectiveRole = profileValues.targetRole || profileForm.getValues('targetRole') || storedProfile?.target_role || 'Software Engineer';
-      const effectiveName = accountValues.fullName || accountForm.getValues('fullName') || storedProfile?.display_name || 'Candidate';
-
-      if (isSupabaseConfigured) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
+      if (isSupabaseConfigured && userId && userId !== 'local-preview-user') {
+        await supabase.from('profiles').upsert({
           id: userId,
           role: 'student',
-          display_name: effectiveName,
-          target_role: effectiveRole,
-          github_username: cleanGithub,
-          leetcode_url: leetcodeUrl.trim() || storedProfile?.leetcode_url || null,
-          linkedin_text: linkedinText.trim() || storedProfile?.linkedin_text || null,
-          projects: projects.length > 0 ? projects : (storedProfile?.projects ?? null),
-          resume_pdf_path: resumePath,
-          linkedin_pdf_path: linkedinPath,
+          display_name: displayName || 'Candidate',
+          target_role: targetRole || 'Software Engineer',
+          github_username: github ? normalizeGithubUsername(github) : null,
+          leetcode_url: leetcodeUrl.trim() || null,
+          linkedin_text: linkedinText.trim() || null,
+          projects: projects.length > 0 ? projects : null,
+          resume_pdf_path: resumePath || null,
+          linkedin_pdf_path: linkedinPath || null,
           onboarding_completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-
-        if (profileError) throw profileError;
       }
 
       await clearPendingSignup();
       if (userId && isSupabaseConfigured) hydrate();
 
-      setIsSuccess(true);
-      toast.success('Profile created successfully');
+      toast.success('Profile saved! Opening your readiness dashboard.');
       router.replace('/dashboard');
       router.refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unable to complete profile creation.';
-      setSubmissionError(message);
-      toast.error(message);
+      const msg = err instanceof Error ? err.message : 'Unable to complete dashboard navigation.';
+      toast.error(msg);
     } finally {
-      submissionLockRef.current = false;
       setIsSubmitting(false);
     }
   };
-
-  if (isSuccess) {
-    return (
-      <SegmentedLoader
-        message="Loading candidate workspace…"
-        subtitle="Opening your readiness dashboard…"
-        fullScreen
-      />
-    );
-  }
 
   if (confirmationEmail) {
     return (
@@ -485,7 +546,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         <CheckCircle2 className="mx-auto h-10 w-10 text-[#D93829]" />
         <h2 className="mt-4 font-[var(--font-display)] text-xl font-bold text-stone-100">Confirm your email</h2>
         <p className="mt-2 text-xs leading-relaxed text-stone-400">
-          We sent a confirmation link to <strong className="text-stone-200">{confirmationEmail}</strong>. Your form and attached documents are saved in this browser and will resume after confirmation.
+          We sent a confirmation link to <strong className="text-stone-200">{confirmationEmail}</strong>. Your profile data is saved and will resume once verified.
         </p>
       </motion.div>
     );
@@ -497,542 +558,287 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="w-full max-w-xl rounded-2xl border border-stone-800 bg-[#28201E] p-6 text-stone-200 shadow-lg shadow-black/50 sm:p-8"
+      className="flex w-full max-w-2xl flex-col rounded-2xl border border-stone-800 bg-[#28201E] text-stone-200 shadow-xl shadow-black/50"
     >
-      {/* Header & Step Badges */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 rounded border border-stone-700 bg-stone-800 px-2.5 py-0.5 font-mono text-xs uppercase tracking-wider text-stone-300">
-            <ShieldCheck className="h-3.5 w-3.5 text-[#D93829]" />
-            <span>Flexible intake</span>
+      {/* Top Header Bar */}
+      <div className="flex items-center justify-between border-b border-stone-800 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-stone-700 bg-stone-900 text-[#D93829]">
+            <Bot className="h-5 w-5" />
           </div>
-          <span className="font-mono text-xs text-stone-500">Step {step} of 4</span>
-        </div>
-
-        {/* Any-Order Clickable Step Navigation */}
-        <div className="mt-4 grid grid-cols-4 gap-2" aria-label="Step progress">
-          {STEPS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => goToStep(s.id)}
-              className="group flex flex-col text-left focus:outline-none"
-            >
-              <div
-                className={`h-1.5 w-full rounded-full transition-colors ${
-                  s.id === step
-                    ? 'bg-[#D93829]'
-                    : s.id < step
-                      ? 'bg-[#D93829]/70'
-                      : 'bg-stone-800 group-hover:bg-stone-700'
-                }`}
-              />
-              <span className={`mt-1.5 truncate text-[10px] font-medium transition-colors ${
-                s.id === step ? 'text-stone-100 font-semibold' : 'text-stone-400 group-hover:text-stone-300'
-              }`}>
-                {s.title}
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-[var(--font-display)] text-sm font-bold text-stone-100">
+                Conversational Intake Assistant
+              </h2>
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live
               </span>
-            </button>
-          ))}
+            </div>
+            <p className="text-[11px] text-stone-400">
+              Share details in any order — your profile updates in real-time
+            </p>
+          </div>
         </div>
 
-        <h2 className="mt-4 font-[var(--font-display)] text-2xl font-bold tracking-tight text-stone-100 sm:text-3xl">
-          {step === 1 && 'Create your account'}
-          {step === 2 && 'Target role & coding links'}
-          {step === 3 && 'Showcase your projects'}
-          {step === 4 && 'Resume & experience'}
-        </h2>
-        <p className="mt-1 text-xs text-stone-400">
-          All steps are flexible. Fill in what you have now or complete later from your dashboard.
-        </p>
+        {/* Bypass Button: Always visible and clickable */}
+        <button
+          type="button"
+          onClick={handleBypassToDashboard}
+          disabled={isSubmitting}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#D93829]/60 bg-[#D93829]/10 px-3 py-1.5 text-xs font-semibold text-[#D93829] transition-all hover:bg-[#D93829] hover:text-white disabled:opacity-50"
+        >
+          {isSubmitting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ArrowRight className="h-3.5 w-3.5" />
+          )}
+          <span>Go to Dashboard</span>
+        </button>
       </div>
 
-      {/* Main Step Content */}
-      <div className="relative min-h-[300px]">
-        <AnimatePresence custom={direction} mode="wait">
-          {/* STEP 1: ACCOUNT */}
-          {step === 1 && (
-            <motion.form
-              key="account"
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              onSubmit={handleAccountNext}
-              className="space-y-4"
+      {/* Live Status Pills Bar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-stone-800 bg-stone-900/60 px-5 py-2.5">
+        <div className="mr-1 text-[11px] font-mono uppercase tracking-wider text-stone-500">
+          Collected:
+        </div>
+        <StatusPill
+          label="Resume"
+          isComplete={Boolean(resumeFile || resumePath)}
+          detail={resumeFile ? resumeFile.name : resumePath ? 'Attached' : undefined}
+        />
+        <StatusPill
+          label="GitHub"
+          isComplete={Boolean(github)}
+          detail={github ? `@${github}` : undefined}
+        />
+        <StatusPill
+          label="Role"
+          isComplete={Boolean(targetRole)}
+          detail={targetRole || undefined}
+        />
+        <StatusPill
+          label="Projects"
+          isComplete={projects.length > 0}
+          detail={projects.length > 0 ? `${projects.length}` : undefined}
+        />
+        <StatusPill
+          label="LinkedIn"
+          isComplete={Boolean(linkedinFile || linkedinPath || linkedinText)}
+        />
+        <StatusPill
+          label="Coding Profile"
+          isComplete={Boolean(leetcodeUrl)}
+        />
+      </div>
+
+      {/* Account Setup Card if user is not yet signed up */}
+      {!identity && !accountCreated && (
+        <div className="border-b border-stone-800 bg-stone-900/40 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-stone-300">
+              Set up credentials to persist your profile
+            </span>
+            <button
+              type="button"
+              onClick={onToggleLogin}
+              className="text-xs text-[#D93829] hover:underline"
             >
-              <Field label="Full name" error={accountForm.formState.errors.fullName?.message} icon={<User className="h-4 w-4" />}>
-                <input
-                  {...accountForm.register('fullName')}
-                  autoComplete="name"
-                  className="auth-input"
-                  placeholder="Alex Morgan"
-                />
-              </Field>
-              <Field label="Email address" error={accountForm.formState.errors.email?.message} icon={<Mail className="h-4 w-4" />}>
-                <input
-                  {...accountForm.register('email')}
-                  type="email"
-                  autoComplete="email"
-                  className="auth-input"
-                  placeholder="alex@college.edu"
-                />
-              </Field>
-              <Field label="Password" error={accountForm.formState.errors.password?.message} icon={<Lock className="h-4 w-4" />}>
-                <input
-                  {...accountForm.register('password')}
-                  type="password"
-                  autoComplete="new-password"
-                  className="auth-input"
-                  placeholder="Minimum 8 characters"
-                />
-              </Field>
-              <div className="flex gap-2.5 pt-2">
-                <PrimaryButton label="Next: career & code" />
-              </div>
-            </motion.form>
-          )}
+              Already have an account? Log in
+            </button>
+          </div>
+          <form onSubmit={handleCreateAccount} className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <input
+              {...accountForm.register('fullName')}
+              placeholder="Full name"
+              className="rounded-lg border border-stone-700 bg-stone-900 px-3 py-1.5 text-xs text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none"
+            />
+            <input
+              {...accountForm.register('email')}
+              type="email"
+              placeholder="Email address"
+              className="rounded-lg border border-stone-700 bg-stone-900 px-3 py-1.5 text-xs text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none"
+            />
+            <div className="flex gap-1.5">
+              <input
+                {...accountForm.register('password')}
+                type="password"
+                placeholder="Password (8+ chars)"
+                className="w-full rounded-lg border border-stone-700 bg-stone-900 px-3 py-1.5 text-xs text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={isCreatingAccount}
+                className="shrink-0 rounded-lg bg-[#D93829] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#c03023] disabled:opacity-50"
+              >
+                {isCreatingAccount ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
-          {/* STEP 2: ROLE & CODING PROFILES */}
-          {step === 2 && (
-            <motion.form
-              key="profile"
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              onSubmit={(event) => void handleProfileNext(event)}
-              className="space-y-4"
-            >
-              {identity && (
-                <div className="rounded-lg border border-stone-700 bg-stone-800/80 p-3 text-xs text-stone-300">
-                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-[#D93829]" />
-                  Confirmed account: {identity.email}
-                </div>
-              )}
-              <Field label="Target role" error={profileForm.formState.errors.targetRole?.message} icon={<ShieldCheck className="h-4 w-4" />}>
-                <input
-                  {...profileForm.register('targetRole')}
-                  className="auth-input"
-                  placeholder="Frontend Engineer"
-                />
-              </Field>
-              <Field label="GitHub username or profile URL" error={profileForm.formState.errors.github?.message} icon={<GitBranch className="h-4 w-4" />}>
-                <input
-                  {...profileForm.register('github')}
-                  autoComplete="off"
-                  className="auth-input"
-                  placeholder="octocat or github.com/octocat"
-                />
-              </Field>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-stone-300">
-                  LeetCode / Coding profile URL <span className="text-stone-500 font-normal">(optional)</span>
-                </span>
-                <span className="relative block">
-                  <input
-                    value={leetcodeUrl}
-                    onChange={(e) => {
-                      setLeetcodeUrl(e.target.value);
-                      persistDraft(undefined, undefined, e.target.value);
-                    }}
-                    autoComplete="off"
-                    className="auth-input"
-                    placeholder="https://leetcode.com/u/yourhandle"
-                  />
-                  <span className="pointer-events-none absolute right-3.5 top-3.5 text-stone-500">
-                    <Code2 className="h-4 w-4" />
-                  </span>
-                </span>
-              </label>
-
-              <div className="flex items-center gap-2.5 pt-2">
-                {!identity && <BackButton onClick={handlePrevious} />}
-                <button
-                  type="button"
-                  onClick={() => goToStep(3)}
-                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-stone-800 bg-stone-900 px-4 text-xs font-semibold text-stone-300 transition-colors hover:bg-stone-800"
-                >
-                  <FastForward className="h-3.5 w-3.5" />
-                  <span>Skip step</span>
-                </button>
-                <div className="flex-1">
-                  <PrimaryButton label="Next: projects" />
-                </div>
-              </div>
-            </motion.form>
-          )}
-
-          {/* STEP 3: PROJECTS (DEDICATED MODAL & FORM) */}
-          {step === 3 && (
+      {/* Chat Messages Scroll Container */}
+      <div className="flex flex-1 flex-col space-y-3 overflow-y-auto p-5 max-h-[420px] min-h-[300px]">
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => (
             <motion.div
-              key="projects"
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              className="space-y-4"
+              key={msg.id}
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className={clsx('flex flex-col', msg.role === 'user' ? 'items-end' : 'items-start')}
             >
-              <div className="flex items-center justify-between rounded-xl border border-stone-800 bg-stone-900/60 p-4">
-                <div>
-                  <h3 className="text-xs font-semibold text-stone-100">Featured Projects</h3>
-                  <p className="text-[11px] text-stone-400">
-                    Add projects with repo URLs, live demos, and technical descriptions.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={openAddProjectModal}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#D93829] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add project</span>
-                </button>
-              </div>
-
-              {projects.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-stone-800 bg-stone-900/30 p-8 text-center">
-                  <Code2 className="mx-auto h-8 w-8 text-stone-600" />
-                  <p className="mt-2 text-xs font-medium text-stone-300">No projects added yet</p>
-                  <p className="mt-1 text-[11px] text-stone-500">
-                    You can add projects now or skip and sync your GitHub repositories later.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                  {projects.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-stone-800 bg-stone-900/80 p-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-xs font-semibold text-stone-200">
-                            {item.title || item.name}
-                          </p>
-                          {item.repoUrl && (
-                            <span className="inline-flex items-center gap-1 rounded bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-400">
-                              <GitBranch className="h-3 w-3" /> Repo
-                            </span>
-                          )}
-                          {item.liveUrl && (
-                            <span className="inline-flex items-center gap-1 rounded bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-400">
-                              <ExternalLink className="h-3 w-3" /> Live
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-[11px] text-stone-400">
-                          {item.description}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => openEditProjectModal(idx)}
-                          className="rounded p-1 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
-                          aria-label="Edit project"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteProject(idx)}
-                          className="rounded p-1 text-red-400 hover:bg-red-950/50 hover:text-red-300"
-                          aria-label="Delete project"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2.5 pt-2">
-                <BackButton onClick={handlePrevious} />
-                <button
-                  type="button"
-                  onClick={() => goToStep(4)}
-                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-stone-800 bg-stone-900 px-4 text-xs font-semibold text-stone-300 transition-colors hover:bg-stone-800"
-                >
-                  <FastForward className="h-3.5 w-3.5" />
-                  <span>Skip step</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => goToStep(4)}
-                  className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
-                >
-                  <span>Next: documents & bio</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+              <div
+                className={clsx(
+                  'max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed sm:text-sm shadow-sm',
+                  msg.role === 'user'
+                    ? 'rounded-br-xs bg-[#D93829] text-white'
+                    : 'rounded-bl-xs border border-stone-800 bg-stone-900/90 text-stone-200'
+                )}
+              >
+                {msg.role === 'assistant' && (
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-stone-400">
+                    <Bot className="h-3 w-3 text-[#D93829]" />
+                    <span>Placement Copilot</span>
+                  </div>
+                )}
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <span className="mt-1 block text-[10px] opacity-60 text-right">
+                  {msg.timestamp}
+                </span>
               </div>
             </motion.div>
-          )}
+          ))}
 
-          {/* STEP 4: RESUME & LINKEDIN (ACCEPTS .DOCX AND TEXTAREA BIO) */}
-          {step === 4 && (
+          {isAssistantTyping && (
             <motion.div
-              key="documents"
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              className="space-y-4"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 rounded-xl border border-stone-800 bg-stone-900/80 px-3 py-2 text-xs text-stone-400"
             >
-              {/* Resume: accepts .pdf and .docx */}
-              <SignupPdfDropzone
-                label="Resume (.pdf or .docx)"
-                description="Drop your resume here, or browse (.pdf, .docx)"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                fileTypeLabel="PDF or DOCX"
-                file={resumeFile}
-                existingDocument={Boolean(storedProfile?.resume_pdf_path)}
-                error={resumeError}
-                progress={progress.resume}
-                onChange={(file) => void selectDocument('resume', file)}
-              />
-
-              {/* LinkedIn: PDF export OR direct text area */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-stone-300">LinkedIn Profile / Experience</span>
-                  <LinkedInPdfTooltip />
-                </div>
-                <SignupPdfDropzone
-                  label="LinkedIn export PDF (optional)"
-                  description="Drop your LinkedIn PDF export here, or browse"
-                  file={linkedinFile}
-                  existingDocument={Boolean(storedProfile?.linkedin_pdf_path)}
-                  error={linkedinError}
-                  progress={progress.linkedin}
-                  onChange={(file) => void selectDocument('linkedin', file)}
-                />
-                <div className="pt-1">
-                  <label className="mb-1 block text-xs font-medium text-stone-300">
-                    Or paste LinkedIn profile / bio text directly
-                  </label>
-                  <textarea
-                    value={linkedinText}
-                    onChange={(e) => {
-                      setLinkedinText(e.target.value);
-                      persistDraft(undefined, undefined, undefined, e.target.value);
-                    }}
-                    placeholder="Paste summary, experience bullets, education, or skills here..."
-                    rows={3}
-                    className="w-full rounded-xl border border-stone-800 bg-stone-950 px-3.5 py-2.5 text-xs text-stone-100 placeholder:text-stone-600 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829]"
-                  />
-                </div>
-              </div>
-
-              {submissionError && (
-                <div role="alert" className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-2.5 text-xs text-red-300">
-                  {submissionError}
-                </div>
-              )}
-
-              <div className="flex gap-2.5 pt-2">
-                <BackButton onClick={handlePrevious} disabled={isSubmitting} />
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  aria-busy={isSubmitting}
-                  onClick={() => void handleFinalSubmit()}
-                  className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Creating profile…</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Complete profile</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </div>
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#D93829]" />
+              <span>Analyzing intent & updating profile...</span>
             </motion.div>
           )}
         </AnimatePresence>
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Global Quick Finish / Bypass Option */}
-      {step < 4 && (
-        <div className="mt-4 flex items-center justify-between border-t border-stone-800/80 pt-3">
-          <p className="text-[11px] text-stone-400">Want to add evidence later?</p>
+      {/* Quick Suggestion Chips */}
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-stone-800/80 bg-stone-900/40 px-5 py-2">
+        <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider">Try:</span>
+        {QUICK_PROMPTS.map((prompt, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => void handleSendMessage(prompt)}
+            className="rounded-full border border-stone-800 bg-stone-900/80 px-2.5 py-1 text-[11px] text-stone-300 transition-colors hover:border-stone-700 hover:text-stone-100"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
+      {/* Chat Input & File Attachment Bar */}
+      <div className="border-t border-stone-800 p-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSendMessage();
+          }}
+          className="flex items-center gap-2"
+        >
+          {/* Hidden File Input for PDF/DOCX */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                void handleFileUpload(file);
+                e.target.value = '';
+              }
+            }}
+          />
+
+          {/* Attachment Button */}
           <button
             type="button"
-            disabled={isSubmitting}
-            onClick={() => void handleFinalSubmit()}
-            className="text-[11px] font-semibold text-stone-300 underline decoration-stone-600 underline-offset-4 hover:text-[#D93829]"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach Resume (.pdf or .docx)"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stone-700 bg-stone-900 text-stone-400 transition-colors hover:border-stone-600 hover:text-stone-100"
           >
-            Skip & Enter Dashboard
+            <Paperclip className="h-4 w-4" />
           </button>
-        </div>
-      )}
 
-      {!identity && (
-        <div className="mt-4 border-t border-stone-800 pt-4 text-center text-xs text-stone-400">
-          Already registered?{' '}
+          {/* Text Input */}
+          <input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="Type your details (e.g., 'Here is my GitHub...', 'Targeting SDE')..."
+            className="h-10 flex-1 rounded-xl border border-stone-700 bg-stone-900 px-4 text-xs sm:text-sm text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none"
+          />
+
+          {/* Send Button */}
+          <button
+            type="submit"
+            disabled={!inputMessage.trim() || isAssistantTyping}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#D93829] text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+
+        <div className="mt-2 flex items-center justify-between text-[11px] text-stone-500">
+          <span>Supported attachments: Resume (.pdf, .docx up to 10 MB)</span>
           <button
             type="button"
             onClick={onToggleLogin}
-            className="font-medium text-[#D93829] transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
+            className="text-stone-400 hover:text-stone-200"
           >
-            Sign in
+            Switch to regular login
           </button>
         </div>
-      )}
-
-      {/* Dedicated Project Details Modal */}
-      {isProjectModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-stone-800 bg-[#28201E] p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
-              <h3 className="font-display text-base font-bold text-stone-100">
-                {editingProjectIndex !== null ? 'Edit Project' : 'Add Project Details'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsProjectModalOpen(false)}
-                className="rounded p-1 text-stone-400 hover:text-stone-200"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3.5">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-stone-300">
-                  Project Title <span className="text-[#D93829]">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={projectForm.title}
-                  onChange={(e) => setProjectForm((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="e.g. Distributed Task Queue"
-                  className="auth-input"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-stone-300">
-                  Repository URL
-                </label>
-                <input
-                  type="url"
-                  value={projectForm.repoUrl}
-                  onChange={(e) => setProjectForm((prev) => ({ ...prev, repoUrl: e.target.value }))}
-                  placeholder="https://github.com/username/project"
-                  className="auth-input"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-stone-300">
-                  Live Demo Link
-                </label>
-                <input
-                  type="url"
-                  value={projectForm.liveUrl}
-                  onChange={(e) => setProjectForm((prev) => ({ ...prev, liveUrl: e.target.value }))}
-                  placeholder="https://my-app.vercel.app"
-                  className="auth-input"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-stone-300">
-                  Project Description <span className="text-[#D93829]">*</span>
-                </label>
-                <textarea
-                  value={projectForm.description}
-                  onChange={(e) => setProjectForm((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Key features, architecture, tools used, and measurable impact..."
-                  rows={3}
-                  className="w-full rounded-xl border border-stone-800 bg-stone-950 px-3.5 py-2.5 text-xs text-stone-100 placeholder:text-stone-600 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829]"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsProjectModalOpen(false)}
-                className="rounded-lg border border-stone-800 bg-stone-900 px-4 py-2 text-xs font-semibold text-stone-300 hover:bg-stone-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveProject}
-                className="rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
-              >
-                Save Project
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </motion.div>
   );
 }
 
-interface FieldProps {
+function StatusPill({
+  label,
+  isComplete,
+  detail,
+}: {
   label: string;
-  error?: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}
-
-function Field({ label, error, icon, children }: FieldProps) {
+  isComplete: boolean;
+  detail?: string;
+}) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-stone-300">
-        {label} <span className="text-[#D93829]">*</span>
-      </span>
-      <span className="relative block">
-        {children}
-        <span className="pointer-events-none absolute right-3.5 top-3.5 text-stone-500">{icon}</span>
-      </span>
-      {error && <span role="alert" className="mt-1 block text-xs text-red-400">{error}</span>}
-    </label>
-  );
-}
-
-function PrimaryButton({ label }: { label: string }) {
-  return (
-    <button
-      type="submit"
-      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
+    <div
+      className={clsx(
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+        isComplete
+          ? 'border border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
+          : 'border border-stone-800 bg-stone-900/40 text-stone-400'
+      )}
     >
+      {isComplete ? (
+        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+      ) : (
+        <Circle className="h-3 w-3 text-stone-600 shrink-0" />
+      )}
       <span>{label}</span>
-      <ArrowRight className="h-4 w-4" />
-    </button>
-  );
-}
-
-function BackButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label="Previous step"
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-stone-800 bg-stone-900 text-stone-300 transition-colors hover:bg-stone-800 hover:text-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:opacity-40"
-    >
-      <ArrowLeft className="h-4 w-4" />
-    </button>
+      {isComplete && detail ? (
+        <span className="max-w-[120px] truncate text-emerald-400/80">({detail})</span>
+      ) : null}
+      {isComplete ? <span className="font-bold text-emerald-400">✅</span> : null}
+    </div>
   );
 }
 

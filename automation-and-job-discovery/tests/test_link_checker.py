@@ -169,3 +169,59 @@ def test_unmatched_claims_produce_failed_check(tmp_path, monkeypatch):
     assert result["passed"] is False
     assert any("claims mismatch" in rec.lower() for rec in result["recommendations"])
 
+
+def test_ruthless_quality_score_deductions():
+    checker = LiveLinkChecker(headless=True)
+    # Clean baseline: 100
+    clean_score = checker._compute_quality_score(
+        is_live=True,
+        status_code=200,
+        is_blank=False,
+        page_errors=[],
+        console_errors=[],
+        mobile_friendly=True,
+        load_time_ms=1000,
+        has_complex_state=True,
+    )
+    assert clean_score == 100.0
+
+    # Console errors: heavily deducted
+    with_errors_score = checker._compute_quality_score(
+        is_live=True,
+        status_code=200,
+        is_blank=False,
+        page_errors=[],
+        console_errors=["TypeError: Cannot read property", "Uncaught Error in chunk"],
+        mobile_friendly=True,
+        load_time_ms=1000,
+        has_complex_state=True,
+    )
+    assert with_errors_score <= 75.0
+
+    # Mobile unresponsive: heavily deducted
+    unresponsive_score = checker._compute_quality_score(
+        is_live=True,
+        status_code=200,
+        is_blank=False,
+        page_errors=[],
+        console_errors=[],
+        mobile_friendly=False,
+        load_time_ms=1000,
+        has_complex_state=True,
+    )
+    assert unresponsive_score <= 75.0
+
+    # Lack of complex state: heavily deducted
+    no_state_score = checker._compute_quality_score(
+        is_live=True,
+        status_code=200,
+        is_blank=False,
+        page_errors=[],
+        console_errors=[],
+        mobile_friendly=True,
+        load_time_ms=1000,
+        has_complex_state=False,
+    )
+    assert no_state_score <= 80.0
+
+

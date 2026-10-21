@@ -211,11 +211,11 @@ export default function ConfigureInterviewPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className={`grid h-8 w-8 place-items-center rounded-lg border border-stone-800 ${isRound1Done ? 'bg-stone-900 text-stone-200' : 'bg-amber-500/10 text-amber-400'}`}>
+              <span className={`grid h-8 w-8 place-items-center rounded-lg border border-stone-800 ${isRound1Done ? 'bg-stone-900 text-stone-200' : 'bg-orange-500/10 text-orange-400'}`}>
                 {isRound1Done ? <Code2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               </span>
               <div>
-                <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider ${isRound1Done ? 'text-stone-500' : 'text-amber-400'}`}>
+                <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider ${isRound1Done ? 'text-stone-500' : 'text-orange-400'}`}>
                   {isRound1Done ? 'Round 2' : 'Round 2 (Locked)'}
                 </span>
                 <h3 className="text-sm font-bold text-stone-100">DSA + web dev IDE</h3>
@@ -224,7 +224,7 @@ export default function ConfigureInterviewPage() {
             {isRound1Done && roundType === 'round2' ? (
               <Check className="h-4 w-4 text-[#D93829]" />
             ) : !isRound1Done ? (
-              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+              <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-400">
                 Finish Round 1 First
               </span>
             ) : null}
@@ -239,8 +239,8 @@ export default function ConfigureInterviewPage() {
 
       <section className="relative overflow-hidden rounded-2xl border border-stone-800 bg-[#28201E] p-5 md:p-7">
         {isLocked && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl border border-amber-500/30 bg-[#1c1615]/90 p-6 text-center backdrop-blur-md">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 shadow-lg shadow-amber-500/20">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl border border-orange-500/30 bg-[#1c1615]/90 p-6 text-center backdrop-blur-md">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-400 shadow-lg shadow-orange-500/20">
               <Lock className="h-7 w-7" />
             </div>
             <h3 className="mt-4 text-lg font-bold tracking-tight text-white md:text-xl">
@@ -250,8 +250,8 @@ export default function ConfigureInterviewPage() {
               You have used your 3 free AI mock interviews. Unlimited interviews, advanced analytics, and priority MSOT job matching require a Premium upgrade. Payment gateway integration is pending—please contact a platform Admin to verify your payment and manually unlock your account.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <div className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-orange-500/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-300 shadow-inner">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              <div className="inline-flex items-center gap-2 rounded-xl border border-orange-500/40 bg-gradient-to-r from-orange-500/20 to-red-600/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-orange-300 shadow-inner">
+                <span className="h-2 w-2 rounded-full bg-orange-400 animate-pulse" />
                 Admin Verification Required
               </div>
             </div>
@@ -427,7 +427,7 @@ export default function ConfigureInterviewPage() {
                     : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
                 }`}
               >
-                <Cloud className="h-3.5 w-3.5 text-blue-400" />
+                <Cloud className="h-3.5 w-3.5 text-orange-400" />
                 Cloud API
               </button>
               <button
@@ -466,8 +466,8 @@ export default function ConfigureInterviewPage() {
         )}
 
         {roundType !== 'round2' && livekitConfiguration.status !== 'ready' && (
-          <div role="status" className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-900/40 bg-amber-950/30 px-3.5 py-3 text-xs text-amber-300">
-            <Radio className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div role="status" className="mt-5 flex items-start gap-2.5 rounded-xl border border-orange-900/40 bg-orange-950/30 px-3.5 py-3 text-xs text-orange-300">
+            <Radio className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
             <p>
               The LiveKit server stream is initializing. Your interview selections are safe;
               retry shortly if the session does not begin after deployment finishes.
@@ -491,7 +491,7 @@ export default function ConfigureInterviewPage() {
           >
             {isLocked ? (
               <>
-                <Lock className="mr-2 h-4 w-4 text-amber-400" />
+                <Lock className="mr-2 h-4 w-4 text-orange-400" />
                 Out of Credits (Locked)
               </>
             ) : isCreating ? (

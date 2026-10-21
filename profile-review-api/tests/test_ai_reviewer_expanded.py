@@ -106,3 +106,73 @@ def test_github_error_logger_handles_github_exception(monkeypatch: MonkeyPatch):
         )
         assert res.status_code == 500
         assert "GitHub service error" in res.json()["detail"]
+
+
+def test_resume_without_quantifiable_metrics_is_capped_at_60():
+    vague_resume = (
+        "ALEX MORGAN\ngithub.com/octocat | leetcode.com/u/octocat\n\n"
+        "EXPERIENCE\n"
+        "Helped team build web applications. Made website faster and improved performance.\n\n"
+        "PROJECTS\n"
+        "Web App - Built with React and Node. Worked on backend endpoints.\n\n"
+        "EDUCATION\n"
+        "BS Computer Science.\n\n"
+        "SKILLS\n"
+        "React, Node.js, Python, PostgreSQL."
+    )
+    result = evaluate_text(vague_resume, 1)
+    assert result.has_quantifiable_metrics is False
+    assert result.score <= 60
+    assert any("Score Capped at 60/100" in fix for fix in result.specific_fixes)
+
+
+def test_github_without_tests_ci_or_diagrams_is_capped_at_50():
+    basic_github_data = {
+        "username": "basicuser",
+        "has_pinned_repos": True,
+        "has_recent_commit_activity": True,
+        "has_committed_secrets": False,
+        "repositories": [
+            {
+                "name": "basic-crud-app",
+                "description": "Simple Todo List app",
+                "has_readme": True,
+                "readme_length": 300,
+                "is_fork": False,
+                "structure": {
+                    "has_source_directory": True,
+                    "has_dependency_manifest": True,
+                    "has_tests": False,
+                    "has_ci_workflow": False,
+                    "has_architecture_diagram": False,
+                },
+                "has_unit_tests": False,
+                "has_ci_cd": False,
+                "has_architecture_diagram": False,
+            }
+        ],
+    }
+    review = evaluate_github(basic_github_data)
+    assert review.has_unit_tests is False
+    assert review.has_ci_cd is False
+    assert review.has_architecture_diagrams is False
+    assert review.score <= 50
+    assert any("Score Capped at 50/100" in fix for fix in review.specific_fixes)
+
+
+def test_linkedin_copy_paste_without_engagement_is_capped_at_70():
+    copy_paste_linkedin = (
+        "Alex Morgan\n"
+        "Photo: Professional headshot uploaded\n"
+        "Headline: Software Engineer | React, TypeScript & Node.js\n"
+        "About: Software Engineer with experience developing full-stack web applications.\n"
+        "Experience: Frontend Engineer at Acme Corp. Built user interfaces with React and TypeScript.\n"
+        "Skills: React, TypeScript, Node.js, PostgreSQL\n"
+    )
+    resume_context = "Alex Morgan Software Engineer React TypeScript Node.js Frontend Engineer Acme Corp"
+    review = evaluate_linkedin_text(copy_paste_linkedin, resume_context=resume_context)
+    assert review.is_copy_paste_of_resume is True
+    assert review.has_engagement_markers is False
+    assert review.score <= 70
+    assert any("Score Capped at 70/100" in fix for fix in review.specific_fixes)
+

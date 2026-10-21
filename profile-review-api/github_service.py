@@ -161,11 +161,29 @@ def _inspect_repository(
 
     has_committed_secrets = len(detected_secrets) > 0
 
+    # Architecture diagram detection in README
+    has_architecture_diagram = False
+    if readme_text:
+        diagram_indicators = [
+            r"```mermaid",
+            r"\bmermaid\b",
+            r"\bplantuml\b",
+            r"!\[.*(?:architecture|diagram|workflow|system design|dataflow|topology).*\].*\.(?:png|jpg|jpeg|svg|webp)",
+            r"<img\s+[^>]*src=[\"'][^\"']*(?:architecture|diagram|flow|system)[^\"']*[\"']",
+            r"\+[-+]+\+",
+        ]
+        for pattern in diagram_indicators:
+            if re.search(pattern, readme_text, re.IGNORECASE):
+                has_architecture_diagram = True
+                break
+
     # 4. Source-level Code Quality Assessment
     has_source_dir = bool(normalized_directories & SOURCE_DIRECTORIES)
     has_manifest = bool(normalized_files & DEPENDENCY_MANIFESTS)
     has_linter = bool(normalized_files & LINTER_CONFIGS)
-    has_ci = bool(normalized_directories & CI_DIRECTORIES)
+    has_ci = bool(normalized_directories & CI_DIRECTORIES) or any(
+        ".github" in d.lower() for d in top_level_directories
+    )
     has_license = any("license" in f.lower() for f in top_level_files)
 
     code_quality_score = 0
@@ -194,6 +212,9 @@ def _inspect_repository(
         "days_since_push": days_since_push,
         "has_committed_secrets": has_committed_secrets,
         "detected_secrets": detected_secrets,
+        "has_unit_tests": has_tests,
+        "has_ci_cd": has_ci,
+        "has_architecture_diagram": has_architecture_diagram,
         "code_quality_score": code_quality_score,
         "has_readme": has_readme,
         "readme_length": readme_length,
@@ -206,6 +227,7 @@ def _inspect_repository(
             "has_linter_or_formatter": has_linter,
             "has_ci_workflow": has_ci,
             "has_license": has_license,
+            "has_architecture_diagram": has_architecture_diagram,
         },
         "inspection_errors": inspection_errors,
     }
@@ -287,6 +309,9 @@ def fetch_github_data(username: str) -> dict[str, object]:
         has_pinned = any(bool(r.get("is_pinned")) for r in repositories)
         has_recent = any(bool(r.get("has_recent_activity")) for r in repositories)
         has_secrets = any(bool(r.get("has_committed_secrets")) for r in repositories)
+        has_unit_tests = any(bool(r.get("has_unit_tests")) for r in repositories)
+        has_ci_cd = any(bool(r.get("has_ci_cd")) for r in repositories)
+        has_architecture = any(bool(r.get("has_architecture_diagram")) for r in repositories)
         avg_code_quality = (
             round(sum(int(r.get("code_quality_score", 0)) for r in repositories) / len(repositories))
             if repositories
@@ -306,6 +331,9 @@ def fetch_github_data(username: str) -> dict[str, object]:
             "has_pinned_repos": has_pinned,
             "has_recent_commit_activity": has_recent,
             "has_committed_secrets": has_secrets,
+            "has_unit_tests": has_unit_tests,
+            "has_ci_cd": has_ci_cd,
+            "has_architecture_diagrams": has_architecture,
             "average_code_quality_score": avg_code_quality,
         }
 

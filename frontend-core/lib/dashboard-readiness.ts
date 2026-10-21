@@ -2,10 +2,11 @@ import type { ReadinessBreakdownItem, ReadinessScore } from '@/types';
 
 export type RoadmapCategory =
   | 'resume'
-  | 'github'
   | 'projects'
-  | 'linkedin'
   | 'mock_interview'
+  | 'github'
+  | 'linkedin'
+  | 'leetcode'
   | 'coding_practice';
 
 export type RoadmapStatus = 'Evidence needed' | 'Action required' | 'In progress' | 'Ready';
@@ -38,16 +39,17 @@ export const READINESS_CATEGORY_LABELS: readonly { key: RoadmapCategory; label: 
   { key: 'github', label: 'GitHub' },
   { key: 'projects', label: 'Projects' },
   { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'leetcode', label: 'LeetCode' },
   { key: 'mock_interview', label: 'Mock Interview' },
 ];
 
-export const ALL_READINESS_PILLARS: readonly { key: RoadmapCategory; label: string }[] = [
-  { key: 'resume', label: 'Resume' },
-  { key: 'github', label: 'GitHub' },
-  { key: 'projects', label: 'Projects' },
-  { key: 'linkedin', label: 'LinkedIn' },
-  { key: 'mock_interview', label: 'Mock Interview' },
-  { key: 'coding_practice', label: 'Coding Practice' },
+export const ALL_READINESS_PILLARS: readonly { key: RoadmapCategory; label: string; maxPoints: number; weight: number }[] = [
+  { key: 'resume', label: 'Resume', maxPoints: 25, weight: 0.25 },
+  { key: 'projects', label: 'Projects', maxPoints: 20, weight: 0.20 },
+  { key: 'mock_interview', label: 'Mock Interview', maxPoints: 20, weight: 0.20 },
+  { key: 'github', label: 'GitHub', maxPoints: 15, weight: 0.15 },
+  { key: 'linkedin', label: 'LinkedIn', maxPoints: 10, weight: 0.10 },
+  { key: 'leetcode', label: 'LeetCode', maxPoints: 10, weight: 0.10 },
 ];
 
 interface RoadmapDefinition {
@@ -68,16 +70,16 @@ interface RecommendationDefinition {
   href: string;
 }
 
-const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
+export const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
   {
     id: '01',
     categoryKey: 'resume',
     stepNumber: 1,
     title: 'Resume',
     eyebrow: 'Document Intelligence',
-    maxPoints: 20,
+    maxPoints: 25,
     actionLabel: 'Improve resume',
-    actionHref: '/dashboard/profile',
+    actionHref: '/dashboard/action-plan#resume',
     side: 'left',
   },
   {
@@ -86,9 +88,9 @@ const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
     stepNumber: 2,
     title: 'GitHub',
     eyebrow: 'Engineering Evidence',
-    maxPoints: 20,
+    maxPoints: 15,
     actionLabel: 'Review GitHub score',
-    actionHref: '/dashboard#readiness-breakdown',
+    actionHref: '/dashboard/action-plan#github',
     side: 'right',
   },
   {
@@ -99,7 +101,7 @@ const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
     eyebrow: 'Proof of Work',
     maxPoints: 20,
     actionLabel: 'Manage projects',
-    actionHref: '/dashboard/profile',
+    actionHref: '/dashboard/action-plan#projects',
     side: 'left',
   },
   {
@@ -108,56 +110,103 @@ const ROADMAP_DEFINITIONS: readonly RoadmapDefinition[] = [
     stepNumber: 4,
     title: 'LinkedIn',
     eyebrow: 'Professional Network',
-    maxPoints: 20,
+    maxPoints: 10,
     actionLabel: 'Update profile',
-    actionHref: '/dashboard/profile',
+    actionHref: '/dashboard/action-plan#linkedin',
     side: 'right',
   },
   {
     id: '05',
-    categoryKey: 'mock_interview',
+    categoryKey: 'leetcode',
     stepNumber: 5,
+    title: 'LeetCode',
+    eyebrow: 'DSA & Contest Performance',
+    maxPoints: 10,
+    actionLabel: 'Coding practice',
+    actionHref: '/dashboard/action-plan#leetcode',
+    side: 'left',
+  },
+  {
+    id: '06',
+    categoryKey: 'mock_interview',
+    stepNumber: 6,
     title: 'Mock Interview',
     eyebrow: '15-Minute AI Viva',
     maxPoints: 20,
     actionLabel: 'Launch interview',
     actionHref: '/dashboard/interview',
-    side: 'left',
+    side: 'right',
   },
 ];
 
 const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefinition> = {
   resume: {
     title: 'Strengthen your resume evidence',
-    description: (score) => `Your resume score is ${score}/100. Add quantified outcomes and role-specific keywords to your strongest bullets.`,
-    href: '/dashboard/profile',
-  },
-  github: {
-    title: 'Showcase your best GitHub work',
-    description: (score) => `Your GitHub score is ${score}/100. Pin 2 representative repositories and add outcome-focused READMEs.`,
+    description: (score) => `Your resume score is ${score}/100. Add quantified outcomes and role-specific keywords to your strongest bullets (25 pts max).`,
     href: '/dashboard/profile',
   },
   projects: {
     title: 'Make your projects verifiable',
-    description: (score) => `Your projects score is ${score}/100. Add a live link, test instructions, and measurable outcomes to your strongest project.`,
-    href: '/dashboard/profile',
-  },
-  linkedin: {
-    title: 'Align your LinkedIn profile',
-    description: (score) => `Your LinkedIn score is ${score}/100. Add a role-specific headline, relevant skills, and evidence-backed project details.`,
+    description: (score) => `Your projects score is ${score}/100. Add live links, clear README documentation, and measurable metrics (20 pts max).`,
     href: '/dashboard/profile',
   },
   mock_interview: {
     title: 'Practice your interview delivery',
-    description: (score) => `Your mock interview score is ${score}/100. Complete a focused AI viva and act on its weakest-topic feedback.`,
+    description: (score) => `Your mock interview score is ${score}/100. Complete a focused 15 or 20-min AI viva and review feedback (20 pts max).`,
     href: '/dashboard/interview',
   },
+  github: {
+    title: 'Showcase your best GitHub work',
+    description: (score) => `Your GitHub score is ${score}/100. Pin representative repositories with CI/CD and clean code structure (15 pts max).`,
+    href: '/dashboard/profile',
+  },
+  linkedin: {
+    title: 'Align your LinkedIn profile',
+    description: (score) => `Your LinkedIn score is ${score}/100. Add a role-focused headline, summary, and skills (10 pts max).`,
+    href: '/dashboard/profile',
+  },
+  leetcode: {
+    title: 'Sharpen your LeetCode DSA stats',
+    description: (score) => `Your LeetCode score is ${score}/100. Aim for >300 solved problems with solid Medium/Hard ratio for full 10 points.`,
+    href: '/dashboard/interview/coding',
+  },
   coding_practice: {
-    title: 'Sharpen your coding & DSA skills',
-    description: (score) => `Your coding practice score is ${score}/100. Connect your LeetCode profile and solve interactive problems in the Round 2 IDE.`,
+    title: 'Sharpen your LeetCode DSA stats',
+    description: (score) => `Your LeetCode score is ${score}/100. Aim for >300 solved problems with solid Medium/Hard ratio for full 10 points.`,
     href: '/dashboard/interview/coding',
   },
 };
+
+export function calculateMasterReadinessScore(scores: {
+  resume: number;
+  projects: number;
+  mock?: number;
+  mock_interview?: number;
+  github: number;
+  linkedin: number;
+  leetcode?: number;
+  coding_practice?: number;
+}): number {
+  const resume = clamp(scores.resume, 0, 100);
+  const projects = clamp(scores.projects, 0, 100);
+  const mock = clamp(scores.mock_interview ?? scores.mock ?? 0, 0, 100);
+  const github = clamp(scores.github, 0, 100);
+  const linkedin = clamp(scores.linkedin, 0, 100);
+  const leetcode = clamp(scores.leetcode ?? scores.coding_practice ?? 0, 0, 100);
+
+  // Math explicitly caps LeetCode's contribution at 10 points
+  const leetcodeContribution = Math.min(10, Math.max(0, leetcode * 0.10));
+
+  const total =
+    (resume * 0.25) +
+    (projects * 0.20) +
+    (mock * 0.20) +
+    (github * 0.15) +
+    (linkedin * 0.10) +
+    leetcodeContribution;
+
+  return Math.min(100, Math.max(0, Math.round(total)));
+}
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -177,13 +226,20 @@ function statusFor(item: ReadinessBreakdownItem | undefined): RoadmapStatus {
 
 export function buildDashboardRoadmap(readiness: ReadinessScore | null): DashboardRoadmapNode[] {
   return ROADMAP_DEFINITIONS.map((definition) => {
-    const item = readiness?.breakdown?.[definition.categoryKey];
+    const item =
+      readiness?.breakdown?.[definition.categoryKey] ||
+      (definition.categoryKey === 'leetcode' ? readiness?.breakdown?.['coding_practice'] : undefined) ||
+      (definition.categoryKey === 'coding_practice' ? readiness?.breakdown?.['leetcode'] : undefined);
     const rawScore = typeof item?.rawScore === 'number' && Number.isFinite(item.rawScore)
       ? clamp(item.rawScore, 0, 100)
       : 0;
-    const weightedPoints = typeof item?.weightedPoints === 'number' && Number.isFinite(item.weightedPoints)
+    let weightedPoints = typeof item?.weightedPoints === 'number' && Number.isFinite(item.weightedPoints)
       ? clamp(item.weightedPoints, 0, definition.maxPoints)
       : Math.round(rawScore * (definition.maxPoints / 100) * 10) / 10;
+
+    if (definition.categoryKey === 'leetcode' || definition.categoryKey === 'coding_practice') {
+      weightedPoints = Math.min(10, weightedPoints);
+    }
 
     return {
       id: definition.id,

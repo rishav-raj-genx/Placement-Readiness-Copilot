@@ -37,12 +37,12 @@ const GUEST_MOCK_READINESS: ReadinessScore = {
   readinessLevel: 'Not ready',
   topActions: [],
   breakdown: {
-    resume: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
-    github: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
-    projects: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
-    linkedin: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
-    mock_interview: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
-    coding_practice: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
+    resume: { rawScore: 0, weight: 0.25, weightedPoints: 0, present: false },
+    github: { rawScore: 0, weight: 0.15, weightedPoints: 0, present: false },
+    projects: { rawScore: 0, weight: 0.20, weightedPoints: 0, present: false },
+    linkedin: { rawScore: 0, weight: 0.10, weightedPoints: 0, present: false },
+    leetcode: { rawScore: 0, weight: 0.10, weightedPoints: 0, present: false },
+    mock_interview: { rawScore: 0, weight: 0.20, weightedPoints: 0, present: false },
   },
 };
 
@@ -249,7 +249,7 @@ export default function DashboardHomePage() {
                       <Code2 className="h-3.5 w-3.5 text-stone-400" /> Round 2: DSA + web dev IDE
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-orange-400">
                       <Lock className="h-3.5 w-3.5" /> Round 2: Locked (Complete Round 1 First)
                     </span>
                   )}
@@ -300,32 +300,61 @@ export default function DashboardHomePage() {
               </div>
             </div>
             <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
-              {READINESS_CATEGORY_LABELS.map(({ key, label }) => (
-                <div key={key}>
-                  <BreakdownMeter label={label} value={visibleReadiness?.breakdown[key]} />
-                </div>
-              ))}
+              {READINESS_CATEGORY_LABELS.map(({ key, label }) => {
+                const item = visibleReadiness?.breakdown[key] ||
+                  (key === 'leetcode' ? visibleReadiness?.breakdown['coding_practice'] : undefined);
+                const maxPointsMap: Record<string, number> = {
+                  resume: 25,
+                  github: 15,
+                  projects: 20,
+                  linkedin: 10,
+                  leetcode: 10,
+                  mock_interview: 20,
+                };
+                return (
+                  <div key={key}>
+                    <BreakdownMeter
+                      label={label}
+                      value={item}
+                      maxPoints={maxPointsMap[key] ?? 20}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-stone-800 bg-stone-900 p-6 sm:p-7">
-            <p className="text-xs font-semibold text-stone-400">Highest impact</p>
-            <h2 className="mt-1 text-xl font-bold text-stone-100">Next best actions</h2>
-            {nextBestActions.length ? (
-              <ol className="mt-5 space-y-3">
-                {nextBestActions.map((action, index) => (
-                  <li key={action.category}>
-                    <Link href={action.href} className="group flex gap-3 rounded-xl border border-stone-800 bg-stone-950 p-3.5 transition hover:border-red-600/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-red-600/15 text-xs font-bold text-red-500">{index + 1}</span>
-                      <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="text-sm font-medium text-stone-200">{action.title}</span><span className="shrink-0 text-xs text-red-500">{action.score}/100</span></span><span className="mt-1 block text-xs leading-relaxed text-stone-500">{action.description}</span></span>
-                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-600 transition-transform group-hover:translate-x-1 group-hover:text-red-500" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <div className="mt-5 rounded-xl border border-dashed border-stone-800 p-5 text-sm leading-relaxed text-stone-500">Actions will appear after the readiness engine completes its first evidence review.</div>
-            )}
+          <div className="flex flex-col justify-between rounded-2xl border border-stone-800 bg-stone-900 p-6 sm:p-7">
+            <div>
+              <p className="text-xs font-semibold text-stone-400">Highest impact</p>
+              <h2 className="mt-1 text-xl font-bold text-stone-100">Next best actions</h2>
+              {nextBestActions.length ? (
+                <ol className="mt-5 space-y-3">
+                  {nextBestActions.slice(0, 3).map((action, index) => (
+                    <li key={action.category}>
+                      <Link href={action.href} className="group flex gap-3 rounded-xl border border-stone-800 bg-stone-950 p-3.5 transition hover:border-[#D93829]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#D93829]/15 text-xs font-bold text-[#D93829]">{index + 1}</span>
+                        <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="text-sm font-medium text-stone-200">{action.title}</span><span className="shrink-0 text-xs text-[#D93829]">{action.score}/100</span></span><span className="mt-1 block text-xs leading-relaxed text-stone-500">{action.description}</span></span>
+                        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-stone-600 transition-transform group-hover:translate-x-1 group-hover:text-[#D93829]" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="mt-5 rounded-xl border border-dashed border-stone-800 p-5 text-sm leading-relaxed text-stone-500">Actions will appear after the readiness engine completes its first evidence review.</div>
+              )}
+            </div>
+            <div className="mt-5 pt-4 border-t border-stone-800/80">
+              <Link
+                href="/dashboard/action-plan"
+                className="group flex w-full items-center justify-between rounded-xl border border-stone-800 bg-stone-950/80 px-4 py-2.5 text-xs font-semibold text-stone-300 transition hover:border-[#D93829]/60 hover:bg-stone-950 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
+              >
+                <span>See detailed action plan</span>
+                <span className="flex items-center gap-1 font-bold text-[#D93829] transition-transform group-hover:translate-x-1">
+                  &rarr;
+                </span>
+              </Link>
+            </div>
           </div>
         </section>
 

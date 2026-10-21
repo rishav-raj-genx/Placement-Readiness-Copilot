@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
+  Code2,
   FileText,
   FolderGit2,
   GitBranch,
@@ -39,6 +40,8 @@ const CATEGORY_PRESENTATION: Record<string, CategoryPresentation> = {
   'Professional Network': { icon: Linkedin, color: '#D93829' },
   mock_interview: { icon: Mic2, color: '#D93829' },
   '15-Minute AI Viva': { icon: Mic2, color: '#D93829' },
+  leetcode: { icon: Code2, color: '#D93829' },
+  'DSA & Contest Performance': { icon: Code2, color: '#D93829' },
 };
 
 const BASE_TIMELINE_STEPS = [
@@ -48,9 +51,9 @@ const BASE_TIMELINE_STEPS = [
     category: 'Document Intelligence',
     categoryKey: 'resume' as RoadmapCategory,
     eyebrow: 'Document Intelligence',
-    maxPoints: 20,
+    maxPoints: 25,
     actionLabel: 'Improve resume',
-    actionHref: '/dashboard/profile',
+    actionHref: '/dashboard/action-plan#resume',
     side: 'left' as const,
   },
   {
@@ -59,9 +62,9 @@ const BASE_TIMELINE_STEPS = [
     category: 'Engineering Evidence',
     categoryKey: 'github' as RoadmapCategory,
     eyebrow: 'Engineering Evidence',
-    maxPoints: 20,
+    maxPoints: 15,
     actionLabel: 'Review GitHub score',
-    actionHref: '/dashboard#readiness-breakdown',
+    actionHref: '/dashboard/action-plan#github',
     side: 'right' as const,
   },
   {
@@ -72,7 +75,7 @@ const BASE_TIMELINE_STEPS = [
     eyebrow: 'Proof of Work',
     maxPoints: 20,
     actionLabel: 'Manage projects',
-    actionHref: '/dashboard/profile',
+    actionHref: '/dashboard/action-plan#projects',
     side: 'left' as const,
   },
   {
@@ -81,13 +84,24 @@ const BASE_TIMELINE_STEPS = [
     category: 'Professional Network',
     categoryKey: 'linkedin' as RoadmapCategory,
     eyebrow: 'Professional Network',
-    maxPoints: 20,
-    actionLabel: 'Update LinkedIn',
-    actionHref: '/dashboard/profile',
+    maxPoints: 10,
+    actionLabel: 'Update profile',
+    actionHref: '/dashboard/action-plan#linkedin',
     side: 'right' as const,
   },
   {
     id: '05',
+    title: 'LeetCode',
+    category: 'DSA & Contest Performance',
+    categoryKey: 'leetcode' as RoadmapCategory,
+    eyebrow: 'DSA & Contest Performance',
+    maxPoints: 10,
+    actionLabel: 'Practice LeetCode',
+    actionHref: '/dashboard/action-plan#leetcode',
+    side: 'left' as const,
+  },
+  {
+    id: '06',
     title: 'Mock Interview',
     category: '15-Minute AI Viva',
     categoryKey: 'mock_interview' as RoadmapCategory,
@@ -95,7 +109,7 @@ const BASE_TIMELINE_STEPS = [
     maxPoints: 20,
     actionLabel: 'Start mock interview',
     actionHref: '/dashboard/interview',
-    side: 'left' as const,
+    side: 'right' as const,
   },
 ] as const;
 
@@ -118,7 +132,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
 
   useMotionValueEvent(scrollYProgress, 'change', (latest) => setScrollProgress(latest));
 
-  // Hardcode the Sequence Structure: strictly enforce these 5 steps in this exact order.
+  // Hardcode the Sequence Structure: strictly enforce these 6 steps in this exact order.
   // Map the user's fetched data into this structure, but DO NOT remove the step if data is missing.
   const timelineSteps = useMemo(() => {
     const nodeMap = new Map<string, DashboardRoadmapNode>();
@@ -181,10 +195,10 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                 <motion.button
                   type="button"
                   onClick={() => setActiveNode(node.id)}
-                  className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-xl border bg-stone-950 outline-none focus-visible:ring-2 focus-visible:ring-red-600 md:col-start-2 md:justify-self-center"
+                  className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-xl border bg-stone-950 outline-none transition-shadow hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] focus-visible:ring-2 focus-visible:ring-red-600 md:col-start-2 md:justify-self-center"
                   style={{
-                    borderColor: reached ? presentation.color : 'rgba(255,255,255,0.16)',
-                    boxShadow: 'none',
+                    borderColor: reached ? '#F97316' : 'rgba(255,255,255,0.16)',
+                    boxShadow: reached ? '0 0 15px rgba(249,115,22,0.3)' : 'none',
                   }}
                   whileHover={reduceMotion ? undefined : { scale: 1.08, rotate: 2 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.96 }}
@@ -193,13 +207,12 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                 >
                   {reached && !reduceMotion && (
                     <motion.span
-                      className="absolute inset-[-4px] rounded-xl border border-stone-800 opacity-60"
-                      style={{ borderColor: presentation.color }}
+                      className="absolute inset-[-4px] rounded-xl border border-orange-500 opacity-60"
                       animate={{ opacity: 0.6 }}
                       transition={{ duration: 0 }}
                     />
                   )}
-                  <Icon className="h-6 w-6" style={{ color: presentation.color }} aria-hidden="true" />
+                  <Icon className="h-6 w-6" style={{ color: reached ? '#F97316' : presentation.color }} aria-hidden="true" />
                   <span className="absolute -bottom-3 rounded-full bg-stone-800 px-2 py-0.5 text-xs font-bold text-stone-300">{node.id}</span>
                 </motion.button>
 
@@ -208,11 +221,11 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                   whileInView={{ opacity: 1, y: 0, rotateY: 0 }}
                   viewport={{ once: true, amount: 0.25 }}
                   transition={{ type: 'spring', stiffness: 110, damping: 20 }}
-                  className={`col-start-2 row-start-1 rounded-2xl border bg-stone-900 p-5 shadow-md shadow-black/40 sm:p-7 ${node.side === 'left' ? 'md:col-start-1' : 'md:col-start-3'} ${selected ? 'border-red-600' : 'border-stone-800'}`}
+                  className={`col-start-2 row-start-1 rounded-2xl border bg-stone-900 p-5 shadow-md shadow-black/40 transition hover:shadow-[0_0_15px_rgba(249,115,22,0.2)] sm:p-7 ${node.side === 'left' ? 'md:col-start-1' : 'md:col-start-3'} ${selected ? 'border-[#D93829]' : 'border-stone-800'}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-xs font-semibold text-stone-400" style={{ color: presentation.color }}>{node.eyebrow}</p>
+                      <p className="text-xs font-semibold" style={{ color: presentation.color }}>{node.eyebrow}</p>
                       <h3 className="mt-1 font-display text-xl font-bold text-stone-100 sm:text-2xl">{node.title}</h3>
                     </div>
                     <div className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
@@ -223,8 +236,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
 
                   <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]" aria-label={`${node.title} weighted progress`}>
                     <motion.div
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: presentation.color }}
+                      className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-600"
                       initial={reduceMotion ? false : { width: 0 }}
                       whileInView={{ width: `${meterWidth}%` }}
                       viewport={{ once: true }}
@@ -238,11 +250,27 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                   </div>
 
                   <footer className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                    <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold" style={{ color: presentation.color, backgroundColor: `${presentation.color}15` }}>
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: presentation.color }} />
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                      node.status === 'In progress'
+                        ? 'text-orange-400 border border-orange-500/30 bg-orange-500/10'
+                        : node.status === 'Ready'
+                          ? 'text-emerald-400 border border-emerald-500/30 bg-emerald-500/10'
+                          : node.status === 'Action required'
+                            ? 'text-rose-400 border border-rose-500/30 bg-rose-500/10'
+                            : 'text-stone-400 border border-stone-800 bg-stone-900'
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${
+                        node.status === 'In progress'
+                          ? 'bg-orange-400'
+                          : node.status === 'Ready'
+                            ? 'bg-emerald-400'
+                            : node.status === 'Action required'
+                              ? 'bg-rose-400'
+                              : 'bg-stone-500'
+                      }`} />
                       {node.status}
                     </span>
-                    <Link href={node.actionHref} className="group inline-flex items-center gap-1.5 text-xs font-bold text-stone-200 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
+                    <Link href={node.actionHref} className="group inline-flex items-center gap-1.5 text-xs font-bold text-stone-200 hover:text-[#D93829] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
                       {node.actionLabel}<ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                     </Link>
                   </footer>
@@ -270,8 +298,8 @@ function RoadPath({ id, path, progress, reduceMotion, className, viewBox }: Road
     <svg aria-hidden="true" className={className} viewBox={viewBox} fill="none" preserveAspectRatio="none">
       <defs>
         <linearGradient id={`road-gradient-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop stopColor="#78716C" />
-          <stop offset="1" stopColor="#D93829" />
+          <stop stopColor="#F97316" />
+          <stop offset="1" stopColor="#DC2626" />
         </linearGradient>
       </defs>
       <path d={path} stroke="rgba(255,255,255,0.08)" strokeWidth="5" strokeDasharray="10 12" strokeLinecap="round" />

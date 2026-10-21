@@ -15,9 +15,11 @@ from ai_reviewer import (
     evaluate_github,
     evaluate_linkedin_text,
     evaluate_text,
+    extract_docx_text,
     get_backend_status,
 )
 from github_service import fetch_github_data
+from leetcode_service import fetch_leetcode_stats
 
 logger = logging.getLogger("profile_review_api")
 logging.basicConfig(level=logging.INFO)
@@ -36,13 +38,28 @@ class ExtractedPdf(BaseModel):
     is_truncated: bool = False
 
 
+class LeetCodeReview(BaseModel):
+    username: str
+    exists: bool = False
+    total_solved: int = 0
+    easy_solved: int = 0
+    medium_solved: int = 0
+    hard_solved: int = 0
+    contest_rating: float | None = None
+    global_ranking: int | None = None
+    score: int = Field(default=0, ge=0, le=100)
+    error: str | None = None
+
+
 class AnalyzeProfileResponse(BaseModel):
     resume_review: ReviewResult
     github_review: GithubReview | None = None
     linkedin_review: LinkedInReviewResult | None = None
+    leetcode_review: LeetCodeReview | None = None
     document_review_subtotal: float = Field(ge=0, le=100)
     total_readiness_score: float = Field(ge=0, le=100)
     github_error: str | None = None
+    leetcode_error: str | None = None
 
 
 @app.get("/health")
@@ -66,10 +83,18 @@ def ready() -> dict[str, object]:
 def _validate_pdf_headers(file: UploadFile) -> None:
     filename = (file.filename or "").lower()
     is_pdf_type = file.content_type in {"application/pdf", "application/octet-stream"}
-    if not filename.endswith(".pdf") or not is_pdf_type:
+    is_docx_type = file.content_type in {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/octet-stream",
+        "application/msword",
+        "application/zip",
+    }
+    is_pdf = filename.endswith(".pdf") and is_pdf_type
+    is_docx = filename.endswith(".docx") and is_docx_type
+    if not (is_pdf or is_docx):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Upload a PDF file with the application/pdf content type.",
+            detail="Upload a PDF or DOCX file with a supported content type.",
         )
 
 
@@ -109,8 +134,30 @@ def verify_service_token(authorization: Annotated[str | None, Header()] = None) 
 CHUNK_SIZE_BYTES = 64 * 1024
 
 
-def _parse_pdf_bytes_sync(pdf_bytes: bytes) -> tuple[str, int, bool]:
-    """CPU-bound PDF text extraction run inside a thread pool."""
+def _parse_pdf_bytes_sync(
+    pdf_bytes: bytes, filename: str = "", filetype: str | None = None
+) -> tuple[str, int, bool]:
+    """CPU-bound PDF or DOCX text extraction run inside a thread pool."""
+    is_docx = (
+        filetype == "docx"
+        or filename.lower().endswith(".docx")
+        or (pdf_bytes.startswith(b"PK\x03\x04") and not pdf_bytes.startswith(b"%PDF"))
+    )
+
+    if is_docx:
+        try:
+            extracted_text = extract_docx_text(pdf_bytes)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="The uploaded file is not a valid DOCX document.") from exc
+
+        page_count = max(1, (len(extracted_text) + 2500) // 2500)
+        is_truncated = False
+        if len(extracted_text) > 100_000:
+            extracted_text = extracted_text[:100_000]
+            is_truncated = True
+
+        return extracted_text, page_count, is_truncated
+
     try:
         document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     except (pymupdf.FileDataError, pymupdf.EmptyFileError, RuntimeError, ValueError) as exc:
@@ -142,22 +189,26 @@ async def extract_pdf_text(file: UploadFile) -> ExtractedPdf:
     _validate_pdf_headers(file)
 
     if file.size and file.size > MAX_PDF_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail="The uploaded PDF exceeds the 10 MB limit.")
+        raise HTTPException(status_code=413, detail="The uploaded file exceeds the 10 MB limit.")
 
     chunks: list[bytes] = []
     total_bytes = 0
     while chunk := await file.read(CHUNK_SIZE_BYTES):
         total_bytes += len(chunk)
         if total_bytes > MAX_PDF_SIZE_BYTES:
-            raise HTTPException(status_code=413, detail="The uploaded PDF exceeds the 10 MB limit.")
+            raise HTTPException(status_code=413, detail="The uploaded file exceeds the 10 MB limit.")
         chunks.append(chunk)
 
     if not total_bytes:
-        raise HTTPException(status_code=400, detail="The uploaded PDF is empty.")
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
 
-    pdf_bytes = b"".join(chunks)
+    file_bytes = b"".join(chunks)
+    filename = (file.filename or "").lower()
+    filetype = "docx" if filename.endswith(".docx") else "pdf"
 
-    extracted_text, page_count, is_truncated = await asyncio.to_thread(_parse_pdf_bytes_sync, pdf_bytes)
+    extracted_text, page_count, is_truncated = await asyncio.to_thread(
+        _parse_pdf_bytes_sync, file_bytes, filename, filetype
+    )
 
     return ExtractedPdf(
         text=extracted_text,
@@ -209,11 +260,23 @@ def review_github(
         ) from exc
 
 
+@app.post("/review/leetcode", response_model=LeetCodeReview)
+@app.get("/review/leetcode/{username}", response_model=LeetCodeReview)
+def review_leetcode(
+    username: str,
+    _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
+) -> LeetCodeReview:
+    """Fetch LeetCode solved counts and contest rating. Defaults to 0 score without throwing 500."""
+    stats = fetch_leetcode_stats(username)
+    return LeetCodeReview(**stats)
+
+
 @app.post("/analyze-profile", response_model=AnalyzeProfileResponse)
 async def analyze_profile(
     github_username: Annotated[str, Form()],
     resume: Annotated[UploadFile, File()],
     linkedin_pdf: Annotated[UploadFile | None, File()] = None,
+    leetcode_url: Annotated[str | None, Form()] = None,
     _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
 ) -> AnalyzeProfileResponse:
     extracted_resume = await extract_pdf_text(resume)
@@ -243,12 +306,26 @@ async def analyze_profile(
             resume_context=extracted_resume.text,
         )
 
+    leetcode_review = None
+    leetcode_error = None
+    if leetcode_url and leetcode_url.strip():
+        try:
+            stats = fetch_leetcode_stats(leetcode_url)
+            leetcode_review = LeetCodeReview(**stats)
+            leetcode_error = stats.get("error")
+        except Exception as exc:
+            logger.warning("LeetCode fetch error for %s: %s", leetcode_url, exc)
+            leetcode_review = LeetCodeReview(username=leetcode_url, exists=False, score=0)
+            leetcode_error = str(exc)
+
     # Subtotal calculation over available document reviews
     scores = [resume_review.score]
     if github_review is not None:
         scores.append(github_review.score)
     if linkedin_review is not None:
         scores.append(linkedin_review.score)
+    if leetcode_review is not None:
+        scores.append(leetcode_review.score)
 
     subtotal_score = round(sum(scores) / len(scores), 2)
 
@@ -256,7 +333,9 @@ async def analyze_profile(
         resume_review=resume_review,
         github_review=github_review,
         linkedin_review=linkedin_review,
+        leetcode_review=leetcode_review,
         document_review_subtotal=subtotal_score,
         total_readiness_score=subtotal_score,
         github_error=github_error,
+        leetcode_error=leetcode_error,
     )

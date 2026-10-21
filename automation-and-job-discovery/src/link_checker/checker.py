@@ -312,6 +312,17 @@ class LiveLinkChecker:
                     """)
                     mobile_friendly = has_viewport_meta and not horizontal_overflow
 
+                    # Check complex interactive state management
+                    has_complex_state = page.evaluate("""
+                        () => {
+                            const interactive = document.querySelectorAll('button, input, select, textarea, form, [role="button"], [data-state], [aria-expanded]');
+                            const hasInputs = interactive.length >= 3;
+                            const hasStorage = !!(window.localStorage && window.localStorage.length > 0) || !!(window.sessionStorage && window.sessionStorage.length > 0);
+                            const hasFrameworkState = !!window.__NEXT_DATA__ || !!window.__REACT_QUERY_STATE__ || !!document.querySelector('#__next, #root, [data-reactroot]');
+                            return hasInputs || hasStorage || hasFrameworkState;
+                        }
+                    """)
+
                     # Keyword verification for specific project claims
                     if claimed_keywords:
                         page_html = ""
@@ -364,6 +375,7 @@ class LiveLinkChecker:
             console_errors=console_errors,
             mobile_friendly=mobile_friendly,
             load_time_ms=load_time_ms,
+            has_complex_state=has_complex_state,
         )
 
         # Upload screenshot to Supabase Storage if available
@@ -381,6 +393,7 @@ class LiveLinkChecker:
             mobile_friendly=mobile_friendly,
             load_time_ms=load_time_ms,
             horizontal_overflow=horizontal_overflow,
+            has_complex_state=has_complex_state,
         )
 
         claims_matched = True
@@ -402,6 +415,7 @@ class LiveLinkChecker:
             "status_code": status_code,
             "load_time_ms": load_time_ms,
             "mobile_friendly": mobile_friendly,
+            "has_complex_state": has_complex_state,
             "screenshot_url": remote_screenshot_url
             or (str(screenshot_local_path) if screenshot_local_path else ""),
             "screenshot_local_path": str(screenshot_local_path) if screenshot_local_path else "",
@@ -440,6 +454,7 @@ class LiveLinkChecker:
         console_errors: List[str],
         mobile_friendly: bool,
         load_time_ms: int,
+        has_complex_state: bool = True,
     ) -> float:
         if not is_live:
             return 0.0
@@ -476,7 +491,20 @@ class LiveLinkChecker:
         elif load_time_ms < 8000:
             score += 3.0
 
-        return round(min(100.0, score), 1)
+        # RUTHLESS DEDUCTIONS:
+        # Deduct heavily if console errors exist
+        if len(console_errors) > 0:
+            score -= min(30.0, 15.0 + len(console_errors) * 5.0)
+
+        # Deduct heavily if mobile responsiveness fails
+        if not mobile_friendly:
+            score -= 25.0
+
+        # Deduct heavily if fails to implement complex state management
+        if not has_complex_state:
+            score -= 20.0
+
+        return round(max(0.0, min(100.0, score)), 1)
 
     def _generate_recommendations(
         self,
@@ -488,6 +516,7 @@ class LiveLinkChecker:
         mobile_friendly: bool,
         load_time_ms: int,
         horizontal_overflow: bool,
+        has_complex_state: bool = True,
     ) -> List[str]:
         tips = []
         if not is_live:
@@ -506,7 +535,7 @@ class LiveLinkChecker:
 
         if len(console_errors) > 0:
             tips.append(
-                f"Resolve {len(console_errors)} browser console error(s) to ensure recruiter's DevTools show clean code."
+                f"Deducted heavily for {len(console_errors)} browser console error(s). Recruiter DevTools will immediately flag errors. Resolve all console exceptions."
             )
 
         if horizontal_overflow:
@@ -516,7 +545,12 @@ class LiveLinkChecker:
 
         if not mobile_friendly and not horizontal_overflow:
             tips.append(
-                "Add `<meta name='viewport' content='width=device-width, initial-scale=1.0'>` in your HTML header."
+                "Deducted heavily for failing mobile responsiveness. Over 50% of hiring managers review submissions on mobile screens. Add viewport meta and optimize mobile CSS."
+            )
+
+        if not has_complex_state:
+            tips.append(
+                "Deducted heavily: Project lacks complex interactive state management. Implement dynamic state (forms, filters, state stores, client caches, or user interaction state) rather than a static presentation page."
             )
 
         if load_time_ms > 4500:

@@ -14,19 +14,29 @@ import {
   LogOut,
   Mic2,
   Settings,
+  Target,
+  type LucideIcon,
 } from 'lucide-react';
 import { HireableLogo } from '@/components/brand/hireable-logo';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
+import { DASHBOARD_NAV_CONFIG } from '@/lib/dashboard-navigation';
 
-export const DASHBOARD_NAV_ITEMS = [
-  { label: 'Home', href: '/dashboard', icon: Home },
-  { label: 'Job Matches', href: '/dashboard/jobs', icon: BriefcaseBusiness },
-  { label: 'Applications', href: '/dashboard/tracker', icon: BarChart3 },
-  { label: 'Interview', href: '/dashboard/interview', icon: Mic2 },
-  { label: 'Interview History', href: '/dashboard/interviews', icon: History },
-] as const;
+const NAV_ICON_MAP: Record<string, LucideIcon> = {
+  Home,
+  Target,
+  BriefcaseBusiness,
+  BarChart3,
+  Mic2,
+  History,
+};
+
+export const DASHBOARD_NAV_ITEMS = DASHBOARD_NAV_CONFIG.map((item) => ({
+  label: item.label,
+  href: item.href,
+  icon: NAV_ICON_MAP[item.iconName] || Home,
+}));
 
 interface DashboardNavigationProps {
   collapsed?: boolean;
