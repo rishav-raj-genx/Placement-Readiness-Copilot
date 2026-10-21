@@ -837,6 +837,8 @@ function executeJsCode(problemId: string, code: string): {
   }
 
   // Step 3: Contextual execution with extraction wrapper
+  const exportsObj: Record<string, unknown> = {};
+  const moduleObj: { exports: unknown } = { exports: exportsObj };
   const sandbox: Record<string, unknown> = {
     console,
     Map,
@@ -855,22 +857,26 @@ function executeJsCode(problemId: string, code: string): {
     setInterval,
     clearInterval,
     Promise,
+    exports: exportsObj,
+    module: moduleObj,
   };
+  sandbox.global = sandbox;
+  sandbox.globalThis = sandbox;
   const context = vm.createContext(sandbox);
 
   const extractionSnippet = `
 ${executableCode}
 ;({
-  twoSum: typeof twoSum !== 'undefined' ? twoSum : (typeof globalThis.twoSum !== 'undefined' ? globalThis.twoSum : undefined),
-  two_sum: typeof two_sum !== 'undefined' ? two_sum : (typeof globalThis.two_sum !== 'undefined' ? globalThis.two_sum : undefined),
-  LRUCache: typeof LRUCache !== 'undefined' ? LRUCache : (typeof globalThis.LRUCache !== 'undefined' ? globalThis.LRUCache : undefined),
-  LruCache: typeof LruCache !== 'undefined' ? LruCache : (typeof globalThis.LruCache !== 'undefined' ? globalThis.LruCache : undefined),
-  debounce: typeof debounce !== 'undefined' ? debounce : (typeof globalThis.debounce !== 'undefined' ? globalThis.debounce : undefined),
-  useDebounce: typeof useDebounce !== 'undefined' ? useDebounce : (typeof globalThis.useDebounce !== 'undefined' ? globalThis.useDebounce : undefined),
-  use_debounce: typeof use_debounce !== 'undefined' ? use_debounce : (typeof globalThis.use_debounce !== 'undefined' ? globalThis.use_debounce : undefined),
-  fetchWithRetry: typeof fetchWithRetry !== 'undefined' ? fetchWithRetry : (typeof globalThis.fetchWithRetry !== 'undefined' ? globalThis.fetchWithRetry : undefined),
-  fetch_with_retry: typeof fetch_with_retry !== 'undefined' ? fetch_with_retry : (typeof globalThis.fetch_with_retry !== 'undefined' ? globalThis.fetch_with_retry : undefined),
-  Solution: typeof Solution !== 'undefined' ? Solution : (typeof globalThis.Solution !== 'undefined' ? globalThis.Solution : undefined),
+  twoSum: typeof twoSum !== 'undefined' ? twoSum : (typeof exports !== 'undefined' && exports.twoSum ? exports.twoSum : (typeof module !== 'undefined' && module.exports && (module.exports.twoSum || module.exports.default || module.exports) ? (module.exports.twoSum || module.exports.default || (typeof module.exports === 'function' ? module.exports : undefined)) : undefined)),
+  two_sum: typeof two_sum !== 'undefined' ? two_sum : (typeof exports !== 'undefined' && exports.two_sum ? exports.two_sum : undefined),
+  LRUCache: typeof LRUCache !== 'undefined' ? LRUCache : (typeof exports !== 'undefined' && exports.LRUCache ? exports.LRUCache : (typeof module !== 'undefined' && module.exports && (module.exports.LRUCache || module.exports) ? (module.exports.LRUCache || (typeof module.exports === 'function' ? module.exports : undefined)) : undefined)),
+  LruCache: typeof LruCache !== 'undefined' ? LruCache : (typeof exports !== 'undefined' && exports.LruCache ? exports.LruCache : undefined),
+  debounce: typeof debounce !== 'undefined' ? debounce : (typeof exports !== 'undefined' && exports.debounce ? exports.debounce : (typeof module !== 'undefined' && module.exports && (module.exports.debounce || module.exports) ? (module.exports.debounce || (typeof module.exports === 'function' ? module.exports : undefined)) : undefined)),
+  useDebounce: typeof useDebounce !== 'undefined' ? useDebounce : (typeof exports !== 'undefined' && exports.useDebounce ? exports.useDebounce : undefined),
+  use_debounce: typeof use_debounce !== 'undefined' ? use_debounce : (typeof exports !== 'undefined' && exports.use_debounce ? exports.use_debounce : undefined),
+  fetchWithRetry: typeof fetchWithRetry !== 'undefined' ? fetchWithRetry : (typeof exports !== 'undefined' && exports.fetchWithRetry ? exports.fetchWithRetry : (typeof module !== 'undefined' && module.exports && (module.exports.fetchWithRetry || module.exports) ? (module.exports.fetchWithRetry || (typeof module.exports === 'function' ? module.exports : undefined)) : undefined)),
+  fetch_with_retry: typeof fetch_with_retry !== 'undefined' ? fetch_with_retry : (typeof exports !== 'undefined' && exports.fetch_with_retry ? exports.fetch_with_retry : undefined),
+  Solution: typeof Solution !== 'undefined' ? Solution : (typeof exports !== 'undefined' && exports.Solution ? exports.Solution : undefined),
 });
 `;
 

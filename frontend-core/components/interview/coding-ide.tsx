@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Brain,
   Check,
@@ -216,12 +217,21 @@ export function CodingIDE() {
 
   const currentProblemIndex = problems.findIndex((p) => p.id === activeProblem?.id);
   const hasNextProblem = currentProblemIndex >= 0 && currentProblemIndex < problems.length - 1;
+  const hasPrevProblem = currentProblemIndex > 0;
 
   const handleNextProblem = () => {
     if (hasNextProblem) {
       const nextProb = problems[currentProblemIndex + 1];
       handleSelectProblem(nextProb);
       toast.info(`Loaded next question: ${nextProb.title}`);
+    }
+  };
+
+  const handlePrevProblem = () => {
+    if (hasPrevProblem) {
+      const prevProb = problems[currentProblemIndex - 1];
+      handleSelectProblem(prevProb);
+      toast.info(`Loaded challenge: ${prevProb.title}`);
     }
   };
 
@@ -389,6 +399,8 @@ export function CodingIDE() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('interview_round2_completed', 'true');
       sessionStorage.setItem('interview_round2_completed', 'true');
+      localStorage.setItem('interview_round2_evaluations', JSON.stringify(evaluatedProblems));
+      localStorage.setItem('interview_round2_average_score', String(averageScore || 85));
     }
     const currentUserId = useAuthStore.getState().user?.id;
     if (currentUserId) {
@@ -451,15 +463,20 @@ export function CodingIDE() {
           </Badge>
         </div>
 
-        {/* Action Controls: End Interview Button */}
-        <div className="flex items-center gap-2">
-          <Button
+        {/* Action Controls: Progress Badge & Prominent Finalize Exam Button */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Badge
             variant="outline"
+            className="border-stone-800 bg-stone-900/90 font-mono text-[11px] text-stone-300 px-3 py-1.5"
+          >
+            {totalEvaluatedCount} of {problems.length} evaluated
+          </Badge>
+          <Button
             size="sm"
             onClick={() => setShowEndInterviewDialog(true)}
-            className="h-8 rounded-xl border-red-900/60 bg-red-950/30 text-xs font-semibold text-red-300 hover:bg-red-900/40 hover:text-white transition-colors"
+            className="h-9 px-4 rounded-xl bg-[#D93829] hover:bg-[#C22F21] text-white text-xs font-bold shadow-lg shadow-red-950/40 flex items-center gap-1.5 transition-all active:scale-[0.98]"
           >
-            <PhoneOff className="mr-1.5 h-3.5 w-3.5" /> End Interview
+            <Sparkles className="h-3.5 w-3.5" /> Finalize &amp; Submit Exam
           </Button>
         </div>
       </div>
@@ -837,13 +854,25 @@ export function CodingIDE() {
               )}
             </div>
 
-            {/* Right: Spacious Action Buttons */}
-            <div className="flex items-center gap-3">
+            {/* Right: Spacious Action Buttons with Next/Prev and Finalize */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {hasPrevProblem && (
+                <Button
+                  variant="outline"
+                  onClick={handlePrevProblem}
+                  className="h-10 px-3 rounded-xl border border-stone-800 bg-stone-900 hover:bg-stone-800 text-stone-300 font-medium text-xs flex items-center gap-1 transition-all"
+                  title="Previous challenge"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Prev</span>
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 onClick={handleRunTests}
                 disabled={isRunningTests}
-                className="h-10 px-5 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all hover:border-stone-600 active:scale-[0.98]"
+                className="h-10 px-4 sm:px-5 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all hover:border-stone-600 active:scale-[0.98]"
               >
                 {isRunningTests ? (
                   <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
@@ -856,7 +885,7 @@ export function CodingIDE() {
               <Button
                 onClick={handleSubmitSolution}
                 disabled={isEvaluating}
-                className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-[0.98]"
+                className="h-10 px-5 sm:px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-[0.98]"
               >
                 {isEvaluating ? (
                   <Loader2 className="h-4 w-4 animate-spin text-white" />
@@ -865,6 +894,25 @@ export function CodingIDE() {
                 )}
                 <span>Submit Code</span>
               </Button>
+
+              {hasNextProblem ? (
+                <Button
+                  variant="outline"
+                  onClick={handleNextProblem}
+                  className="h-10 px-4 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                >
+                  <span>Next</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setShowEndInterviewDialog(true)}
+                  className="h-10 px-5 rounded-xl bg-[#D93829] hover:bg-[#C22F21] text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-red-950/40 transition-all active:scale-[0.98]"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Finalize &amp; Submit Exam</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1012,26 +1060,59 @@ export function CodingIDE() {
         </div>
       </div>
 
-      {/* Confirmation Dialog: End Interview / Force Stop */}
+      {/* Confirmation Dialog: Finalize All Answers & Submit Coding Exam */}
       <AlertDialog open={showEndInterviewDialog} onOpenChange={setShowEndInterviewDialog}>
-        <AlertDialogContent className="border border-stone-800 bg-[#28201E]">
+        <AlertDialogContent className="border border-stone-800 bg-[#28201E] max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-stone-100 flex items-center gap-2">
-              <PhoneOff className="h-5 w-5 text-red-400" /> End Round 2 Coding Assessment?
+            <AlertDialogTitle className="text-stone-100 flex items-center gap-2 text-lg">
+              <Sparkles className="h-5 w-5 text-[#D93829]" /> Finalize &amp; Submit Coding Exam?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-stone-400 text-xs leading-relaxed">
-              Are you sure you want to finalize this coding assessment session? All completed problems, test results, and evaluations will be recorded to your final readiness evaluation.
+              You are about to submit your Round 2 technical assessment solutions. All code executions, test results, and algorithmic complexity evaluations will be permanently recorded into your final evaluation.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+
+          {/* Breakdown of challenges in this session */}
+          <div className="my-3 space-y-2 rounded-xl border border-stone-800 bg-stone-900/80 p-3.5 text-xs">
+            <div className="flex items-center justify-between border-b border-stone-800/80 pb-2">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-stone-400">Challenge</span>
+              <span className="font-mono text-[11px] uppercase tracking-wider text-stone-400">Score &middot; Status</span>
+            </div>
+            {problems.map((p) => {
+              const evalRes = evaluatedProblems[p.id];
+              return (
+                <div key={p.id} className="flex items-center justify-between py-1 border-b border-stone-800/40 last:border-0">
+                  <div className="flex items-center gap-1.5">
+                    {evalRes ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-stone-600" />
+                    )}
+                    <span className="text-stone-200 font-medium">{p.title}</span>
+                  </div>
+                  {evalRes ? (
+                    <Badge variant="outline" className="border-emerald-800 bg-emerald-950/40 text-emerald-300 font-mono text-[10px]">
+                      {evalRes.overall_score}/100 Evaluated
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-stone-800 bg-stone-900 text-stone-500 font-mono text-[10px]">
+                      Pending Evaluation
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
             <AlertDialogCancel className="border-stone-800 text-stone-300 hover:bg-stone-800">
-              Continue Interview
+              Continue Coding
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleFinalizeAssessment}
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+              className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold"
             >
-              End Assessment & Save
+              Submit &amp; Complete Exam
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
