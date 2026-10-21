@@ -71,7 +71,7 @@ export interface UseLiveKitInterviewReturn {
   sendFinishMessage: () => void;
   submitCandidateAnswer: (answerText?: string) => Promise<void>;
   repeatCurrentQuestion: () => void;
-  setCurrentCandidateAnswer: (text: string) => void;
+  setCurrentCandidateAnswer: (valOrFn: string | ((prev: string) => string)) => void;
   compileResultsNow: () => LiveKitResultsPayload;
   startListeningToCandidate: () => void;
   stopListeningToCandidate: () => void;

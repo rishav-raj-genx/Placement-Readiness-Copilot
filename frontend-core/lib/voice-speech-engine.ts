@@ -709,6 +709,7 @@ interface SpeechRecognitionResultEvent {
 interface SpeechRecognitionInstance {
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives?: number;
   lang: string;
   onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
@@ -855,7 +856,8 @@ export class BrowserSpeechRecognizer {
       try {
         this.recognition = null;
         this.initRecognition();
-        this.recognition?.start();
+        const freshRec = this.recognition as SpeechRecognitionInstance | null;
+        freshRec?.start();
         this.isRecognitionActive = true;
         return true;
       } catch (inner) {

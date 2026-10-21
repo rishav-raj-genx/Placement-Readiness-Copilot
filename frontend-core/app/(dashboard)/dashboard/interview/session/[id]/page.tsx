@@ -99,38 +99,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     onError: handleRecordingError,
   });
 
-  const [isTranscribingChunk, setIsTranscribingChunk] = useState(false);
-
-  const handleTranscribeRecordedAudio = useCallback(async () => {
-    if (!recordingChunks || recordingChunks.length === 0) {
-      toast.info('No audio chunks captured yet. Please speak into your microphone first.');
-      return;
-    }
-    setIsTranscribingChunk(true);
-    toast.info('Processing audio with AI Whisper...');
-    try {
-      const audioBlob = new Blob(recordingChunks, { type: 'audio/webm' });
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'candidate_response.webm');
-
-      const res = await fetch('/api/interview/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = (await res.json()) as { success?: boolean; text?: string; error?: string };
-      if (data.success && data.text) {
-        livekit.setCurrentCandidateAnswer((prev) => (prev ? `${prev} ${data.text}` : data.text || ''));
-        toast.success('Audio transcribed successfully with AI Whisper!');
-      } else {
-        toast.info(data.error || 'Speech transcription complete.');
-      }
-    } catch {
-      toast.error('Failed to communicate with transcription service.');
-    } finally {
-      setIsTranscribingChunk(false);
-    }
-  }, [livekit, recordingChunks]);
-
   const finalizeRecording = useCallback(async () => {
     try {
       await stopAndUpload();
@@ -243,6 +211,38 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     onResults: handleResults,
     onError: handleError,
   });
+
+  const [isTranscribingChunk, setIsTranscribingChunk] = useState(false);
+
+  const handleTranscribeRecordedAudio = useCallback(async () => {
+    if (!recordingChunks || recordingChunks.length === 0) {
+      toast.info('No audio chunks captured yet. Please speak into your microphone first.');
+      return;
+    }
+    setIsTranscribingChunk(true);
+    toast.info('Processing audio with AI Whisper...');
+    try {
+      const audioBlob = new Blob([...recordingChunks], { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'candidate_response.webm');
+
+      const res = await fetch('/api/interview/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = (await res.json()) as { success?: boolean; text?: string; error?: string };
+      if (data.success && data.text) {
+        livekit.setCurrentCandidateAnswer((prev: string) => (prev ? `${prev} ${data.text}` : data.text || ''));
+        toast.success('Audio transcribed successfully with AI Whisper!');
+      } else {
+        toast.info(data.error || 'Speech transcription complete.');
+      }
+    } catch {
+      toast.error('Failed to communicate with transcription service.');
+    } finally {
+      setIsTranscribingChunk(false);
+    }
+  }, [livekit, recordingChunks]);
 
   useEffect(() => {
     if (livekit.status === 'connected' || livekit.status === 'active') {
