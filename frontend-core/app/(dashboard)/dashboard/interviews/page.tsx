@@ -18,17 +18,22 @@ import {
 } from '@/components/ui/select';
 import { useAuthStore } from '@/stores/auth-store';
 import { supabase } from '@/lib/supabase-client';
-import { normalizeInterviewResult } from '@/lib/interview-result-adapter';
 
 interface LiveKitHistoryEntry {
   id: string;
-  target_role: string;
+  target_role?: string;
   status: string;
   completed_at: string | null;
   started_at: string | null;
   created_at: string;
-  config: unknown;
-  result: unknown;
+  config?: unknown;
+  result?: unknown;
+  viva_scores?: unknown;
+  code_history?: string | null;
+  admin_score?: number | null;
+  interview_score?: number | null;
+  viva_score?: number | null;
+  ide_score?: number | null;
 }
 
 interface HistoryEntry {
@@ -41,6 +46,8 @@ interface HistoryEntry {
   difficulty: string | null;
   durationMinutes: number | null;
   overallScore?: number;
+  vivaScore?: number;
+  ideScore?: number;
   topics: string[];
 }
 
@@ -64,6 +71,81 @@ function readPositiveNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function readNumericScore(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.round(Math.min(100, Math.max(0, value)));
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) {
+      return Math.round(Math.min(100, Math.max(0, parsed)));
+    }
+  }
+  return null;
+}
+
+function resolveRoundScores(session: LiveKitHistoryEntry): {
+  vivaScore?: number;
+  ideScore?: number;
+  overallScore?: number;
+} {
+  const config = isRecord(session.config) ? session.config : {};
+  const vivaScores = isRecord(session.viva_scores) ? session.viva_scores : {};
+  const result = isRecord(session.result) ? session.result : {};
+  const codingResult = isRecord(result.coding_result) ? result.coding_result : {};
+
+  // Check explicit viva_score / ide_score fields first
+  let viva =
+    readNumericScore(session.viva_score) ??
+    readNumericScore(vivaScores.viva_score) ??
+    readNumericScore(result.viva_score) ??
+    readNumericScore(vivaScores.round1_score);
+
+  let ide =
+    readNumericScore(session.ide_score) ??
+    readNumericScore(vivaScores.ide_score) ??
+    readNumericScore(result.ide_score) ??
+    readNumericScore(codingResult.overall_score) ??
+    readNumericScore(vivaScores.round2_score);
+
+  const isCoding =
+    config.type === 'coding' ||
+    config.round === 2 ||
+    Boolean(session.code_history);
+
+  const genericScore =
+    readNumericScore(session.interview_score) ??
+    readNumericScore(session.admin_score) ??
+    readNumericScore(result.interview_score) ??
+    readNumericScore(result.finalScore) ??
+    readNumericScore(vivaScores.interview_score) ??
+    readNumericScore(vivaScores.overall_score);
+
+  if (viva === null && !isCoding && genericScore !== null) {
+    viva = genericScore;
+  }
+  if (ide === null && isCoding && genericScore !== null) {
+    ide = genericScore;
+  }
+
+  let overall: number | undefined;
+  if (viva !== null && ide !== null) {
+    overall = Math.round((viva + ide) / 2);
+  } else if (genericScore !== null) {
+    overall = genericScore;
+  } else if (viva !== null) {
+    overall = viva;
+  } else if (ide !== null) {
+    overall = ide;
+  }
+
+  return {
+    vivaScore: viva !== null ? viva : undefined,
+    ideScore: ide !== null ? ide : undefined,
+    overallScore: overall,
+  };
+}
+
 function elapsedMinutes(session: LiveKitHistoryEntry): number | null {
   if (!session.started_at || !session.completed_at) return null;
   const elapsed = new Date(session.completed_at).getTime() - new Date(session.started_at).getTime();
@@ -72,20 +154,20 @@ function elapsedMinutes(session: LiveKitHistoryEntry): number | null {
 
 function toHistoryEntry(session: LiveKitHistoryEntry): HistoryEntry {
   const config = isRecord(session.config) ? session.config : {};
-  const result = isRecord(session.result) ? normalizeInterviewResult(session.result) : null;
-  const hasScore = isRecord(session.result)
-    && (typeof session.result.interview_score === 'number' || typeof session.result.finalScore === 'number');
+  const { vivaScore, ideScore, overallScore } = resolveRoundScores(session);
 
   return {
     id: session.id,
-    targetRole: session.target_role,
+    targetRole: session.target_role || 'Software Engineer',
     type: readString(config.type) ?? 'live_audio',
     status: session.status,
     completedAt: session.completed_at,
     createdAt: session.created_at,
     difficulty: readString(config.difficulty),
     durationMinutes: readPositiveNumber(config.durationMinutes) ?? elapsedMinutes(session),
-    overallScore: result && hasScore ? result.finalScore : undefined,
+    overallScore,
+    vivaScore,
+    ideScore,
     topics: readStringArray(config.topics),
   };
 }
@@ -107,94 +189,31 @@ export default function InterviewHistoryPage() {
       const combinedSessions: LiveKitHistoryEntry[] = [];
       const seenIds = new Set<string>();
 
-      // 1. Fetch from Supabase if user exists
-      if (user?.id) {
-        try {
-          const { data, error: queryError } = await supabase
-            .from('interview_sessions')
-            .select('id, target_role, status, completed_at, started_at, created_at, config, result')
-            .or(`user_id.eq.${user.id},student_id.eq.${user.id}`)
-            .order('created_at', { ascending: false })
-            .limit(50);
+      try {
+        // Strict Privacy Lockdown: students can only view their own interviews
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const activeUserId = authUser?.id || user?.id;
 
-          if (!queryError && Array.isArray(data)) {
-            data.forEach((row) => {
+        if (activeUserId) {
+          const { data: history, error: queryError } = await supabase
+            .from('interview_sessions')
+            .select('*')
+            .eq('student_id', activeUserId) // CRITICAL PRIVACY LOCK
+            .order('created_at', { ascending: false });
+
+          if (queryError) {
+            console.warn('Supabase history fetch notice:', queryError.message);
+          } else if (Array.isArray(history)) {
+            history.forEach((row) => {
               if (row && row.id && !seenIds.has(row.id)) {
                 seenIds.add(row.id);
                 combinedSessions.push(row as LiveKitHistoryEntry);
               }
             });
           }
-        } catch (loadError: unknown) {
-          console.warn('Supabase history fetch notice:', loadError);
         }
-      }
-
-      // 2. Discover local browser sessions from LocalStorage & SessionStorage
-      if (typeof window !== 'undefined') {
-        try {
-          // Check livekit-current-interview store in storage
-          const currentStored =
-            localStorage.getItem('hireable:livekit-current-interview') ||
-            localStorage.getItem('livekit-current-interview');
-          if (currentStored) {
-            try {
-              const parsed = JSON.parse(currentStored);
-              if (parsed && parsed.interviewId && !seenIds.has(parsed.interviewId)) {
-                seenIds.add(parsed.interviewId);
-                combinedSessions.push({
-                  id: parsed.interviewId,
-                  target_role: parsed.targetRole || 'Software Engineer',
-                  status:
-                    parsed.status === 'completed' || parsed.results
-                      ? 'completed'
-                      : parsed.status || 'completed',
-                  completed_at: parsed.completedAt || new Date().toISOString(),
-                  started_at: parsed.startedAt || parsed.createdAt || new Date().toISOString(),
-                  created_at: parsed.createdAt || new Date().toISOString(),
-                  config: {
-                    type: parsed.mode === 'text' ? 'text' : 'live_audio',
-                    difficulty: 'medium',
-                    durationMinutes: parsed.durationMinutes || 15,
-                    topics: parsed.topics || [],
-                  },
-                  result: parsed.results || null,
-                });
-              }
-            } catch {}
-          }
-
-          // Scan all localStorage keys for interview_result_...
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('interview_result_intv_')) {
-              const intvId = key.replace('interview_result_', '');
-              if (!seenIds.has(intvId)) {
-                try {
-                  const resVal = JSON.parse(localStorage.getItem(key) || '{}');
-                  seenIds.add(intvId);
-                  combinedSessions.push({
-                    id: intvId,
-                    target_role: resVal.targetRole || 'Software Engineer',
-                    status: 'completed',
-                    completed_at: new Date().toISOString(),
-                    started_at: new Date().toISOString(),
-                    created_at: new Date().toISOString(),
-                    config: {
-                      type: 'live_audio',
-                      difficulty: 'medium',
-                      durationMinutes: 15,
-                      topics: resVal.strongestTopics || [],
-                    },
-                    result: resVal,
-                  });
-                } catch {}
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('Local storage history scan error:', err);
-        }
+      } catch (loadError: unknown) {
+        console.warn('Supabase history fetch notice:', loadError);
       }
 
       if (active) {
@@ -315,13 +334,27 @@ export default function InterviewHistoryPage() {
                     </span>
                     {entry.difficulty && <span className="capitalize">{entry.difficulty}</span>}
                     {entry.durationMinutes !== null && <span>{entry.durationMinutes} min</span>}
-                    {entry.overallScore !== undefined && (
-                      <span className="flex items-center gap-1 font-mono font-medium text-stone-200">
-                        <Award className="h-3 w-3 text-[#D93829]" />
-                        Score: {entry.overallScore}
-                      </span>
-                    )}
                   </div>
+
+                  {entry.status === 'completed' && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-xs">
+                      <span className="inline-flex items-center gap-1 rounded border border-emerald-800/60 bg-emerald-950/40 px-2 py-0.5 text-[11px] text-emerald-300">
+                        <Radio className="h-3 w-3 text-emerald-400" />
+                        Round 1 Viva: {entry.vivaScore !== undefined ? `${entry.vivaScore}/100` : '--/100'}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded border border-blue-800/60 bg-blue-950/40 px-2 py-0.5 text-[11px] text-blue-300">
+                        <Brain className="h-3 w-3 text-blue-400" />
+                        Round 2 IDE: {entry.ideScore !== undefined ? `${entry.ideScore}/100` : '--/100'}
+                      </span>
+                      {entry.overallScore !== undefined && (
+                        <span className="inline-flex items-center gap-1 rounded border border-[#D93829]/40 bg-[#D93829]/10 px-2 py-0.5 text-[11px] font-semibold text-[#FF8577]">
+                          <Award className="h-3 w-3 text-[#D93829]" />
+                          Score: {entry.overallScore}/100
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {entry.topics.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-1">
                       {entry.topics.slice(0, 3).map((topic) => (
@@ -332,16 +365,17 @@ export default function InterviewHistoryPage() {
                     </div>
                   )}
                 </div>
+
                 {entry.status === 'completed' ? (
                   <Link href={`/dashboard/interview/results/${entry.id}`}>
-                    <Button variant="outline" size="sm" className="rounded-lg border-stone-700 bg-stone-800 text-xs font-medium text-stone-200 hover:bg-stone-700 hover:text-white">
-                      Review
+                    <Button variant="outline" size="sm" className="rounded-lg border-stone-700 bg-stone-800 text-xs font-medium text-stone-200 transition-colors hover:border-[#D93829] hover:bg-stone-700 hover:text-white">
+                      View Feedback
                       <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                     </Button>
                   </Link>
                 ) : (
                   <Link href="/dashboard/interview">
-                    <Button variant="ghost" size="sm" className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200">
+                    <Button variant="ghost" size="sm" className="rounded-lg text-xs text-stone-400 transition-colors hover:bg-stone-800 hover:text-stone-200">
                       Retry
                     </Button>
                   </Link>

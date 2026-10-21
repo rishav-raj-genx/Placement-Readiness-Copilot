@@ -68,13 +68,17 @@ export const useJobStore = create<JobState>((set, get) => ({
       if (profile) {
         query = query.eq('publication_status', 'published');
         if (profile.id) {
-          query = query.or(`student_id.eq.${profile.id},student_id.is.null`);
+          query = query.or(`student_id.eq.${profile.id},is_msot_post.eq.true`);
         }
       }
       const { data, error } = await query
+        .order('is_msot_post', { ascending: false })
         .order('relevance_score', { ascending: false })
         .order('posted_at', { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error("Job Fetch Error:", error.message);
+        throw error;
+      }
       const jobs = normalizeDiscoveredJobs(data as unknown);
 
       let matchCandidates = jobs;
@@ -88,7 +92,7 @@ export const useJobStore = create<JobState>((set, get) => ({
             .select('*')
             .eq('publication_status', 'published');
           if (profile.id) {
-            matchQuery = matchQuery.or(`student_id.eq.${profile.id},student_id.is.null`);
+            matchQuery = matchQuery.or(`student_id.eq.${profile.id},is_msot_post.eq.true`);
           }
           if (skill) matchQuery = matchQuery.contains('required_skills', [skill]);
           if (employmentType) matchQuery = matchQuery.eq('employment_type', employmentType);

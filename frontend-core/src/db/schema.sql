@@ -292,10 +292,11 @@ ALTER TABLE application_tracker ENABLE ROW LEVEL SECURITY;
 ALTER TABLE discovered_jobs ENABLE ROW LEVEL SECURITY;
 
 -- 1. Student Read-Own / Manage-Own Policies
+DROP POLICY IF EXISTS "Students can only view their own interviews" ON interview_sessions;
 DROP POLICY IF EXISTS "Students can read own interview sessions" ON interview_sessions;
-CREATE POLICY "Students can read own interview sessions"
+CREATE POLICY "Students can only view their own interviews"
     ON interview_sessions FOR SELECT
-    USING (auth.uid()::text = student_id OR auth.uid() = user_id);
+    USING (auth.uid() = student_id OR auth.uid()::text = student_id::text OR auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Students can insert own interview sessions" ON interview_sessions;
 CREATE POLICY "Students can insert own interview sessions"
@@ -398,10 +399,12 @@ $$;
 REVOKE ALL ON FUNCTION public.is_msot_admin() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_msot_admin() TO authenticated;
 
+DROP POLICY IF EXISTS "Users can view their own matched jobs" ON discovered_jobs;
 DROP POLICY IF EXISTS "Authenticated users can read discovered jobs" ON discovered_jobs;
-CREATE POLICY "Authenticated users can read discovered jobs"
+DROP POLICY IF EXISTS "Students view personal matches and MSOT posts" ON discovered_jobs;
+CREATE POLICY "Students view personal matches and MSOT posts"
     ON discovered_jobs FOR SELECT TO authenticated
-    USING (publication_status = 'published' OR public.is_msot_admin());
+    USING (student_id = auth.uid() OR student_id::text = auth.uid()::text OR is_msot_post = true);
 
 DROP POLICY IF EXISTS "MSOT admins can insert jobs" ON discovered_jobs;
 CREATE POLICY "MSOT admins can insert jobs"

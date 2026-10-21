@@ -97,9 +97,9 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
 
     if (authData.user) {
       // Crucial: Use the .or() filter to allow global admin jobs to bypass the student_id lock
-      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},is_msot_post.eq.true,student_id.is.null`);
+      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},is_msot_post.eq.true`);
     } else {
-      jobsQuery = jobsQuery.or('is_msot_post.eq.true,student_id.is.null');
+      jobsQuery = jobsQuery.or('is_msot_post.eq.true');
     }
 
     const { data: jobData, error: jobsError } = await jobsQuery
@@ -108,7 +108,7 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
       .order('posted_at', { ascending: false });
 
     if (jobsError) {
-      console.warn('Jobs query warning:', jobsError.message);
+      console.error("Job Fetch Error:", jobsError.message);
       return {
         profile,
         jobs: [],

@@ -106,6 +106,160 @@ async function persistCodingAssessment(input: PersistCodingAssessmentInput): Pro
   });
 
   if (error) throw new Error(`Unable to persist coding assessment: ${error.message}`);
+
+  // PHASE 3: MASTER SCORE RECALCULATION
+  try {
+    const ideScore = Math.round(score);
+    let vivaScore: number | null = null;
+
+    // Fetch latest completed Viva (Round 1) session
+    const { data: recentVivaSessions } = await admin
+      .from('interview_sessions')
+      .select('interview_score, viva_scores, result, config')
+      .or(`user_id.eq.${input.userId},student_id.eq.${input.userId}`)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(10);
+
+    if (Array.isArray(recentVivaSessions)) {
+      const vivaSession = recentVivaSessions.find((s) => {
+        const cfg = typeof s.config === 'object' && s.config !== null ? (s.config as Record<string, unknown>) : {};
+        return cfg.type !== 'coding' && cfg.round !== 2;
+      });
+
+      if (vivaSession) {
+        const vivaRec = typeof vivaSession.viva_scores === 'object' && vivaSession.viva_scores !== null
+          ? (vivaSession.viva_scores as Record<string, unknown>)
+          : {};
+        const resultRec = typeof vivaSession.result === 'object' && vivaSession.result !== null
+          ? (vivaSession.result as Record<string, unknown>)
+          : {};
+
+        const rawViva =
+          vivaSession.interview_score ??
+          vivaRec.interview_score ??
+          vivaRec.overall_score ??
+          resultRec.interview_score;
+
+        if (typeof rawViva === 'number' && Number.isFinite(rawViva)) {
+          vivaScore = Math.round(rawViva);
+        }
+      }
+    }
+
+    const newMockScore = vivaScore !== null
+      ? Math.round((vivaScore + ideScore) / 2)
+      : ideScore;
+
+    const studentId = input.userId;
+    const { data: profileData } = await admin
+      .from('profiles')
+      .select('scores')
+      .eq('id', studentId)
+      .maybeSingle();
+
+    type ProfileScoresPayload = Record<string, unknown> & {
+      resume?: number;
+      projects?: number;
+      mock_interview?: number;
+      github?: number;
+      linkedin?: number;
+      leetcode?: number;
+      coding_practice?: number;
+    };
+
+    const currentScores: ProfileScoresPayload = (profileData?.scores && typeof profileData.scores === 'object' && !Array.isArray(profileData.scores))
+      ? (profileData.scores as ProfileScoresPayload)
+      : {};
+
+    const updatedScores: ProfileScoresPayload = {
+      ...currentScores,
+      mock_interview: newMockScore,
+    };
+
+    await admin
+      .from('profiles')
+      .update({
+        scores: updatedScores,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', studentId);
+
+    // Synchronize readiness_scores table if present
+    const { data: existingReadiness } = await admin
+      .from('readiness_scores')
+      .select('*')
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    if (existingReadiness) {
+      const resumeScore = typeof updatedScores.resume === 'number' ? updatedScores.resume : 0;
+      const projectsScore = typeof updatedScores.projects === 'number' ? updatedScores.projects : 0;
+      const githubScore = typeof updatedScores.github === 'number' ? updatedScores.github : 0;
+      const linkedinScore = typeof updatedScores.linkedin === 'number' ? updatedScores.linkedin : 0;
+      const leetcodeScore = typeof updatedScores.leetcode === 'number'
+        ? updatedScores.leetcode
+        : (typeof updatedScores.coding_practice === 'number' ? updatedScores.coding_practice : 0);
+      const leetcodeContribution = Math.min(10, Math.max(0, leetcodeScore * 0.10));
+
+      const newTotalReadiness = Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            (resumeScore * 0.25) +
+            (projectsScore * 0.20) +
+            (newMockScore * 0.20) +
+            (githubScore * 0.15) +
+            (linkedinScore * 0.10) +
+            leetcodeContribution
+          )
+        )
+      );
+
+      const newReadinessLevel = newTotalReadiness >= 75
+        ? 'Placement ready'
+        : newTotalReadiness >= 50
+          ? 'Almost ready'
+          : 'Not ready';
+
+      const rawInputs = typeof existingReadiness.raw_inputs === 'object' && existingReadiness.raw_inputs !== null
+        ? (existingReadiness.raw_inputs as Record<string, unknown>)
+        : {};
+
+      const existingBreakdown = typeof existingReadiness.breakdown === 'object' && existingReadiness.breakdown !== null
+        ? (existingReadiness.breakdown as Record<string, unknown>)
+        : {};
+
+      const updatedBreakdown = {
+        ...existingBreakdown,
+        mock_interview: {
+          raw_score: newMockScore,
+          weight: 0.20,
+          weighted_points: Math.round(newMockScore * 0.20 * 10) / 10,
+          max_points: 20,
+          present: newMockScore > 0,
+        },
+      };
+
+      await admin
+        .from('readiness_scores')
+        .update({
+          total_score: newTotalReadiness,
+          readiness_level: newReadinessLevel,
+          breakdown: updatedBreakdown,
+          raw_inputs: {
+            ...rawInputs,
+            scores: updatedScores,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('student_id', studentId);
+    }
+  } catch (codingRecalcErr) {
+    console.warn('[Coding Complete] Master score recalculation notice:', codingRecalcErr);
+  }
+
   return interviewId;
 }
 

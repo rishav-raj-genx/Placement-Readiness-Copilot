@@ -151,3 +151,22 @@ export function personalizeAndRankDiscoveredJobs(
     return timestamp(second.posted_at) - timestamp(first.posted_at);
   });
 }
+
+export async function fetchDiscoveredJobs(
+  supabase: { from: (table: string) => any },
+  user: { id: string }
+) {
+  const { data: jobs, error } = await supabase
+    .from('discovered_jobs')
+    .select('*')
+    .or(`student_id.eq.${user.id},is_msot_post.eq.true`)
+    .eq('publication_status', 'published')
+    .order('is_msot_post', { ascending: false })
+    .order('relevance_score', { ascending: false });
+
+  if (error) {
+    console.error("Job Fetch Error:", error.message);
+  }
+  return { data: jobs, error };
+}
+
