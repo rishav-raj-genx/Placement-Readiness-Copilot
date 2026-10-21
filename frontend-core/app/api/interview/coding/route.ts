@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getOptionalInterviewBaseUrl, serviceRequest } from '@/lib/backend-services';
 import { execFileSync } from 'child_process';
 import vm from 'vm';
+import ts from 'typescript';
 
 export const runtime = 'nodejs';
 
@@ -321,7 +322,9 @@ function executePythonCode(problemId: string, code: string): {
   };
 } {
   const runnerScript = `
-import sys, json, ast, time, traceback
+import sys, json, ast, time, traceback, collections, heapq, math, bisect
+import typing
+from typing import List, Dict, Set, Tuple, Optional, Any, Union, Deque
 
 raw_code = sys.stdin.read()
 problem_id = sys.argv[1]
@@ -345,8 +348,24 @@ except SyntaxError as e:
     print(json.dumps(res))
     sys.exit(0)
 
-# Step 2: Namespace execution
-ns = {}
+# Step 2: Namespace execution with standard library pre-injected
+ns = {
+    "List": List,
+    "Dict": Dict,
+    "Set": Set,
+    "Tuple": Tuple,
+    "Optional": Optional,
+    "Any": Any,
+    "Union": Union,
+    "deque": collections.deque,
+    "defaultdict": collections.defaultdict,
+    "Counter": collections.Counter,
+    "heapq": heapq,
+    "math": math,
+    "bisect": bisect,
+    "typing": typing,
+    "collections": collections,
+}
 try:
     exec(raw_code, ns)
 except Exception as e:
@@ -372,14 +391,20 @@ except Exception as e:
 
 # Step 3: Run problem-specific test cases
 if problem_id == "two_sum":
-    fn = ns.get("two_sum")
+    fn = ns.get("two_sum") or ns.get("twoSum")
+    if not fn and "Solution" in ns:
+        try:
+            sol = ns["Solution"]()
+            fn = getattr(sol, "two_sum", None) or getattr(sol, "twoSum", None)
+        except:
+            pass
     if not fn or not callable(fn):
         res = {
             "status": "compile_error",
             "error": {
                 "type": "SyntaxError",
-                "message": "Function 'two_sum' not found or not callable",
-                "details": "Ensure your function is defined as: def two_sum(nums, target):"
+                "message": "Function 'two_sum' or 'twoSum' not found or not callable",
+                "details": "Ensure your function is defined as: def two_sum(nums, target): or class Solution: def twoSum(self, nums, target):"
             }
         }
         print(json.dumps(res))
@@ -397,13 +422,13 @@ if problem_id == "two_sum":
             t0 = time.perf_counter()
             actual = fn(tc["nums"], tc["target"])
             dt = round((time.perf_counter() - t0) * 1000, 2)
-            passed = actual == tc["expected"] or (isinstance(actual, list) and sorted(actual) == sorted(tc["expected"]))
+            passed = actual == tc["expected"] or (isinstance(actual, (list, tuple)) and sorted(list(actual)) == sorted(tc["expected"]))
             results.append({
                 "id": tc["id"],
                 "name": tc["name"],
                 "passed": passed,
                 "input": {"nums": tc["nums"], "target": tc["target"]},
-                "actual": actual,
+                "actual": list(actual) if isinstance(actual, (list, tuple)) else actual,
                 "expected": tc["expected"],
                 "runtime_ms": dt
             })
@@ -421,7 +446,7 @@ if problem_id == "two_sum":
     sys.exit(0)
 
 elif problem_id == "lru_cache":
-    cls = ns.get("LRUCache")
+    cls = ns.get("LRUCache") or ns.get("LruCache")
     if not cls:
         res = {
             "status": "compile_error",
@@ -774,9 +799,28 @@ function executeJsCode(problemId: string, code: string): {
     details: string;
   };
 } {
-  // Step 1: Pre-flight syntax validation
+  // Step 1: Transpile TypeScript / Modern ES syntax to standard JavaScript
+  let executableCode = code;
   try {
-    new vm.Script(code);
+    executableCode = ts.transpile(code, {
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.CommonJS,
+    });
+  } catch (err: unknown) {
+    const e = err as Error;
+    return {
+      status: 'compile_error',
+      error: {
+        type: 'SyntaxError',
+        message: e.message,
+        details: `TypeScript Compilation Error: ${e.message}`,
+      },
+    };
+  }
+
+  // Step 2: Pre-flight syntax validation
+  try {
+    new vm.Script(executableCode);
   } catch (err: unknown) {
     const e = err as Error;
     const match = e.stack?.match(/evalmachine\.<anonymous>:(\d+)/);
@@ -792,7 +836,7 @@ function executeJsCode(problemId: string, code: string): {
     };
   }
 
-  // Step 2: Contextual execution
+  // Step 3: Contextual execution with extraction wrapper
   const sandbox: Record<string, unknown> = {
     console,
     Map,
@@ -803,15 +847,37 @@ function executeJsCode(problemId: string, code: string): {
     String,
     Boolean,
     Math,
+    Date,
+    RegExp,
+    JSON,
     setTimeout,
     clearTimeout,
+    setInterval,
+    clearInterval,
     Promise,
   };
   const context = vm.createContext(sandbox);
 
+  const extractionSnippet = `
+${executableCode}
+;({
+  twoSum: typeof twoSum !== 'undefined' ? twoSum : (typeof globalThis.twoSum !== 'undefined' ? globalThis.twoSum : undefined),
+  two_sum: typeof two_sum !== 'undefined' ? two_sum : (typeof globalThis.two_sum !== 'undefined' ? globalThis.two_sum : undefined),
+  LRUCache: typeof LRUCache !== 'undefined' ? LRUCache : (typeof globalThis.LRUCache !== 'undefined' ? globalThis.LRUCache : undefined),
+  LruCache: typeof LruCache !== 'undefined' ? LruCache : (typeof globalThis.LruCache !== 'undefined' ? globalThis.LruCache : undefined),
+  debounce: typeof debounce !== 'undefined' ? debounce : (typeof globalThis.debounce !== 'undefined' ? globalThis.debounce : undefined),
+  useDebounce: typeof useDebounce !== 'undefined' ? useDebounce : (typeof globalThis.useDebounce !== 'undefined' ? globalThis.useDebounce : undefined),
+  use_debounce: typeof use_debounce !== 'undefined' ? use_debounce : (typeof globalThis.use_debounce !== 'undefined' ? globalThis.use_debounce : undefined),
+  fetchWithRetry: typeof fetchWithRetry !== 'undefined' ? fetchWithRetry : (typeof globalThis.fetchWithRetry !== 'undefined' ? globalThis.fetchWithRetry : undefined),
+  fetch_with_retry: typeof fetch_with_retry !== 'undefined' ? fetch_with_retry : (typeof globalThis.fetch_with_retry !== 'undefined' ? globalThis.fetch_with_retry : undefined),
+  Solution: typeof Solution !== 'undefined' ? Solution : (typeof globalThis.Solution !== 'undefined' ? globalThis.Solution : undefined),
+});
+`;
+
+  let exported: Record<string, unknown> = {};
   try {
-    const script = new vm.Script(code);
-    script.runInContext(context, { timeout: 3000 });
+    const script = new vm.Script(extractionSnippet);
+    exported = (script.runInContext(context, { timeout: 3000 }) || {}) as Record<string, unknown>;
   } catch (err: unknown) {
     const e = err as Error;
     return {
@@ -825,18 +891,29 @@ function executeJsCode(problemId: string, code: string): {
   }
 
   if (problemId === 'two_sum') {
-    const fn = sandbox.twoSum as ((nums: number[], target: number) => number[]) | undefined;
+    let fn = (exported.twoSum || exported.two_sum || sandbox.twoSum || sandbox.two_sum) as
+      | ((nums: number[], target: number) => number[])
+      | undefined;
+    if (typeof fn !== 'function' && typeof exported.Solution === 'function') {
+      try {
+        const sol = new (exported.Solution as new () => Record<string, unknown>)();
+        fn = (sol.twoSum || sol.two_sum) as ((nums: number[], target: number) => number[]) | undefined;
+      } catch {
+        // ignore
+      }
+    }
     if (typeof fn !== 'function') {
       return {
         status: 'compile_error',
         error: {
           type: 'SyntaxError',
-          message: "Function 'twoSum' not found",
-          details: 'Ensure your function is defined as: function twoSum(nums, target) { ... }',
+          message: "Function 'twoSum' or 'two_sum' not found",
+          details: 'Ensure your function is defined as: function twoSum(nums, target) { ... } or const twoSum = (nums, target) => { ... }',
         },
       };
     }
 
+    const twoSumFn = fn;
     const cases = [
       { id: 'tc1', name: 'Standard Case', nums: [2, 7, 11, 15], target: 9, expected: [0, 1] },
       { id: 'tc2', name: 'Non-Adjacent Elements', nums: [3, 2, 4], target: 6, expected: [1, 2] },
@@ -847,14 +924,15 @@ function executeJsCode(problemId: string, code: string): {
     const results = cases.map((tc) => {
       try {
         const t0 = performance.now();
-        const actual = fn([...tc.nums], tc.target);
+        const actual = twoSumFn([...tc.nums], tc.target);
         const dt = Math.round((performance.now() - t0) * 100) / 100;
         const isArr = Array.isArray(actual);
         const passed =
           isArr &&
           actual.length === 2 &&
           (JSON.stringify(actual) === JSON.stringify(tc.expected) ||
-            JSON.stringify([...actual].sort()) === JSON.stringify([...tc.expected].sort()));
+            JSON.stringify([...actual].sort((a, b) => Number(a) - Number(b))) ===
+              JSON.stringify([...tc.expected].sort((a, b) => Number(a) - Number(b))));
         return {
           id: tc.id,
           name: tc.name,
@@ -885,7 +963,7 @@ function executeJsCode(problemId: string, code: string): {
       get: (k: number) => number;
       put: (k: number, v: number) => void;
     };
-    const LRU = sandbox.LRUCache as LRUClassType | undefined;
+    const LRU = (exported.LRUCache || exported.LruCache || sandbox.LRUCache || sandbox.LruCache) as LRUClassType | undefined;
     if (typeof LRU !== 'function') {
       return {
         status: 'compile_error',
@@ -1005,7 +1083,7 @@ function executeJsCode(problemId: string, code: string): {
 
   if (problemId === 'use_debounce') {
     type DebounceFn = (fn: (...args: unknown[]) => void, delay: number) => ((...args: unknown[]) => void) & { cancel?: () => void };
-    const debounce = sandbox.debounce as DebounceFn | undefined;
+    const debounce = (exported.debounce || exported.useDebounce || exported.use_debounce || sandbox.debounce || sandbox.useDebounce || sandbox.use_debounce) as DebounceFn | undefined;
     if (typeof debounce !== 'function') {
       return {
         status: 'compile_error',
@@ -1104,7 +1182,7 @@ function executeJsCode(problemId: string, code: string): {
 
   if (problemId === 'fetch_with_retry') {
     type FetchRetryFn = (url: unknown, options?: unknown, maxRetries?: number, backoffMs?: number) => Promise<unknown>;
-    const fetchFn = sandbox.fetchWithRetry as FetchRetryFn | undefined;
+    const fetchFn = (exported.fetchWithRetry || exported.fetch_with_retry || sandbox.fetchWithRetry || sandbox.fetch_with_retry || sandbox.request_with_retry) as FetchRetryFn | undefined;
     if (typeof fetchFn !== 'function') {
       return {
         status: 'compile_error',
@@ -1186,45 +1264,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   const cleanedCode = (code || '').trim();
   const lang = (language || 'javascript').toLowerCase();
 
-  // Step 1: Language Syntax Mismatch Check
-  const isPythonWithJsKeywords =
-    lang === 'python' &&
-    /\b(function|const|let|var|console\.log|=>|async function)\b/.test(cleanedCode);
-  const isJsWithPythonKeywords =
-    (lang === 'javascript' || lang === 'typescript') &&
-    /\b(def |elif |self\.|__init__|print\()\b/.test(cleanedCode);
-
-  if (isPythonWithJsKeywords || isJsWithPythonKeywords) {
-    const mismatchedLanguage = isPythonWithJsKeywords ? 'JavaScript syntax in Python mode' : 'Python syntax in JavaScript mode';
-    return NextResponse.json({
-      status: 'compile_error',
-      error: {
-        type: 'SyntaxError',
-        line: 1,
-        message: `Detected ${mismatchedLanguage}. Code could not compile.`,
-        details: `Compilation Error: You selected ${lang.toUpperCase()}, but wrote ${mismatchedLanguage}. Please switch the language selector or fix your syntax.`,
-      },
-      result: {
-        problem_id: problem.id,
-        problem_title: problem.title,
-        overall_score: 20,
-        passed_tests: 0,
-        total_tests: problem.test_cases.length,
-        estimated_time_complexity: 'Compilation Failed',
-        estimated_space_complexity: 'Compilation Failed',
-        optimal_time_complexity: problem.optimal_time_complexity,
-        optimal_space_complexity: problem.optimal_space_complexity,
-        complexity_comparison: `Syntax error: Detected ${mismatchedLanguage}. Code could not compile.`,
-        code_quality_feedback: `Compilation Error: You selected ${lang.toUpperCase()}, but wrote ${mismatchedLanguage}.`,
-        strengths: ['Addressed the challenge requirements'],
-        improvement_areas: ['Ensure code matches the selected programming language syntax.'],
-        interviewer_follow_up: 'What syntax differences between Python and JavaScript are most critical?',
-        optimal_code_diff_note: 'Ensure language selector matches the code syntax.',
-      },
-    });
-  }
-
-  // Step 2: Execute code in target runtime (Python or JS)
+  // Execute code in target runtime (Python or JS/TS)
   const execResult =
     lang === 'python'
       ? executePythonCode(problem.id, cleanedCode)

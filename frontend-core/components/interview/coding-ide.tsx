@@ -97,10 +97,10 @@ interface CompileErrorState {
   details?: string;
 }
 
-// Client-side syntax and language mismatch check (LeetCode-grade)
+// Client-side empty check; real syntax errors and compilation diagnostics are handled by the execution engine
 function validateCodeSyntax(
   code: string,
-  lang: 'javascript' | 'typescript' | 'python'
+  _lang?: 'javascript' | 'typescript' | 'python'
 ): { valid: boolean; error?: CompileErrorState } {
   const trimmed = code.trim();
   if (!trimmed) {
@@ -110,140 +110,6 @@ function validateCodeSyntax(
         type: 'SyntaxError',
         message: 'Empty solution provided',
         details: 'Please write your code implementation before running tests or submitting.',
-      },
-    };
-  }
-
-  const lines = trimmed.split('\n');
-
-  if (lang === 'python') {
-    // Check for JavaScript keywords in Python mode
-    const jsKeywords = [
-      { pattern: /\basync\s+function\b/, msg: "Keyword 'async function' is JavaScript syntax. Use 'async def' in Python." },
-      { pattern: /\bfunction\s+/, msg: "Keyword 'function' is JavaScript syntax. Use 'def' in Python." },
-      { pattern: /\bconst\s+/, msg: "Keyword 'const' is JavaScript syntax. In Python, assign variables directly without 'const'." },
-      { pattern: /\blet\s+/, msg: "Keyword 'let' is JavaScript syntax. In Python, assign variables directly without 'let'." },
-      { pattern: /\bvar\s+/, msg: "Keyword 'var' is JavaScript syntax. In Python, assign variables directly." },
-      { pattern: /=>/, msg: "Arrow function '=>' is JavaScript syntax. Use 'lambda' or 'def' in Python." },
-      { pattern: /===|!==/, msg: "Strict equality operator is JavaScript. Use '==' / '!=' or 'is' in Python." },
-      { pattern: /console\.log\(/, msg: "'console.log' is JavaScript. Use 'print()' in Python." },
-    ];
-
-    for (let i = 0; i < lines.length; i++) {
-      const lineText = lines[i];
-      for (const { pattern, msg } of jsKeywords) {
-        if (pattern.test(lineText)) {
-          return {
-            valid: false,
-            error: {
-              type: 'SyntaxError',
-              line: i + 1,
-              message: `SyntaxError: invalid syntax on line ${i + 1}`,
-              details: `Line ${i + 1}: ${lineText.trim()}\nSyntaxError: ${msg}`,
-            },
-          };
-        }
-      }
-
-      // Check for missing colon on Python control flow headers
-      const stripped = lineText.trim();
-      const headerMatch = stripped.match(/^(def\s+\w+.*|class\s+\w+.*|if\s+.*|elif\s+.*|else|for\s+.*|while\s+.*|try|except.*|finally|with\s+.*)$/);
-      if (headerMatch && !stripped.endsWith(':') && !stripped.endsWith('\\') && !stripped.endsWith(',')) {
-        return {
-          valid: false,
-          error: {
-            type: 'SyntaxError',
-            line: i + 1,
-            message: `SyntaxError: expected ':' at end of line ${i + 1}`,
-            details: `Line ${i + 1}: ${stripped}\nSyntaxError: expected ':' at end of block header`,
-          },
-        };
-      }
-    }
-  } else {
-    // JavaScript / TypeScript mode: Check for Python keywords
-    const pyKeywords = [
-      { pattern: /\bdef\s+/, msg: "Keyword 'def' is Python syntax. Use 'function' or arrow functions in JavaScript." },
-      { pattern: /\belif\s+/, msg: "Keyword 'elif' is Python syntax. Use 'else if' in JavaScript." },
-      { pattern: /\bprint\(/, msg: "'print()' is Python syntax. Use 'console.log()' in JavaScript." },
-      { pattern: /__init__/, msg: "'__init__' is Python syntax. Use 'constructor' in JavaScript classes." },
-    ];
-
-    for (let i = 0; i < lines.length; i++) {
-      const lineText = lines[i];
-      for (const { pattern, msg } of pyKeywords) {
-        if (pattern.test(lineText)) {
-          return {
-            valid: false,
-            error: {
-              type: 'SyntaxError',
-              line: i + 1,
-              message: `SyntaxError: invalid syntax on line ${i + 1}`,
-              details: `Line ${i + 1}: ${lineText.trim()}\nSyntaxError: ${msg}`,
-            },
-          };
-        }
-      }
-    }
-  }
-
-  // Universal bracket balance check with line numbers across all languages
-  const stack: { char: string; line: number; col: number }[] = [];
-  const openPairs: Record<string, string> = { '(': ')', '{': '}', '[': ']' };
-  const closePairs: Record<string, string> = { ')': '(', '}': '{', ']': '[' };
-
-  for (let l = 0; l < lines.length; l++) {
-    const lineStr = lines[l];
-    // Strip comments
-    const commentIdx = lang === 'python' ? lineStr.indexOf('#') : lineStr.indexOf('//');
-    const cleanLine = commentIdx >= 0 ? lineStr.slice(0, commentIdx) : lineStr;
-
-    for (let c = 0; c < cleanLine.length; c++) {
-      const ch = cleanLine[c];
-      if (ch === '(' || ch === '{' || ch === '[') {
-        stack.push({ char: ch, line: l + 1, col: c + 1 });
-      } else if (ch === ')' || ch === '}' || ch === ']') {
-        const expectedOpen = closePairs[ch];
-        if (stack.length === 0) {
-          return {
-            valid: false,
-            error: {
-              type: 'SyntaxError',
-              line: l + 1,
-              column: c + 1,
-              message: `SyntaxError: unmatched '${ch}' on line ${l + 1}`,
-              details: `Line ${l + 1}: ${cleanLine.trim()}\nSyntaxError: closing '${ch}' has no matching opening bracket`,
-            },
-          };
-        }
-        const top = stack.pop()!;
-        if (top.char !== expectedOpen) {
-          return {
-            valid: false,
-            error: {
-              type: 'SyntaxError',
-              line: l + 1,
-              column: c + 1,
-              message: `SyntaxError: closing '${ch}' on line ${l + 1} does not match '${top.char}' opened on line ${top.line}`,
-              details: `Line ${l + 1}: ${cleanLine.trim()}\nSyntaxError: mismatched brackets '${top.char}' and '${ch}'`,
-            },
-          };
-        }
-      }
-    }
-  }
-
-  if (stack.length > 0) {
-    const unclosed = stack[stack.length - 1];
-    const offendingLine = lines[unclosed.line - 1] || '';
-    return {
-      valid: false,
-      error: {
-        type: 'SyntaxError',
-        line: unclosed.line,
-        column: unclosed.col,
-        message: `SyntaxError: unclosed '${unclosed.char}' on line ${unclosed.line}`,
-        details: `Line ${unclosed.line}: ${offendingLine.trim()}\nSyntaxError: unmatched opening bracket '${unclosed.char}' was never closed`,
       },
     };
   }
@@ -313,7 +179,8 @@ export function CodingIDE() {
   const [followUpSubmitted, setFollowUpSubmitted] = useState(false);
   const [isAutoAdvancing, setIsAutoAdvancing] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'problem' | 'tests' | 'ai_review'>('problem');
+  const [activeTab, setActiveTab] = useState<'problem' | 'ai_review'>('problem');
+  const [isConsoleOpen, setIsConsoleOpen] = useState(true);
   const [showEndInterviewDialog, setShowEndInterviewDialog] = useState(false);
   const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
 
@@ -381,7 +248,7 @@ export function CodingIDE() {
     if (!activeProblem) return;
     setCompileError(null);
     setIsRunningTests(true);
-    setActiveTab('tests');
+    setIsConsoleOpen(true);
 
     // Step 1: Pre-flight syntax validation
     const syntaxCheck = validateCodeSyntax(code, language);
@@ -443,6 +310,7 @@ export function CodingIDE() {
     if (!activeProblem) return;
     setCompileError(null);
     setIsEvaluating(true);
+    setIsConsoleOpen(true);
     setActiveTab('ai_review');
 
     // Syntax pre-check before submission
@@ -450,7 +318,6 @@ export function CodingIDE() {
     if (!syntaxCheck.valid && syntaxCheck.error) {
       setCompileError(syntaxCheck.error);
       setIsEvaluating(false);
-      setActiveTab('tests');
       toast.error(syntaxCheck.error.message);
       return;
     }
@@ -476,7 +343,6 @@ export function CodingIDE() {
           message: data.error?.message || 'Compilation Error',
           details: data.error?.details || data.result?.code_quality_feedback,
         });
-        setActiveTab('tests');
         toast.error('Code failed execution: ' + (data.error?.message || 'Compile Error'));
       } else if (data.result) {
         setEvaluation(data.result);
@@ -631,89 +497,10 @@ export function CodingIDE() {
         })}
       </div>
 
-      {/* Main IDE Workspace: Spacious Balanced 50/50 Split */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Side: Code Editor & Console Actions */}
-        <div className="flex flex-col rounded-2xl border border-stone-800 bg-[#1a1310] overflow-hidden shadow-xl">
-          {/* Editor Header Bar */}
-          <div className="flex flex-wrap items-center justify-between border-b border-stone-800 bg-stone-950 px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <Code2 className="h-4 w-4 text-[#D93829]" />
-              <span className="font-mono text-xs font-medium text-stone-200 truncate max-w-[200px]">
-                {activeProblem ? activeProblem.title : 'Code editor'}
-              </span>
-              <div className="h-4 w-px bg-stone-800" />
-              <select
-                value={language}
-                onChange={(e) => handleLanguageChange(e.target.value as 'javascript' | 'typescript' | 'python')}
-                className="rounded-lg border border-stone-800 bg-stone-900 px-2.5 py-1 text-xs font-mono text-stone-300 focus:outline-none focus:ring-1 focus:ring-[#D93829]"
-              >
-                <option value="javascript">JavaScript</option>
-                <option value="typescript">TypeScript</option>
-                <option value="python">Python</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleReset}
-                className="h-8 text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200"
-              >
-                <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRunTests}
-                disabled={isRunningTests}
-                className="h-8 rounded-lg border-stone-700 bg-stone-900 text-xs font-semibold text-stone-200 hover:bg-stone-800"
-              >
-                {isRunningTests ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Play className="mr-1 h-3.5 w-3.5 text-emerald-400" />}
-                Run tests
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSubmitSolution}
-                disabled={isEvaluating}
-                className="h-8 rounded-lg bg-[#D93829] px-4 text-xs font-bold text-white shadow-md hover:bg-[#C22F21] active:bg-[#AB281B]"
-              >
-                {isEvaluating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
-                Submit
-              </Button>
-            </div>
-          </div>
-
-          {/* Monaco Editor Container */}
-          <div className="h-[520px] w-full">
-            <Editor
-              height="100%"
-              language={language === 'python' ? 'python' : 'javascript'}
-              value={code}
-              onChange={(val) => {
-                setCode(val || '');
-                if (compileError) setCompileError(null);
-                if (testOutput) setTestOutput(null);
-              }}
-              theme="vs-dark"
-              options={{
-                fontSize: 13,
-                fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                lineNumbers: 'on',
-                automaticLayout: true,
-                tabSize: 2,
-                cursorBlinking: 'smooth',
-                padding: { top: 14, bottom: 14 },
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Right Side: Tabbed Workspace (Problem Spec, LeetCode Test Cases, AI Review) */}
-        <div className="flex flex-col rounded-2xl border border-stone-800 bg-[#28201E] overflow-hidden shadow-xl">
+      {/* Main IDE Workspace: Problem Spec on Left, HackerRank / Judge0 Code Workspace on Right */}
+      <div className="grid gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column (5 cols on lg): Problem Spec & AI Feedback Hub */}
+        <div className="lg:col-span-5 flex flex-col rounded-2xl border border-stone-800 bg-[#28201E] overflow-hidden shadow-xl">
           {/* Navigation Tabs Header */}
           <div className="flex border-b border-stone-800 bg-stone-950 p-1.5">
             <button
@@ -724,17 +511,7 @@ export function CodingIDE() {
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
-              Problem spec
-            </button>
-            <button
-              onClick={() => setActiveTab('tests')}
-              className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-all ${
-                activeTab === 'tests'
-                  ? 'border border-stone-700 bg-stone-800 text-stone-100 shadow-sm'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
-            >
-              Test cases {testOutput ? `(${testOutput.filter((t) => t.passed).length}/${testOutput.length})` : ''}
+              Problem description
             </button>
             <button
               onClick={() => setActiveTab('ai_review')}
@@ -744,12 +521,12 @@ export function CodingIDE() {
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
-              Review {evaluation ? `(${evaluation.overall_score}/100)` : ''}
+              AI review & score {evaluation ? `(${evaluation.overall_score}/100)` : ''}
             </button>
           </div>
 
           {/* Tab Content Container */}
-          <div className="flex-1 overflow-y-auto p-6 text-sm h-[520px]">
+          <div className="flex-1 overflow-y-auto p-6 text-sm max-h-[820px]">
             {/* TAB 1: Detailed Problem Spec with Full Markdown */}
             {activeTab === 'problem' && activeProblem && (
               <div className="space-y-5">
@@ -804,178 +581,41 @@ export function CodingIDE() {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* TAB 2: LeetCode-Grade Interactive Test Cases */}
-            {activeTab === 'tests' && activeProblem && (
-              <div className="space-y-5">
-                {/* Compile / Runtime Error Banner (LeetCode Style) */}
-                {compileError && (
-                  <div className="rounded-xl border border-red-800/80 bg-red-950/50 p-4 space-y-2.5 font-mono text-xs text-red-200 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-red-900/60 pb-2">
-                      <div className="flex items-center gap-2 font-bold text-red-400">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
-                        <span className="text-sm font-semibold tracking-wide">
-                          {compileError.type || 'Compile Error'}
-                        </span>
-                      </div>
-                      {typeof compileError.line === 'number' && (
-                        <Badge variant="outline" className="border-red-800 bg-red-900/50 text-red-300 font-mono text-[11px]">
-                          Line {compileError.line}{typeof compileError.column === 'number' ? `:${compileError.column}` : ''}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="font-semibold text-stone-200">{compileError.message}</p>
-                    {compileError.details && (
-                      <pre className="whitespace-pre-wrap rounded-lg bg-stone-950/90 p-3.5 text-[11px] text-red-300 font-mono border border-red-900/50 overflow-x-auto">
-                        {compileError.details}
-                      </pre>
-                    )}
-                    <p className="text-[11px] text-stone-400 font-sans">
-                      Fix the syntax or runtime error above and click &quot;Run all tests&quot; to re-evaluate.
-                    </p>
-                  </div>
-                )}
-
-                {/* Test Cases Sub-tabs (Case 1, Case 2, Case 3, ...) */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="h-4 w-4 text-stone-400" />
-                      <h3 className="text-xs font-bold text-stone-200">Test Cases ({activeProblem.test_cases?.length || 0})</h3>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRunTests}
-                      disabled={isRunningTests}
-                      className="h-7 rounded-lg border-stone-700 bg-stone-900 text-xs text-stone-200 hover:bg-stone-800"
-                    >
-                      {isRunningTests ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Play className="mr-1 h-3 w-3 text-emerald-400" />}
-                      Run all tests
-                    </Button>
-                  </div>
-
-                  {/* Case Pills */}
-                  <div className="flex flex-wrap gap-2">
-                    {activeProblem.test_cases?.map((tc, idx) => {
-                      const result = testOutput?.[idx];
-                      const isSelected = selectedTestCaseIndex === idx;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => setSelectedTestCaseIndex(idx)}
-                          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-mono transition-colors ${
-                            isSelected
-                              ? 'border-stone-600 bg-stone-800 text-stone-100 font-bold'
-                              : 'border-stone-800 bg-stone-900/60 text-stone-400 hover:text-stone-200'
-                          }`}
-                        >
-                          {result && (
-                            result.passed ? (
-                              <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                            ) : (
-                              <XCircle className="h-3 w-3 text-red-400" />
-                            )
-                          )}
-                          <span>Case {idx + 1}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Selected Test Case Inspection (LeetCode Format) */}
-                {activeProblem.test_cases && activeProblem.test_cases[selectedTestCaseIndex] && (
-                  <div className="rounded-xl border border-stone-800 bg-stone-900/50 p-4 space-y-4 font-mono text-xs">
-                    {/* Test Case Title / Scenario */}
-                    <div className="flex items-center justify-between border-b border-stone-800 pb-2">
-                      <span className="font-bold text-stone-300">
-                        {(activeProblem.test_cases[selectedTestCaseIndex] as Record<string, unknown>).name as string || `Test Case ${selectedTestCaseIndex + 1}`}
-                      </span>
-                      {testOutput && testOutput[selectedTestCaseIndex] && (
-                        <div className="flex items-center gap-2">
-                          {typeof testOutput[selectedTestCaseIndex].runtime_ms === 'number' && (
-                            <span className="text-[10px] text-stone-400 font-mono">
-                              {testOutput[selectedTestCaseIndex].runtime_ms} ms
-                            </span>
-                          )}
-                          <Badge
-                            variant="outline"
-                            className={
-                              testOutput[selectedTestCaseIndex].passed
-                                ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
-                                : testOutput[selectedTestCaseIndex].error
-                                ? 'border-amber-800 bg-amber-950/40 text-amber-300'
-                                : 'border-red-800 bg-red-950/40 text-red-300'
-                            }
-                          >
-                            {testOutput[selectedTestCaseIndex].passed
-                              ? 'Accepted'
-                              : testOutput[selectedTestCaseIndex].error
-                              ? 'Runtime Error'
-                              : 'Wrong Answer'}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Input */}
+                {/* Sample Test Case 0 (HackerRank Style) */}
+                {activeProblem.test_cases && activeProblem.test_cases.length > 0 && (
+                  <div className="rounded-xl border border-stone-800 bg-stone-900/60 p-4 space-y-3 font-mono text-xs">
+                    <h3 className="font-mono text-[11px] font-bold uppercase tracking-wider text-stone-400">Sample Test Case 0</h3>
                     <div>
-                      <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Input</span>
-                      <pre className="mt-1.5 rounded-lg border border-stone-800 bg-stone-950 p-3 text-stone-200 whitespace-pre-wrap overflow-x-auto">
+                      <span className="text-[10px] uppercase text-stone-500 font-semibold">Sample Input</span>
+                      <pre className="mt-1 rounded-lg border border-stone-800 bg-stone-950 p-2.5 text-stone-200 overflow-x-auto whitespace-pre-wrap">
                         {JSON.stringify(
-                          (activeProblem.test_cases[selectedTestCaseIndex] as Record<string, unknown>).input ||
-                          (activeProblem.test_cases[selectedTestCaseIndex] as Record<string, unknown>).operations ||
-                          (activeProblem.test_cases[selectedTestCaseIndex] as Record<string, unknown>).scenario,
+                          (activeProblem.test_cases[0] as Record<string, unknown>).input ||
+                          (activeProblem.test_cases[0] as Record<string, unknown>).operations ||
+                          (activeProblem.test_cases[0] as Record<string, unknown>).scenario,
                           null,
                           2
                         )}
                       </pre>
                     </div>
-
-                    {/* Expected Output */}
                     <div>
-                      <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Expected Output</span>
-                      <pre className="mt-1.5 rounded-lg border border-stone-800 bg-stone-950 p-3 text-stone-200 whitespace-pre-wrap overflow-x-auto">
-                        {JSON.stringify(
-                          (activeProblem.test_cases[selectedTestCaseIndex] as Record<string, unknown>).expected,
-                          null,
-                          2
-                        )}
+                      <span className="text-[10px] uppercase text-stone-500 font-semibold">Sample Output</span>
+                      <pre className="mt-1 rounded-lg border border-stone-800 bg-stone-950 p-2.5 text-stone-200 overflow-x-auto whitespace-pre-wrap">
+                        {JSON.stringify((activeProblem.test_cases[0] as Record<string, unknown>).expected, null, 2)}
                       </pre>
                     </div>
-
-                    {/* Actual Output (if tests were executed) */}
-                    {testOutput && testOutput[selectedTestCaseIndex] ? (
-                      <div>
-                        <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Actual Output</span>
-                        <pre className={`mt-1.5 rounded-lg border p-3 whitespace-pre-wrap overflow-x-auto ${
-                          testOutput[selectedTestCaseIndex].passed
-                            ? 'border-emerald-900/60 bg-emerald-950/30 text-emerald-200'
-                            : 'border-red-900/60 bg-red-950/30 text-red-200'
-                        }`}>
-                          {testOutput[selectedTestCaseIndex].error ? (
-                            <span className="text-red-400 font-semibold">{testOutput[selectedTestCaseIndex].error}</span>
-                          ) : (
-                            JSON.stringify(testOutput[selectedTestCaseIndex].actual, null, 2)
-                          )}
-                        </pre>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-stone-800 bg-stone-950/50 p-3.5 text-center">
-                        <p className="text-xs text-stone-400 font-sans">
-                          Click <span className="font-semibold text-stone-200">&quot;Run tests&quot;</span> or <span className="font-semibold text-stone-200">&quot;Run all tests&quot;</span> to execute this test case.
-                        </p>
-                      </div>
+                    {Boolean((activeProblem.test_cases[0] as Record<string, unknown>).explanation) && (
+                      <p className="font-sans text-xs text-stone-400 pt-1">
+                        <span className="font-semibold text-stone-300">Explanation: </span>
+                        {String((activeProblem.test_cases[0] as Record<string, unknown>).explanation)}
+                      </p>
                     )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB 3: Code Evaluation & Comparison */}
+            {/* TAB 2: AI Review & Score */}
             {activeTab === 'ai_review' && (
               <div className="space-y-5">
                 {isEvaluating ? (
@@ -1097,12 +737,278 @@ export function CodingIDE() {
                 ) : (
                   <div className="flex h-64 flex-col items-center justify-center text-center text-stone-500">
                     <Brain className="h-7 w-7 text-stone-600" />
-                    <p className="mt-2 text-xs">Click &quot;Submit&quot; in the editor header to receive structured feedback on your code.</p>
+                    <p className="mt-2 text-xs">Click &quot;Submit Code&quot; in the editor action bar to receive structured AI evaluation and complexity feedback on your solution.</p>
                   </div>
                 )}
               </div>
             )}
           </div>
+        </div>
+
+        {/* Right Column (7 cols on lg): HackerRank / Judge0 Code Editor & Execution Console */}
+        <div className="lg:col-span-7 flex flex-col rounded-2xl border border-stone-800 bg-[#1a1310] overflow-hidden shadow-xl">
+          {/* Editor Header Bar: Clean & Uncongested */}
+          <div className="flex flex-wrap items-center justify-between border-b border-stone-800 bg-stone-950 px-5 py-3 gap-2">
+            <div className="flex items-center gap-3">
+              <Code2 className="h-4 w-4 text-[#D93829]" />
+              <span className="font-mono text-xs font-semibold text-stone-200 truncate max-w-[220px]">
+                {activeProblem ? activeProblem.title : 'Code editor'}
+              </span>
+              <div className="h-4 w-px bg-stone-800" />
+              <select
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value as 'javascript' | 'typescript' | 'python')}
+                className="rounded-lg border border-stone-800 bg-stone-900 px-3 py-1.5 text-xs font-mono text-stone-300 focus:outline-none focus:ring-1 focus:ring-[#D93829]"
+              >
+                <option value="javascript">JavaScript (Node.js)</option>
+                <option value="typescript">TypeScript</option>
+                <option value="python">Python 3</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <Badge variant="outline" className="border-stone-800 bg-stone-900/80 text-[11px] font-mono text-stone-400">
+                {isRunningTests ? 'Running...' : isEvaluating ? 'Evaluating...' : 'Ready'}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                className="h-8 text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200"
+                title="Reset to default code template"
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset
+              </Button>
+            </div>
+          </div>
+
+          {/* Monaco Editor Container */}
+          <div className="h-[460px] w-full">
+            <Editor
+              height="100%"
+              language={language === 'python' ? 'python' : 'javascript'}
+              value={code}
+              onChange={(val) => {
+                setCode(val || '');
+                if (compileError) setCompileError(null);
+                if (testOutput) setTestOutput(null);
+              }}
+              theme="vs-dark"
+              options={{
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                automaticLayout: true,
+                tabSize: 2,
+                cursorBlinking: 'smooth',
+                padding: { top: 14, bottom: 14 },
+              }}
+            />
+          </div>
+
+          {/* Dedicated HackerRank / Judge0 Bottom Action Bar (Uncongested, Spacious) */}
+          <div className="flex flex-wrap items-center justify-between border-t border-stone-800 bg-stone-950 px-6 py-3.5 gap-3">
+            {/* Left: Console toggle & Status pill */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsConsoleOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-lg border border-stone-800 bg-stone-900 px-3 py-1.5 text-xs font-mono text-stone-300 hover:border-stone-700 hover:text-stone-100 transition-colors"
+              >
+                <Terminal className="h-3.5 w-3.5 text-stone-400" />
+                <span>Console</span>
+                <span className="text-[10px] text-stone-500">{isConsoleOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {compileError ? (
+                <span className="flex items-center gap-1.5 text-xs font-mono font-medium text-red-400">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Compile Error
+                </span>
+              ) : testOutput ? (
+                <span className="flex items-center gap-1.5 text-xs font-mono font-medium text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {testOutput.filter((t) => t.passed).length}/{testOutput.length} Tests Passed
+                </span>
+              ) : (
+                <span className="hidden sm:inline-block text-[11px] text-stone-500 font-mono">
+                  Live Sandbox • Node & Python
+                </span>
+              )}
+            </div>
+
+            {/* Right: Spacious Action Buttons */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={handleRunTests}
+                disabled={isRunningTests}
+                className="h-10 px-5 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all hover:border-stone-600 active:scale-[0.98]"
+              >
+                {isRunningTests ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                ) : (
+                  <Play className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />
+                )}
+                <span>Run Code</span>
+              </Button>
+
+              <Button
+                onClick={handleSubmitSolution}
+                disabled={isEvaluating}
+                className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-[0.98]"
+              >
+                {isEvaluating ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                <span>Submit Code</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* HackerRank / Judge0 Test Results & Console Drawer */}
+          {isConsoleOpen && (
+            <div className="border-t border-stone-800 bg-[#140e0b] p-5 space-y-4">
+              {compileError ? (
+                /* Compile / Runtime Error Terminal */
+                <div className="rounded-xl border border-red-800/80 bg-red-950/60 p-4 space-y-2.5 font-mono text-xs text-red-200 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-red-900/60 pb-2">
+                    <div className="flex items-center gap-2 font-bold text-red-400">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                      <span className="text-sm font-semibold tracking-wide">
+                        {compileError.type || 'Compilation Error'}
+                      </span>
+                    </div>
+                    {typeof compileError.line === 'number' && (
+                      <Badge variant="outline" className="border-red-800 bg-red-900/50 text-red-300 font-mono text-[11px]">
+                        Line {compileError.line}{typeof compileError.column === 'number' ? `:${compileError.column}` : ''}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="font-semibold text-stone-200">{compileError.message}</p>
+                  {compileError.details && (
+                    <pre className="whitespace-pre-wrap rounded-lg bg-stone-950/90 p-3.5 text-[11px] text-red-300 font-mono border border-red-900/50 overflow-x-auto">
+                      {compileError.details}
+                    </pre>
+                  )}
+                  <p className="text-[11px] text-stone-400 font-sans">
+                    Fix the error above in your code and click &quot;Run Code&quot; to test again.
+                  </p>
+                </div>
+              ) : testOutput ? (
+                /* Test Execution Results (HackerRank & Judge0 Format) */
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      {testOutput.every((t) => t.passed) ? (
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          Accepted ({testOutput.length}/{testOutput.length} test cases passed)
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-red-400">
+                          <XCircle className="h-4 w-4 text-red-400" />
+                          Wrong Answer ({testOutput.filter((t) => t.passed).length}/{testOutput.length} passed)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Test Case Selectors */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {testOutput.map((tc, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedTestCaseIndex(idx)}
+                          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-mono transition-colors ${
+                            selectedTestCaseIndex === idx
+                              ? 'border-stone-600 bg-stone-800 text-stone-100 font-bold'
+                              : 'border-stone-800 bg-stone-900/70 text-stone-400 hover:text-stone-200'
+                          }`}
+                        >
+                          {tc.passed ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <XCircle className="h-3 w-3 text-red-400" />
+                          )}
+                          <span>Case {idx}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Selected Case Inspection */}
+                  {testOutput[selectedTestCaseIndex] && (
+                    <div className="rounded-xl border border-stone-800 bg-stone-900/70 p-4 space-y-3 font-mono text-xs">
+                      <div className="flex items-center justify-between border-b border-stone-800 pb-2">
+                        <span className="font-bold text-stone-200">
+                          {testOutput[selectedTestCaseIndex].name || `Test Case ${selectedTestCaseIndex}`}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {typeof testOutput[selectedTestCaseIndex].runtime_ms === 'number' && (
+                            <span className="text-[10px] text-stone-400">
+                              {testOutput[selectedTestCaseIndex].runtime_ms} ms
+                            </span>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={
+                              testOutput[selectedTestCaseIndex].passed
+                                ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
+                                : 'border-red-800 bg-red-950/40 text-red-300'
+                            }
+                          >
+                            {testOutput[selectedTestCaseIndex].passed ? 'Accepted' : 'Wrong Answer'}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Input */}
+                      <div>
+                        <span className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider">Input (stdin)</span>
+                        <pre className="mt-1 rounded-lg border border-stone-800 bg-stone-950 p-2.5 text-stone-200 whitespace-pre-wrap overflow-x-auto">
+                          {JSON.stringify(testOutput[selectedTestCaseIndex].input, null, 2)}
+                        </pre>
+                      </div>
+
+                      {/* Output */}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <span className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider">Your Output</span>
+                          <pre className={`mt-1 rounded-lg border p-2.5 whitespace-pre-wrap overflow-x-auto ${
+                            testOutput[selectedTestCaseIndex].passed
+                              ? 'border-emerald-900/60 bg-emerald-950/30 text-emerald-200'
+                              : 'border-red-900/60 bg-red-950/30 text-red-200'
+                          }`}>
+                            {testOutput[selectedTestCaseIndex].error ? (
+                              <span className="text-red-400">{testOutput[selectedTestCaseIndex].error}</span>
+                            ) : (
+                              JSON.stringify(testOutput[selectedTestCaseIndex].actual, null, 2)
+                            )}
+                          </pre>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider">Expected Output</span>
+                          <pre className="mt-1 rounded-lg border border-stone-800 bg-stone-950 p-2.5 text-stone-200 whitespace-pre-wrap overflow-x-auto">
+                            {JSON.stringify(testOutput[selectedTestCaseIndex].expected, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Idle Helper State */
+                <div className="rounded-xl border border-dashed border-stone-800 bg-stone-950/40 p-5 text-center">
+                  <Terminal className="mx-auto h-5 w-5 text-stone-500" />
+                  <p className="mt-2 text-xs text-stone-400 font-sans">
+                    Click <span className="font-semibold text-stone-200">&quot;Run Code&quot;</span> to compile and test with sample inputs, or <span className="font-semibold text-emerald-400">&quot;Submit Code&quot;</span> for full AI evaluation and scoring.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
