@@ -120,7 +120,7 @@ export async function createInterviewSession(
 
   const functionUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/interview-session`;
 
-  let response: Response;
+  let response: Response | null = null;
   try {
     response = await fetch(functionUrl, {
       method: 'POST',
@@ -131,9 +131,24 @@ export async function createInterviewSession(
       },
       body: JSON.stringify(requestBody),
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Network request failed';
-    throw new Error(`Could not reach the interview service: ${message}`);
+  } catch {
+    // If Edge function network call fails, try the internal Next.js /api/interview/start route
+    try {
+      response = await fetch('/api/interview/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+    } catch (innerError) {
+      const message = innerError instanceof Error ? innerError.message : 'Network request failed';
+      throw new Error(`Could not reach the interview service: ${message}`);
+    }
+  }
+
+  if (!response) {
+    throw new Error('Could not reach the interview service: No response received.');
   }
 
   const payload: unknown = await response.json().catch(() => null);

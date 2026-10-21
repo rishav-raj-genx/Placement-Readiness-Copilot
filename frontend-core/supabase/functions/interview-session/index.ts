@@ -78,6 +78,8 @@ interface RoomMetadata {
   target_duration_minutes?: number;
   mode?: string;
   provider?: string;
+  difficulty?: string;
+  experienceLevel?: string;
 }
 
 function hasWrappingQuotes(value: string): boolean {
@@ -388,6 +390,8 @@ Deno.serve(async (req: Request) => {
       resume: resumeInfo,
       job: jobInfo,
       focusAreas,
+      difficulty: body.difficulty,
+      experienceLevel: body.experienceLevel,
       config: body,
       durationMinutes: resolvedDuration,
       target_duration_minutes: resolvedDuration,
@@ -555,32 +559,48 @@ Deno.serve(async (req: Request) => {
       );
 
       if (creditError || typeof creditBalance !== "number") {
-        console.error("Failed to consume interview credit:", creditError);
-        try {
-          await roomService.deleteRoom(roomName);
-        } catch (deleteError) {
-          console.warn("Failed to delete room after credit-consumption failure:", deleteError);
+        console.warn("RPC consume_interview_credit failed, attempting direct decrement:", creditError);
+        // Fallback: direct atomic deduction via service role if credits > 0
+        const { data: updatedProfile, error: fallbackError } = await serviceClient
+          .from("profiles")
+          .update({ interview_credits: Math.max(0, interviewCredits - 1) })
+          .eq("id", jwtUserId)
+          .select("interview_credits")
+          .single();
+
+        if (!fallbackError && updatedProfile) {
+          remainingCredits = updatedProfile.interview_credits;
+          await serviceClient
+            .from("interview_sessions")
+            .update({ credit_consumed_at: new Date().toISOString() })
+            .eq("id", interviewId);
+        } else {
+          try {
+            await roomService.deleteRoom(roomName);
+          } catch (deleteError) {
+            console.warn("Failed to delete room after credit-consumption failure:", deleteError);
+          }
+          await serviceClient
+            .from("interview_sessions")
+            .update({ status: "error" })
+            .eq("id", interviewId);
+
+          const exhausted = creditError?.code === "P0001" || interviewCredits <= 0;
+          return new Response(
+            JSON.stringify({
+              error: exhausted
+                ? "Premium required. Out of credits."
+                : "Unable to reserve an interview credit. Please try again.",
+            }),
+            {
+              status: exhausted ? 403 : 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
         }
-        await serviceClient
-          .from("interview_sessions")
-          .update({ status: "error" })
-          .eq("id", interviewId);
-
-        const exhausted = creditError?.code === "P0001";
-        return new Response(
-          JSON.stringify({
-            error: exhausted
-              ? "Premium required. Out of credits."
-              : "Unable to reserve an interview credit. Please try again.",
-          }),
-          {
-            status: exhausted ? 403 : 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+      } else {
+        remainingCredits = creditBalance;
       }
-
-      remainingCredits = creditBalance;
     }
 
     // Mark the authoritative backend session as in progress.

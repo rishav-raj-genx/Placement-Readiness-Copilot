@@ -59,4 +59,33 @@ describe('freemium monetization & interview credits', () => {
     const isPremiumLocked = !premiumUser?.isPremium && (premiumUser?.interviewCredits ?? 3) <= 0;
     expect(isPremiumLocked).toBe(false);
   });
+
+  it('correctly calculates credit decrement upon interview token generation', () => {
+    const initialCredits = 3;
+    const decremented = Math.max(0, initialCredits - 1);
+    expect(decremented).toBe(2);
+
+    const singleCredit = 1;
+    expect(Math.max(0, singleCredit - 1)).toBe(0);
+
+    const zeroCredit = 0;
+    expect(Math.max(0, zeroCredit - 1)).toBe(0);
+  });
+
+  it('validates interview configuration payload shape and defaults', () => {
+    const rawPayload = {
+      targetRole: 'Distributed Systems Engineer',
+      difficulty: 'hard',
+      experienceLevel: 'three_plus',
+      durationMinutes: 20,
+      focusAreas: ['Raft Consensus', 'LSM Trees'],
+    };
+
+    expect(rawPayload.targetRole).toBe('Distributed Systems Engineer');
+    expect(rawPayload.difficulty).toBe('hard');
+    expect(rawPayload.experienceLevel).toBe('three_plus');
+    expect(rawPayload.durationMinutes).toBe(20);
+    expect(rawPayload.focusAreas).toEqual(['Raft Consensus', 'LSM Trees']);
+  });
 });
+

@@ -47,37 +47,41 @@ async function loadFacultyVivas(): Promise<FacultyVivaData> {
       }
     );
 
-    let { data: completedVivas, error } = await supabaseAdmin
+    const { data: completedVivas, error: sessionError } = await supabaseAdmin
       .from('interview_sessions')
-      .select('*, profiles(name, email, github_handle)')
+      .select('*')
       .eq('status', 'completed')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Admin Viva Fetch Error:', error);
-      const retry = await supabaseAdmin
-        .from('interview_sessions')
-        .select('*, profiles!fk_interview_sessions_user_profile(name, email, github_handle)')
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false });
-
-      if (!retry.error) {
-        completedVivas = retry.data;
-        error = null;
-      }
+    if (sessionError) {
+      console.error('Admin Viva Fetch Error:', sessionError);
+      return { interviews: [], error: null };
     }
 
-    if (error) {
-      console.error('Admin Viva Fetch Error:', error);
-      return {
-        interviews: [],
-        error: null,
-      };
+    const studentIds = Array.from(
+      new Set(
+        (completedVivas || []).flatMap((item: Record<string, unknown>) => {
+          const id = typeof item.student_id === 'string'
+            ? item.student_id
+            : typeof item.user_id === 'string'
+            ? item.user_id
+            : null;
+          return id ? [id] : [];
+        }),
+      ),
+    );
+
+    let candidateProfiles: unknown[] = [];
+    if (studentIds.length > 0) {
+      const { data: profilesData } = await supabaseAdmin
+        .from('profiles')
+        .select('id, display_name, email, github_username, role')
+        .in('id', studentIds);
+      if (profilesData) candidateProfiles = profilesData;
     }
 
-    const vivasValue: unknown = completedVivas;
     return {
-      interviews: normalizeFacultyVivas(vivasValue, []),
+      interviews: normalizeFacultyVivas(completedVivas, candidateProfiles),
       error: null,
     };
   } catch (err) {

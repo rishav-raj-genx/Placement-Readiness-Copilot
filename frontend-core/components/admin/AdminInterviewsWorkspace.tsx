@@ -138,12 +138,26 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.rpc('override_interview_score', {
-        p_interview_id: selected.id,
-        p_override_score: score,
-        p_reason: reason,
+      const response = await fetch('/api/admin/interviews/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interviewId: selected.id,
+          score,
+          reason,
+        }),
       });
-      if (error) throw error;
+
+      if (!response.ok) {
+        // Fallback to RPC if direct API route returns an error
+        const { error } = await supabase.rpc('override_interview_score', {
+          p_interview_id: selected.id,
+          p_override_score: score,
+          p_reason: reason,
+        });
+        if (error) throw error;
+      }
+
       toast.success('Score overridden and faculty audit logged.');
       setSelected(null);
       router.refresh();

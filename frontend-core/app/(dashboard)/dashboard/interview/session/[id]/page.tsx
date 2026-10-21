@@ -109,6 +109,28 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     }
     await finalizeRecording();
     markRound1Completed(user?.id);
+
+    // Deep state saving to backend database
+    const transcriptTurns = p.transcript && p.transcript.length > 0
+      ? p.transcript
+      : liveKitStore.currentInterview?.transcripts || [];
+
+    try {
+      await fetch('/api/interview/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interviewId: id,
+          transcript: transcriptTurns,
+          vivaScores: p,
+          result: p,
+          status: 'completed',
+        }),
+      });
+    } catch (saveErr) {
+      console.warn('Backend interview completion persist warning:', saveErr);
+    }
+
     if (typeof window !== 'undefined') {
       sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
       localStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
@@ -332,6 +354,22 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           experienceLevel={sessionMeta?.experienceLevel}
           userId={user?.id}
           onFinish={async (resultsPayload) => {
+            try {
+              await fetch('/api/interview/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  interviewId: id,
+                  transcript: resultsPayload.transcript || [],
+                  vivaScores: resultsPayload,
+                  result: resultsPayload,
+                  status: 'completed',
+                }),
+              });
+            } catch (saveErr) {
+              console.warn('Backend text interview completion persist warning:', saveErr);
+            }
+
             if (typeof window !== 'undefined') {
               sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
               localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));

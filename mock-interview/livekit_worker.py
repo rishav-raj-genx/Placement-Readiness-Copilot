@@ -236,6 +236,13 @@ async def entrypoint(ctx: JobContext) -> None:
             return True
         except (RuntimeError, ValueError, TypeError, OSError) as exc:
             logger.error("Finalization attempt failed (retryable): %s", exc)
+            if finalizer.result_store and finalizer.interview_id and finalizer.transcript:
+                with suppress(Exception):
+                    await asyncio.to_thread(
+                        finalizer.result_store.save_transcript,
+                        finalizer.interview_id,
+                        finalizer.transcript,
+                    )
             async with finalization_lock:
                 finalization_state = "failed_retryable"
             return False
@@ -414,7 +421,7 @@ def _interview_instructions(context: InterviewContext, config: SessionConfig) ->
         f"{difficulty_instructions}"
         f"- Target {config.target_duration_minutes} minutes and wrap up by {config.effective_max_minutes} minutes.\n"
         "- Never reveal live scores or grading during the conversation.\n"
-        "- At the end of Round 1, explicitly direct the candidate to Round 2 in the Monaco IDE, where they must write and execute actual code. Explain that correctness plus measured time and space complexity will be graded.\n"
+        "- Prompt the user to write actual code in the Monaco IDE for Round 2, and parse the execution results to grade their algorithmic efficiency.\n"
         f"- Verified Candidate Context: {context.model_dump_json(exclude_none=True)}\n\n"
         "When all questions are answered or when the candidate asks to finish, warmly thank them for their time, acknowledge the conclusion of the session, and explain that detailed diagnostic feedback is ready on their dashboard."
     )

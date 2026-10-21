@@ -214,3 +214,29 @@ def test_transcript_turns_include_timestamps_and_turn_ids():
         assert turn.timestamp_sec is not None
         assert turn.timestamp_sec >= 0
 
+
+def test_hard_difficulty_faang_system_prompt():
+    from scoring.schemas import SessionConfig
+
+    session = InterviewSession(
+        InterviewContext(
+            candidate_name="Rahul",
+            target_role="Staff Systems Engineer",
+            skills=["Distributed Systems", "C++"],
+        ),
+        FakeLLM(),
+        SessionConfig(
+            target_duration_minutes=20,
+            difficulty="hard",
+            focus_topics=["Distributed Systems", "Memory Management"],
+        ),
+    )
+    prompt = session.system_prompt
+    assert "Principal Staff Engineer at a FAANG company" in prompt
+    assert "Do not provide hints unless explicitly asked" in prompt
+    assert "Probe deeply into system architecture, scalability bottlenecks, memory management, and time/space complexity trade-offs" in prompt
+    assert "If the candidate gives a superficial answer, aggressively ask 'Why?' and 'How does that scale to 1 million users?'" in prompt
+    assert "Monaco IDE" in prompt
+    assert "algorithmic efficiency" in prompt
+
+

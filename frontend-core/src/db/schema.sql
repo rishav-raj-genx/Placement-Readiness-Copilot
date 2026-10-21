@@ -129,6 +129,12 @@ ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS code_history TEXT;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS viva_scores JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS admin_score NUMERIC(5, 2);
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS admin_feedback TEXT;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS admin_scored_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS admin_scored_by_name TEXT;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS admin_scored_at TIMESTAMPTZ;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS original_ai_score NUMERIC(5, 2);
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_interview_sessions_student ON interview_sessions(student_id, created_at DESC);

@@ -89,6 +89,10 @@ class InterviewSession:
     def elapsed_seconds(self) -> float:
         return round(time.monotonic() - self._start_time, 1)
 
+    @property
+    def system_prompt(self) -> str:
+        return build_agent_system_prompt(self.context, self.config)
+
     def greeting(self) -> str:
         if self.state not in {SessionState.CREATED, SessionState.IN_PROGRESS}:
             raise ValueError(f"cannot start session in state '{self.state.value}'")
@@ -301,6 +305,39 @@ BEHAVIORAL_QUESTION_POOL = [
         "Evaluate goal orientation, grit, and initiative",
     ),
 ]
+
+
+def build_agent_system_prompt(context: InterviewContext, config: SessionConfig) -> str:
+    """Build dynamic AI system prompt with industry-standard FAANG instructions for Hard mode."""
+    focus_topics = ", ".join(config.focus_topics) if config.focus_topics else "resume-grounded engineering topics"
+    if config.difficulty == "hard":
+        difficulty_instructions = (
+            "- Act as a Principal Staff Engineer at a FAANG company.\n"
+            "- Do not provide hints unless explicitly asked.\n"
+            "- Probe deeply into system architecture, scalability bottlenecks, memory management, and time/space complexity trade-offs.\n"
+            "- If the candidate gives a superficial answer, aggressively ask 'Why?' and 'How does that scale to 1 million users?'\n"
+        )
+    else:
+        difficulty_instructions = (
+            "- Ask at most ONE concise follow-up per question when an answer is incomplete. "
+            "If the candidate passes, move supportively to the next question.\n"
+        )
+
+    return (
+        f"You are an experienced, empathetic, and professional mock interviewer conducting a {config.target_duration_minutes}-minute "
+        f"technical and behavioral session for the {context.target_role or config.role_category} position.\n\n"
+        f"Configured difficulty: {config.difficulty.upper()}\n"
+        f"Candidate experience level: {config.experience_level}\n"
+        f"Required focus topics: {focus_topics}\n\n"
+        "### Interview Conduct Guidelines\n"
+        "- Speak with a calm, conversational, professional cadence. Do not sound robotic.\n"
+        "- Ask questions one at a time. Never dump multiple questions simultaneously.\n"
+        "- Active Listening: Before asking the next primary question, briefly acknowledge a concrete point from the candidate's answer.\n"
+        f"{difficulty_instructions}"
+        f"- Target {config.target_duration_minutes} minutes and wrap up by {config.effective_max_minutes} minutes.\n"
+        "- Never reveal live scores or grading during the conversation.\n"
+        "- Prompt the user to write actual code in the Monaco IDE for Round 2, and parse the execution results to grade their algorithmic efficiency.\n"
+    )
 
 
 def build_question_plan(context: InterviewContext, config: SessionConfig) -> list[QuestionItem]:

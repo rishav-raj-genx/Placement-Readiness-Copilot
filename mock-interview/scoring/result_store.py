@@ -141,6 +141,11 @@ class SupabaseInterviewSessionStore:
             "evaluation_mode": result.evaluation_mode,
             "is_fallback": result.is_fallback,
         }
+        code_history_val = getattr(result, "code_history", None) or (
+            result.coding_result.get("code")
+            if hasattr(result, "coding_result") and isinstance(result.coding_result, dict)
+            else None
+        )
         payload = {
             "result": result.model_dump(mode="json"),
             "transcript": transcript,
@@ -148,6 +153,8 @@ class SupabaseInterviewSessionStore:
             "status": status_val,
             "completed_at": datetime.now(UTC).isoformat() if status_val == "completed" else None,
         }
+        if code_history_val:
+            payload["code_history"] = code_history_val
         # Conditional update: only transition if session is currently created, active, or in_progress
         # This prevents duplicate finishes or stale workers from overwriting completed results
         req = request.Request(

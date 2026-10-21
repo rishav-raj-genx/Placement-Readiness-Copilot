@@ -550,7 +550,7 @@ export function getConversationalTransition(nextIndex: number, totalQuestions: n
 }
 
 export function getConversationalClosing(): string {
-  return 'Fantastic job! That concludes all questions for our Round 1 technical viva. I am now synthesizing your answers across technical depth, architectural trade-offs, and communication clarity to generate your comprehensive evaluation and unlock Round 2.';
+  return 'Fantastic job! That concludes all questions for our Round 1 technical viva. Please proceed to Round 2 in the Monaco IDE, where you will write actual code, and the platform will parse execution results to grade your algorithmic efficiency.';
 }
 
 export class BrowserSpeechSynthesizer {

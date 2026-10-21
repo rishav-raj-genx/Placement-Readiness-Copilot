@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 
 import { createServerSessionClient } from '@/lib/supabase-session-server';
+import { createSupabaseServiceClient } from '@/lib/supabase-service-server';
 
 export const runtime = 'nodejs';
 
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     // Query interview_sessions to verify exact room ownership and eligible session state.
     const { data: sessionRecord, error: sessionError } = await supabase
       .from('interview_sessions')
-      .select('id, user_id, student_id, status, livekit_room_name')
+      .select('id, user_id, student_id, status, livekit_room_name, credit_consumed_at')
       .eq('livekit_room_name', roomName.trim())
       .maybeSingle();
 
@@ -114,6 +115,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── 3. Freemium Entitlement & Credit Check ─────────────────────────────
+    let adminClient: ReturnType<typeof createSupabaseServiceClient> | null = null;
+    try {
+      adminClient = createSupabaseServiceClient();
+    } catch {
+      // Fallback if service client is not available in local environment
+    }
+
+    const dbClient = adminClient ?? supabase;
+    const { data: profile } = await dbClient
+      .from('profiles')
+      .select('id, interview_credits, is_premium')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const isPremium = profile?.is_premium === true;
+    const availableCredits = typeof profile?.interview_credits === 'number'
+      ? profile.interview_credits
+      : 3;
+
+    if (!isPremium && availableCredits <= 0) {
+      return NextResponse.json(
+        { error: 'Premium required. Out of credits.' },
+        { status: 403 },
+      );
+    }
+
     // ── 4. Generate the LiveKit access token ───────────────────────────────
     const at = new AccessToken(apiKey, apiSecret, {
       identity: user.id,
@@ -138,7 +166,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ token, livekitUrl: wsUrl });
+    // ── 5. Strict Credit Deduction: Decrement immediately if credits > 0 ──
+    let remainingCredits = availableCredits;
+    if (!isPremium && availableCredits > 0) {
+      if (adminClient) {
+        // Check if credit was already consumed for this specific interview session
+        const alreadyConsumed = Boolean(sessionRecord?.credit_consumed_at);
+        if (!alreadyConsumed) {
+          const { data: updatedProfile, error: deductError } = await adminClient
+            .from('profiles')
+            .update({ interview_credits: Math.max(0, availableCredits - 1) })
+            .eq('id', user.id)
+            .select('interview_credits')
+            .single();
+
+          if (!deductError && updatedProfile) {
+            remainingCredits = updatedProfile.interview_credits;
+            if (sessionRecord?.id) {
+              await adminClient
+                .from('interview_sessions')
+                .update({ credit_consumed_at: new Date().toISOString() })
+                .eq('id', sessionRecord.id);
+            }
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({
+      token,
+      livekitUrl: wsUrl,
+      remainingCredits,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown token generation error';
     console.error(`[LiveKit Token] Token generation failed: ${message}`);
