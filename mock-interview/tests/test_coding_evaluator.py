@@ -225,3 +225,58 @@ def test_round1_gating_and_activation(monkeypatch):
     assert follow_up_data["result"]["next_problem_id"] == "lru_cache"
 
 
+def test_evaluate_wrong_code_fails_in_sandbox():
+    wrong_code = "def two_sum(nums, target):\n    return []\n"
+    res = evaluate_coding_submission("two_sum", "python", wrong_code, run_sandbox=True)
+    assert res.passed_tests == 0
+    assert res.total_tests > 0
+    assert res.overall_score <= 25
+    assert res.test_execution_status == "failed"
+
+
+def test_evaluate_missing_target_function():
+    code = "def unrelated_fn(x):\n    return x + 1\n"
+    res = evaluate_coding_submission("two_sum", "python", code, run_sandbox=False)
+    assert res.overall_score <= 30
+    assert any("two sum" in imp.lower() for imp in res.improvement_areas)
+
+
+def test_unknown_problem_id_rejected():
+    import pytest
+    with pytest.raises(ValueError, match="Unknown problem_id"):
+        evaluate_coding_submission("unknown_problem_xyz", "python", "x = 1")
+
+
+def test_api_unknown_problem_id_returns_400():
+    client = TestClient(create_app(require_auth=False))
+    resp = client.post(
+        "/api/interview/coding-evaluate",
+        json={
+            "student_id": "test_stud",
+            "problem_id": "invalid_prob_123",
+            "language": "python",
+            "code": "print(1)",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Unknown problem ID" in resp.json()["detail"]
+
+
+def test_api_run_action_does_not_persist():
+    client = TestClient(create_app(require_auth=False))
+    resp = client.post(
+        "/api/interview/coding-evaluate",
+        json={
+            "student_id": "test_stud",
+            "problem_id": "two_sum",
+            "language": "python",
+            "code": "def two_sum(nums, target):\n    return [0, 1]\n",
+            "action": "run",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["persisted"] is False
+
+

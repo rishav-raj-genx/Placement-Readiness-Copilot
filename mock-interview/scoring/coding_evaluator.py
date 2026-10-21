@@ -365,11 +365,7 @@ def _analyze_code_statically(problem_id: str, language: str, code: str) -> dict[
                 has_valid_syntax = True
                 for node in ast.walk(tree):
                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if problem_id == "two_sum" and "two_sum" in node.name.lower():
-                            has_target_function = True
-                        elif problem_id == "fetch_with_retry":
-                            has_target_function = True
-                        elif problem_id == "use_debounce":
+                        if problem_id == "two_sum" and "two_sum" in node.name.lower() or problem_id == "fetch_with_retry" or problem_id == "use_debounce":
                             has_target_function = True
                     elif isinstance(node, ast.ClassDef):
                         if problem_id == "lru_cache" and "lru" in node.name.lower():
@@ -433,6 +429,9 @@ def run_sandboxed_python_tests(problem_id: str, code: str) -> dict[str, Any]:
 
     test_cases_json = json.dumps(problem.test_cases)
     runner_code = f"""import json, sys
+
+for mod in ['socket', 'http', 'urllib', 'requests']:
+    sys.modules[mod] = None
 
 {code}
 
@@ -554,6 +553,99 @@ except Exception as e:
     return {"executed": False, "passed": 0, "total": len(problem.test_cases), "error": "Execution skipped"}
 
 
+def run_sandboxed_js_tests(problem_id: str, code: str) -> dict[str, Any]:
+    """Execute JavaScript/TypeScript code against test cases in an isolated Node subprocess."""
+    problem = CODING_PROBLEM_BANK.get(problem_id)
+    if not problem or not problem.test_cases:
+        return {"executed": False, "passed": 0, "total": 0, "error": "Problem not found"}
+
+    test_cases_json = json.dumps(problem.test_cases)
+    js_runner = f"""
+const vm = require('vm');
+const test_cases = {test_cases_json};
+let passed = 0;
+const total = test_cases.length;
+
+try {{
+  const sandbox = {{
+    console: {{ log: () => {{}}, error: () => {{}}, warn: () => {{}} }},
+    setTimeout, clearTimeout, Promise, Map, Set, Array, Object, Math, JSON
+  }};
+  vm.createContext(sandbox);
+  const script = new vm.Script({json.dumps(code)});
+  script.runInContext(sandbox, {{ timeout: 2000 }});
+
+  for (let i = 0; i < test_cases.length; i++) {{
+    const tc = test_cases[i];
+    if ("{problem_id}" === "two_sum") {{
+      const fn = sandbox.twoSum || sandbox.two_sum;
+      if (typeof fn === 'function') {{
+        const res = fn(tc.input.nums, tc.input.target);
+        if (Array.isArray(res) && res.slice().sort().join(',') === tc.expected.slice().sort().join(',')) {{
+          passed++;
+        }}
+      }}
+    }} else if ("{problem_id}" === "lru_cache") {{
+      const cls = sandbox.LRUCache;
+      if (typeof cls === 'function') {{
+        const c = new cls(2);
+        c.put(1, 1);
+        c.put(2, 2);
+        const v1 = c.get(1);
+        c.put(3, 3);
+        const v2 = c.get(2);
+        if (v1 === 1 && v2 === -1) passed++;
+      }}
+    }} else if ("{problem_id}" === "use_debounce") {{
+      const fn = sandbox.debounce;
+      if (typeof fn === 'function') {{
+        const d = fn(() => {{}}, 50);
+        if (typeof d === 'function' && typeof d.cancel === 'function') passed++;
+      }}
+    }} else if ("{problem_id}" === "fetch_with_retry") {{
+      const fn = sandbox.fetchWithRetry || sandbox.request_with_retry;
+      if (typeof fn === 'function') passed++;
+    }}
+  }}
+  console.log(JSON.stringify({{ passed, total, status: "ok" }}));
+}} catch (err) {{
+  console.log(JSON.stringify({{ passed, total, status: "error", error: err.message }}));
+}}
+"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runner_file = os.path.join(tmpdir, "sandbox_runner.js")
+        with open(runner_file, "w", encoding="utf-8") as f:
+            f.write(js_runner)
+
+        clean_env = {
+            "PATH": "/usr/local/bin:/usr/bin:/bin",
+            "NODE_ENV": "production",
+        }
+        try:
+            res = subprocess.run(
+                ["node", runner_file],
+                check=False,
+                cwd=tmpdir,
+                env=clean_env,
+                capture_output=True,
+                text=True,
+                timeout=3.0,
+            )
+            stdout = res.stdout.strip()
+            if stdout:
+                result_data = json.loads(stdout.splitlines()[-1])
+                return {
+                    "executed": True,
+                    "passed": result_data.get("passed", 0),
+                    "total": result_data.get("total", len(problem.test_cases)),
+                    "error": result_data.get("error"),
+                }
+        except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as exc:
+            return {"executed": True, "passed": 0, "total": len(problem.test_cases), "error": str(exc)}
+
+    return {"executed": False, "passed": 0, "total": len(problem.test_cases), "error": "Execution skipped"}
+
+
 def evaluate_coding_submission(
     problem_id: str,
     language: str,
@@ -564,7 +656,7 @@ def evaluate_coding_submission(
     """Analyze student code via static AST benchmarks and produce AI feedback."""
     problem = CODING_PROBLEM_BANK.get(problem_id)
     if not problem:
-        problem = CODING_PROBLEM_BANK["two_sum"]
+        raise ValueError(f"Unknown problem_id '{problem_id}'. Supported problems: {list(CODING_PROBLEM_BANK.keys())}")
 
     cleaned_code = code.strip()
     lines = [line for line in cleaned_code.splitlines() if line.strip() and not line.strip().startswith(("#", "//"))]
@@ -635,15 +727,23 @@ def evaluate_coding_submission(
     analysis = _analyze_code_statically(problem.id, language, cleaned_code)
     total_tests = analysis["total_tests"]
 
-    # Issue 4: Execute code in sandbox if explicitly requested or container runner is provisioned
+    # Critical Issue 2: If required target function/class is missing, fail correctness immediately
+    if not analysis.get("has_target_function"):
+        correctness_score = 0
+        comp_diff = f"[Missing Definition] Target function or class for '{problem.title}' was not found in the submission."
+
+    # Execute code in sandbox if explicitly requested or container runner is provisioned
     enable_sandbox = (
         run_sandbox
         or os.getenv("ENABLE_CONTAINER_SANDBOX", "0").lower() in {"1", "true", "yes"}
         or os.getenv("ENABLE_CODE_SANDBOX", "0").lower() in {"1", "true", "yes"}
     )
     sandbox_res = None
-    if enable_sandbox and language == "python" and analysis["has_valid_syntax"]:
-        sandbox_res = run_sandboxed_python_tests(problem.id, cleaned_code)
+    if enable_sandbox and analysis["has_valid_syntax"] and analysis.get("has_target_function"):
+        if language == "python":
+            sandbox_res = run_sandboxed_python_tests(problem.id, cleaned_code)
+        elif language in {"javascript", "typescript"}:
+            sandbox_res = run_sandboxed_js_tests(problem.id, cleaned_code)
 
     if sandbox_res and sandbox_res["executed"]:
         passed_tests = sandbox_res["passed"]
@@ -655,12 +755,18 @@ def evaluate_coding_submission(
         if sandbox_res.get("error"):
             test_execution_status = "runtime_error"
             is_provisional = True
+            correctness_score = 0
+        elif passed_tests == 0:
+            correctness_score = 0
+        elif passed_tests == total_tests:
+            correctness_score = 100
+        else:
+            correctness_score = round((passed_tests / total_tests) * 85)
     else:
         passed_tests = 0
         test_execution_status = "sandbox_pending"
         evaluation_mode = "static_ast_analysis"
         is_provisional = True
-        # Issue 5: Static AST analysis is provisional; cap score to 90 so unverified code does not claim 95+
         correctness_score = min(correctness_score, 90)
 
     # Quality score based on static AST inspections
@@ -677,25 +783,35 @@ def evaluate_coding_submission(
         overall = 0
         err_msg = analysis.get("syntax_error_details") or "SyntaxError: Code failed compilation."
         comp_diff = f"[Compile Error] {err_msg}"
+    elif not analysis.get("has_target_function"):
+        quality_score = min(quality_score, 30)
+        correctness_score = 0
+        overall = min(quality_score, 20)
     else:
         if total_lines < 3:
             quality_score = min(quality_score, 40)
             correctness_score = min(correctness_score, 35)
-        overall = round(0.60 * correctness_score + 0.40 * quality_score)
+        if enable_sandbox and passed_tests == 0:
+            quality_score = min(quality_score, 40)
+            overall = round(quality_score * 0.35)
+        else:
+            overall = round(0.60 * correctness_score + 0.40 * quality_score)
         overall = max(10, min(100, overall))
 
     strengths = []
-    if overall > 0:
-        if correctness_score >= 80:
+    if overall > 0 and analysis.get("has_target_function"):
+        if correctness_score >= 80 and (passed_tests > 0 or not enable_sandbox):
             strengths.append(f"Algorithm structure matches {time_comp} time constraints.")
         if has_hash_map or "Map" in cleaned_code:
             strengths.append("Leveraged hash-based data structures for fast lookups.")
         if has_edge_checks:
             strengths.append("Included defensive guards for input edge cases.")
-        if not strengths:
+        if not strengths and overall >= 40:
             strengths.append("Demonstrated clear algorithm decomposition.")
 
     improvements = []
+    if not analysis.get("has_target_function"):
+        improvements.append(f"Implement the required function or class for {problem.title}.")
     if time_comp != problem.optimal_time_complexity:
         improvements.append(f"Optimize time complexity from {time_comp} to {problem.optimal_time_complexity}.")
     if not has_edge_checks:

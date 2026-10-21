@@ -1,7 +1,7 @@
 import logging
 import os
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -102,16 +102,22 @@ def health():
 
 @app.get("/ready")
 def ready():
-    """Readiness probe: verifies Supabase operational connectivity and dependencies."""
+    """Readiness probe: verifies storage operational connectivity and dependencies."""
     is_operational = db_client.check_operational() if db_client.is_live else False
+    storage_mode = "supabase" if db_client.is_live else "sqlite_fallback"
     if config.is_production():
         is_ready = is_operational
+        readiness_status = "ok" if is_operational else "degraded"
     else:
-        is_ready = is_operational or is_e2e_mode() or not db_client.is_live
+        # In non-production, SQLite local fallback and E2E modes are fully ready
+        is_ready = is_operational or is_e2e_mode() or (not db_client.is_live)
+        readiness_status = "ok" if is_ready else "degraded"
 
     return {
-        "status": "ok" if is_operational else "degraded",
+        "status": readiness_status,
         "ready": is_ready,
+        "environment": "production" if config.is_production() else ("e2e" if is_e2e_mode() else "development"),
+        "storage_mode": storage_mode,
         "supabase_configured": db_client.is_live,
         "supabase_operational": is_operational,
     }

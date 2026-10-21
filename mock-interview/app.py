@@ -44,6 +44,12 @@ class CodingSubmissionPayload(BaseModel):
     auth_token: str | None = None
     student_id: str | None = None
     follow_up_answer: str | None = None
+    run_sandbox: bool = False
+    action: str = "submit"
+
+
+MAX_AUDIO_BASE64_LENGTH = 15 * 1024 * 1024  # 15MB base64 limit (~10MB decoded)
+MAX_TEXT_PAYLOAD_LENGTH = 30_000
 
 
 def create_app(
@@ -71,6 +77,9 @@ def create_app(
             "stt": "disabled" if runtime_mode == "e2e" else "deepgram",
             "tts": "text-only" if runtime_mode == "e2e" else "deepgram",
             "scoring": "deterministic" if runtime_mode == "e2e" else "groq",
+            "groq_configured": bool(os.getenv("GROQ_API_KEY")),
+            "deepgram_configured": bool(os.getenv("DEEPGRAM_API_KEY")),
+            "supabase_configured": bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
             "target_duration_minutes": InterviewSession.TARGET_DURATION_MINUTES,
             "max_duration_minutes": InterviewSession.MAX_DURATION_MINUTES,
             "rounds_supported": ["theoretical_technical", "dsa_webdev_ide"],
@@ -122,7 +131,13 @@ def create_app(
         submission: CodingSubmissionPayload,
         authorization: str | None = Header(None),
     ) -> dict[str, object]:
-        """Evaluate submitted candidate code via static AST benchmarks with authentication."""
+        """Evaluate submitted candidate code via static AST benchmarks and secure runner."""
+        if submission.problem_id not in CODING_PROBLEM_BANK:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown problem ID '{submission.problem_id}'. Supported problems are: {list(CODING_PROBLEM_BANK.keys())}",
+            )
+
         verified_student_id = submission.student_id
         if require_auth:
             token = submission.auth_token or (parse_bearer_token(authorization) if authorization else None)
@@ -148,22 +163,42 @@ def create_app(
                 "error": "Round 2 (Coding & Problem Solving IDE) is locked. You must complete Round 1 (Technical Viva) first.",
             }
 
-        result = evaluate_coding_submission(
-            problem_id=submission.problem_id,
-            language=submission.language,
-            code=submission.code,
-            follow_up_answer=submission.follow_up_answer,
-        )
+        try:
+            result = await asyncio.to_thread(
+                evaluate_coding_submission,
+                problem_id=submission.problem_id,
+                language=submission.language,
+                code=submission.code,
+                follow_up_answer=submission.follow_up_answer,
+                run_sandbox=submission.run_sandbox,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
-        # Persist completed Round 2 coding practice session to interview_sessions table
+        # Only persist to interview_sessions if this is a final submission (not a test run)
+        persisted = False
+        persistence_error = None
         effective_student_id = student_for_gating or verified_student_id
-        if effective_student_id and effective_student_id not in {"service_caller", "unknown"}:
-            with contextlib.suppress(Exception):
-                save_coding_interview_session(effective_student_id, submission.problem_id, result)
+        if submission.action != "run" and effective_student_id and effective_student_id not in {"service_caller", "unknown"}:
+            try:
+                await asyncio.to_thread(
+                    save_coding_interview_session,
+                    effective_student_id,
+                    submission.problem_id,
+                    result,
+                )
+                persisted = True
+            except Exception as exc:  # noqa: BLE001
+                persistence_error = str(exc)
 
         return {
             "status": "ok",
             "round1_completed": True,
+            "persisted": persisted,
+            "persistence_error": persistence_error,
             "result": result.model_dump(),
         }
 
@@ -179,16 +214,36 @@ def create_app(
                     raise TypeError("websocket message must be a JSON object")
                 message = raw_message
                 event = message.get("event")
+
+                # Check duration limit if session is active
+                if session is not None and session.elapsed_seconds >= session.config.effective_max_minutes * 60:
+                    result = await asyncio.to_thread(session.finish)
+                    if persistence is not None and student_id is not None:
+                        await asyncio.to_thread(persistence.save, student_id, result)
+                    if student_id and not getattr(result, "is_abandoned", False) and not getattr(result, "is_provisional", False):
+                        record_round1_completed(student_id)
+                    await websocket.send_json(
+                        {
+                            "event": "result",
+                            "reason": "duration_exceeded",
+                            "result": result.model_dump(mode="json"),
+                        }
+                    )
+                    return
+
                 if event == "start":
                     if session is not None:
                         raise ValueError("session is already in progress; finish before starting a new one")
+                    resume_raw = message.get("resume")
+                    if isinstance(resume_raw, str) and len(resume_raw) > MAX_TEXT_PAYLOAD_LENGTH:
+                        raise ValueError("resume payload exceeds maximum allowed length")
                     if require_auth:
                         student_id = authenticate_student(
                             message.get("auth_token"), message.get("student_id")
                         )
                     cfg_raw = message.get("session_config")
                     cfg = SessionConfig.model_validate(cfg_raw) if isinstance(cfg_raw, dict) else None
-                    session = InterviewSession(adapt_resume(message.get("resume")), scoring_llm, config=cfg)
+                    session = InterviewSession(adapt_resume(resume_raw), scoring_llm, config=cfg)
                     greeting = session.greeting()
                     await _send_voice_event(websocket, "greeting", greeting, text_to_speech)
                     await _send_next_question(websocket, session, text_to_speech)
@@ -199,6 +254,8 @@ def create_app(
                     text = message.get("text")
                     if not isinstance(text, str):
                         raise ValueError("answer.text must be a string")
+                    if len(text) > MAX_TEXT_PAYLOAD_LENGTH:
+                        raise ValueError("answer.text exceeds maximum allowed length")
                     session.accept_answer(text)
                     await _send_next_question(websocket, session, text_to_speech)
 
@@ -223,7 +280,7 @@ def create_app(
                     result = await asyncio.to_thread(session.finish)
                     if persistence is not None and student_id is not None:
                         await asyncio.to_thread(persistence.save, student_id, result)
-                    if student_id:
+                    if student_id and not getattr(result, "is_abandoned", False) and not getattr(result, "is_provisional", False):
                         record_round1_completed(student_id)
                     await websocket.send_json(
                         {"event": "result", "result": result.model_dump(mode="json")}
@@ -293,6 +350,8 @@ async def _send_voice_event(
 def _decode_audio(value: object) -> bytes:
     if not isinstance(value, str):
         raise TypeError("audio_base64 must be a string")
+    if len(value) > MAX_AUDIO_BASE64_LENGTH:
+        raise ValueError(f"audio payload exceeds maximum permitted size ({MAX_AUDIO_BASE64_LENGTH} bytes)")
     try:
         return base64.b64decode(value, validate=True)
     except (ValueError, binascii.Error) as exc:

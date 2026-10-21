@@ -4,7 +4,6 @@ import re
 from typing import Any, Dict, List, Optional
 
 import feedparser
-
 import requests
 
 logger = logging.getLogger("rss_fetcher")

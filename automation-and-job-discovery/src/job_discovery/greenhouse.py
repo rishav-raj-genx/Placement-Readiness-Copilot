@@ -34,6 +34,7 @@ class GreenhouseFetcher:
         self.headers = {
             "User-Agent": "PlacementReadinessBot/1.0 (+https://github.com/placement-copilot)"
         }
+        self.last_errors: Dict[str, str] = {}
 
     def fetch_jobs_for_board(self, board_token: str, max_jobs: int = 20) -> List[Dict[str, Any]]:
         url = f"https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
@@ -43,6 +44,7 @@ class GreenhouseFetcher:
             resp = requests.get(url, headers=self.headers, timeout=self.timeout_sec)
             if resp.status_code != 200:
                 logger.warning(f"Greenhouse board {board_token} returned HTTP {resp.status_code}")
+                self.last_errors[board_token] = f"HTTP {resp.status_code}"
                 return []
 
             data = resp.json()
@@ -78,10 +80,12 @@ class GreenhouseFetcher:
 
         except Exception as e:
             logger.error(f"Error fetching Greenhouse board {board_token}: {e}")
+            self.last_errors[board_token] = str(e)
 
         return jobs
 
     def fetch_all(self, max_per_board: int = 15) -> List[Dict[str, Any]]:
+        self.last_errors.clear()
         all_jobs: List[Dict[str, Any]] = []
         for board in self.boards:
             board_jobs = self.fetch_jobs_for_board(board, max_jobs=max_per_board)

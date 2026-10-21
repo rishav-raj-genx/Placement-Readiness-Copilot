@@ -313,3 +313,28 @@ def test_from_profile_review_api_adapter():
     assert report.category_scores["linkedin"]["raw_score"] == 79.0
     assert report.category_scores["mock_interview"]["raw_score"] == 85.0
     assert report.total_score > 70.0
+
+
+def test_save_readiness_score_sqlite_fallback(monkeypatch, tmp_path):
+    from src.db.supabase_client import SupabaseHandler
+
+    client = SupabaseHandler()
+    client.is_live = False
+    client.supabase = None
+    client.local_db_path = tmp_path / "test_local.db"
+    client._init_local_fallback()
+
+    payload = {
+        "student_id": "test_student_fallback",
+        "total_score": 85.5,
+        "readiness_level": "Ready",
+        "breakdown": {"resume": 80.0},
+        "top_actions": [],
+        "raw_inputs": {},
+        "algorithm_version": "v1.0.0",
+        "updated_at": "2026-10-21T00:00:00Z",
+    }
+    result = client.save_readiness_score(payload)
+    assert result["success"] is True
+    assert result["source"] == "local_sqlite"
+

@@ -52,7 +52,6 @@ class LiveLinkChecker:
         SSRF Protection: Validates URL scheme and ensures host does not resolve
         to private, loopback, or cloud-metadata IP ranges.
         """
-        import ipaddress
         import socket
 
         try:

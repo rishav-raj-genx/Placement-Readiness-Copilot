@@ -21,6 +21,7 @@ class LeverFetcher:
         self.headers = {
             "User-Agent": "PlacementReadinessBot/1.0 (+https://github.com/placement-copilot)"
         }
+        self.last_errors: Dict[str, str] = {}
 
     def fetch_jobs_for_company(self, company: str, max_jobs: int = 20) -> List[Dict[str, Any]]:
         url = f"https://api.lever.co/v0/postings/{company}?mode=json"
@@ -30,10 +31,12 @@ class LeverFetcher:
             resp = requests.get(url, headers=self.headers, timeout=self.timeout_sec)
             if resp.status_code != 200:
                 logger.warning(f"Lever board for {company} returned HTTP {resp.status_code}")
+                self.last_errors[company] = f"HTTP {resp.status_code}"
                 return []
 
             postings = resp.json()
             if not isinstance(postings, list):
+                self.last_errors[company] = "Invalid JSON response (expected list)"
                 return []
 
             for item in postings[:max_jobs]:
@@ -63,10 +66,12 @@ class LeverFetcher:
 
         except Exception as e:
             logger.error(f"Error fetching Lever jobs for {company}: {e}")
+            self.last_errors[company] = str(e)
 
         return jobs
 
     def fetch_all(self, max_per_company: int = 15) -> List[Dict[str, Any]]:
+        self.last_errors.clear()
         all_jobs: List[Dict[str, Any]] = []
         for company in self.companies:
             co_jobs = self.fetch_jobs_for_company(company, max_jobs=max_per_company)

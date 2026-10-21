@@ -101,12 +101,22 @@ class JobAggregator:
             else:
                 try:
                     raw_pool.extend(self.greenhouse.fetch_all(max_per_board=10))
+                    if self.greenhouse.last_errors:
+                        if len(self.greenhouse.last_errors) >= len(self.greenhouse.boards):
+                            source_status["greenhouse"] = f"failed: all {len(self.greenhouse.boards)} boards errored"
+                        else:
+                            source_status["greenhouse"] = f"degraded: {len(self.greenhouse.last_errors)}/{len(self.greenhouse.boards)} boards errored"
                 except Exception as e:
                     logger.warning(f"Greenhouse fetch encountered issues: {e}")
                     source_status["greenhouse"] = f"failed: {str(e)}"
 
                 try:
                     raw_pool.extend(self.lever.fetch_all(max_per_company=10))
+                    if self.lever.last_errors:
+                        if len(self.lever.last_errors) >= len(self.lever.companies):
+                            source_status["lever"] = f"failed: all {len(self.lever.companies)} companies errored"
+                        else:
+                            source_status["lever"] = f"degraded: {len(self.lever.last_errors)}/{len(self.lever.companies)} companies errored"
                 except Exception as e:
                     logger.warning(f"Lever fetch encountered issues: {e}")
                     source_status["lever"] = f"failed: {str(e)}"

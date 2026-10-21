@@ -169,8 +169,13 @@ class InterviewSession:
             student_turns_count = len([t for t in self.transcript if t.speaker == "student"])
             if student_turns_count < 3:
                 result.is_provisional = True
-                if not result.summary.startswith("[PARTIAL"):
-                    result.summary = f"[PARTIAL / EARLY TERMINATION - {student_turns_count} ANSWERS] {result.summary}"
+                result.is_abandoned = True
+                result.session_status = "abandoned"
+                if not result.summary.startswith("[ABANDONED") and not result.summary.startswith("[PARTIAL"):
+                    result.summary = f"[ABANDONED / EARLY TERMINATION - {student_turns_count} ANSWERS] {result.summary}"
+            else:
+                result.is_abandoned = False
+                result.session_status = "completed"
             self._cached_result = result
             self.state = SessionState.COMPLETED
             return result
@@ -287,6 +292,10 @@ BEHAVIORAL_QUESTION_POOL = [
         "Describe a high-pressure situation where a production incident or tight deadline occurred. How did you prioritize tasks and communicate with stakeholders?",
         "Evaluate incident triage and cross-functional communication",
     ),
+    (
+        "Give an example of a goal you set for yourself on a technical project and how you achieved it despite unexpected obstacles. What was the impact?",
+        "Evaluate goal orientation, grit, and initiative",
+    ),
 ]
 
 
@@ -314,9 +323,9 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
         )
     )
 
-    # 2. Project Deep-Dive(s)
-    for idx in range(min(config.project_deep_dive_count, 2)):
-        proj_text = project_focus if idx == 0 else (context.projects[1] if len(context.projects) > 1 else project_focus)
+    # 2. Project Deep-Dive(s) - Supports up to 3 deep-dives matching SessionConfig
+    for idx in range(config.project_deep_dive_count):
+        proj_text = context.projects[idx] if idx < len(context.projects) else project_focus
         if idx == 0:
             items.append(
                 QuestionItem(
@@ -329,7 +338,7 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
                     probe_goal="Probe system architecture, personal ownership, and component design",
                 )
             )
-        else:
+        elif idx == 1:
             items.append(
                 QuestionItem(
                     id=f"q_project_{idx+1}",
@@ -339,6 +348,17 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
                         "you made, the alternative you rejected, and the measurable outcome."
                     ),
                     probe_goal="Probe technical trade-offs, rejection rationale, and measurable results",
+                )
+            )
+        else:
+            items.append(
+                QuestionItem(
+                    id=f"q_project_{idx+1}",
+                    category=QuestionCategory.PROJECT_DEEP_DIVE,
+                    text=(
+                        f"Regarding {proj_text}, how did you ensure test coverage, monitor production reliability, and handle unexpected edge cases or load spikes?"
+                    ),
+                    probe_goal="Probe production hardening, telemetry, and resilience in projects",
                 )
             )
 
@@ -379,8 +399,8 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
 
     # Remaining technical questions from curated bank to meet config.technical_question_count
     remaining_tech = max(0, tech_target - 2)
-    for idx in range(min(remaining_tech, len(pool))):
-        q_text, probe_goal = pool[idx]
+    for idx in range(remaining_tech):
+        q_text, probe_goal = pool[idx % len(pool)]
         items.append(
             QuestionItem(
                 id=f"q_tech_{idx+1}",
@@ -391,8 +411,8 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
         )
 
     # 4. Behavioral / HR Questions (STAR framework)
-    for idx in range(min(config.hr_question_count, len(BEHAVIORAL_QUESTION_POOL))):
-        q_text, probe_goal = BEHAVIORAL_QUESTION_POOL[idx]
+    for idx in range(config.hr_question_count):
+        q_text, probe_goal = BEHAVIORAL_QUESTION_POOL[idx % len(BEHAVIORAL_QUESTION_POOL)]
         items.append(
             QuestionItem(
                 id=f"q_hr_{idx+1}",

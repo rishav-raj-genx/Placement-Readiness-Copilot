@@ -334,6 +334,7 @@ class SupabaseHandler:
             raise RuntimeError("Supabase database not connected in production; local SQLite fallback is disabled.")
 
         # Local SQLite storage fallback (development / testing only)
+        conn = sqlite3.connect(self.local_db_path)
         cur = conn.cursor()
         cur.execute(
             """

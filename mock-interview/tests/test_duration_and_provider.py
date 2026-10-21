@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock, patch
-import pytest
 
 from livekit_worker import _duration_from_metadata, _resume_from_room_metadata
 
