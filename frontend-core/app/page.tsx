@@ -19,10 +19,10 @@ export default function Home() {
     }
   }, [router]);
 
-  if (!mounted) return <div className="min-h-screen bg-[#0B0F17]" />;
+  if (!mounted) return <div className="min-h-screen bg-stone-950" />;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0B0F17]">
+    <main className="flex min-h-screen items-center justify-center bg-stone-950">
       {showIntro && <IntroSequence />}
     </main>
   );
