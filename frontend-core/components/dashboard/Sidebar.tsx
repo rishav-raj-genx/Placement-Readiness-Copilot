@@ -67,7 +67,7 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
               }}
               style={{ originX: 0 }}
               className={cn(
-                'flex items-center rounded-xl py-3 text-sm font-medium transition-colors cursor-none',
+                'flex items-center rounded-xl py-3 text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-2' : 'gap-3 px-4',
                 active
                   ? 'border-l-4 border-orange-500 bg-gradient-to-r from-orange-500/10 to-transparent text-orange-500'

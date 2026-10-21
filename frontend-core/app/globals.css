@@ -61,8 +61,46 @@
 }
 
 @media (pointer: fine) {
+  :root,
+  body,
+  html,
   * {
-    cursor: none !important;
+    cursor: url('/pen-cursor.png') 1 1, auto;
+    cursor: -webkit-image-set(url('/pen-cursor.png') 1x, url('/pen-cursor@2x.png') 2x) 1 1, auto;
+    cursor: image-set(url('/pen-cursor.png') 1x, url('/pen-cursor@2x.png') 2x) 1 1, auto;
+  }
+
+  a,
+  button,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  select,
+  summary,
+  label[for],
+  .cursor-pointer {
+    cursor: url('/pen-cursor-pointer.png') 1 1, pointer !important;
+    cursor: -webkit-image-set(url('/pen-cursor-pointer.png') 1x, url('/pen-cursor-pointer@2x.png') 2x) 1 1, pointer !important;
+    cursor: image-set(url('/pen-cursor-pointer.png') 1x, url('/pen-cursor-pointer@2x.png') 2x) 1 1, pointer !important;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  [contenteditable="true"] {
+    cursor: text !important;
+  }
+
+  :disabled,
+  [aria-disabled="true"],
+  .cursor-not-allowed {
+    cursor: not-allowed !important;
   }
 }
 
