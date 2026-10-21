@@ -195,30 +195,59 @@ export function normalizeFacultyVivas(
     const id = readString(item.id);
     const studentId = readString(item.student_id) || readString(item.user_id);
     const targetRole = readString(item.target_role);
-    const result = isRecord(item.result) ? item.result : null;
-    const effectiveScore = readNumber(item.interview_score) ?? (result ? readNumber(result.interview_score ?? result.finalScore) : null);
-    if (!id || !studentId || !targetRole || !result || effectiveScore === null) return [];
+    const rawResult = item.result;
+    const result = isRecord(rawResult)
+      ? rawResult
+      : typeof rawResult === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(rawResult);
+              return isRecord(parsed) ? parsed : null;
+            } catch {
+              return null;
+            }
+          })()
+        : null;
+    const resultRecord = result ?? {};
+    const effectiveScore = readNumber(item.interview_score) ?? readNumber(resultRecord.interview_score ?? resultRecord.finalScore);
+    if (!id || !studentId || !targetRole || effectiveScore === null) return [];
+
+    const joinedProfile = isRecord(item.profiles)
+      ? item.profiles
+      : Array.isArray(item.profiles) && isRecord(item.profiles[0])
+        ? item.profiles[0]
+        : null;
 
     const candidate = candidates.get(studentId);
+    const studentName =
+      readString(joinedProfile?.name) ||
+      readString(joinedProfile?.display_name) ||
+      candidate?.displayName ||
+      `Candidate ${studentId.slice(0, 8)}`;
+    const studentEmail =
+      readString(joinedProfile?.email) ||
+      candidate?.email ||
+      '';
+
     const aiScore = readNumber(item.original_ai_score) ?? effectiveScore;
-    const aiConfidence = normalizeConfidence(result.ai_confidence ?? result.confidence);
+    const aiConfidence = normalizeConfidence(resultRecord.ai_confidence ?? resultRecord.confidence);
     const overriddenAt = readString(item.score_overridden_at);
 
     return [{
       id,
       studentId,
-      studentName: candidate?.displayName || `Candidate ${studentId.slice(0, 8)}`,
-      studentEmail: candidate?.email || '',
+      studentName,
+      studentEmail,
       targetRole,
       aiScore: Math.min(100, Math.max(0, aiScore)),
       effectiveScore: Math.min(100, Math.max(0, effectiveScore)),
       aiConfidence,
       needsReview: aiConfidence !== null && aiConfidence < LOW_CONFIDENCE_THRESHOLD,
       completedAt: readString(item.completed_at) || readString(item.created_at),
-      summary: readString(result.summary),
-      transcript: normalizeTranscript(result.transcript ?? item.transcript),
-      audioUrl: readHttpUrl(item.audio_url) ?? readHttpUrl(result.audio_url),
-      rubric: normalizeRubric(result),
+      summary: readString(resultRecord.summary),
+      transcript: normalizeTranscript(resultRecord.transcript ?? item.transcript),
+      audioUrl: readHttpUrl(item.audio_url) ?? readHttpUrl(resultRecord.audio_url),
+      rubric: normalizeRubric(resultRecord),
       override: overriddenAt ? {
         reason: readString(item.score_override_reason),
         facultyName: readString(item.score_overridden_by_name) || 'MSOT Staff',

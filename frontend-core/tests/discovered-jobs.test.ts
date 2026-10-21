@@ -67,4 +67,31 @@ describe('discovered job normalization', () => {
     expect(first.relevance_score).toBe(50);
     expect(second.id).toBe('greenhouse-123');
   });
+
+  it('allows global admin posts to bypass student scoping without being filtered out', () => {
+    const studentJob = normalizeDiscoveredJob({
+      ...validJob,
+      id: 'student-job-1',
+      is_msot_post: false,
+    });
+    const adminMsotJob = normalizeDiscoveredJob({
+      ...validJob,
+      id: 'msot-global-1',
+      is_msot_post: true,
+      title: 'Global Campus Hiring 2026',
+    });
+
+    expect(studentJob).not.toBeNull();
+    expect(adminMsotJob).not.toBeNull();
+
+    const ranked = personalizeAndRankDiscoveredJobs(
+      [studentJob!, adminMsotJob!],
+      ['typescript'],
+    );
+
+    // Global admin MSOT job is pinned at top even if relevance was 0
+    expect(ranked[0].id).toBe('msot-global-1');
+    expect(ranked[0].is_msot_post).toBe(true);
+    expect(ranked[1].id).toBe('student-job-1');
+  });
 });

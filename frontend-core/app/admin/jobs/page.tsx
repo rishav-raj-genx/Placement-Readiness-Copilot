@@ -231,7 +231,7 @@ export default function AdminJobsPage() {
 
       {/* Jobs Table */}
       {jobs.length === 0 ? (
-        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center gap-3 text-center">
               <Briefcase className="h-8 w-8 text-stone-500" />
@@ -247,7 +247,7 @@ export default function AdminJobsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -322,7 +322,7 @@ export default function AdminJobsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded-xl border border-stone-800 bg-[#28201E] text-stone-200 shadow-lg shadow-black/50">
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded-xl border border-stone-800 bg-[#121826] text-stone-200 shadow-lg shadow-black/50">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-stone-100">
               {editingJob ? 'Edit job posting' : 'New job posting'}
@@ -373,7 +373,7 @@ export default function AdminJobsPage() {
                   <SelectTrigger className="border-stone-800 bg-stone-900 text-stone-200 focus:ring-[#D93829]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-stone-800 bg-[#28201E] text-stone-200">
+                  <SelectContent className="border-stone-800 bg-[#121826] text-stone-200">
                     <SelectItem value="full_time">Full time</SelectItem>
                     <SelectItem value="part_time">Part time</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
@@ -389,7 +389,7 @@ export default function AdminJobsPage() {
                   <SelectTrigger className="border-stone-800 bg-stone-900 text-stone-200 focus:ring-[#D93829]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-stone-800 bg-[#28201E] text-stone-200">
+                  <SelectContent className="border-stone-800 bg-[#121826] text-stone-200">
                     <SelectItem value="published">Published</SelectItem>
                     <SelectItem value="unpublished">Unpublished</SelectItem>
                   </SelectContent>
@@ -450,7 +450,7 @@ export default function AdminJobsPage() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent className="rounded-xl border border-stone-800 bg-[#28201E] text-stone-200 shadow-lg shadow-black/50">
+        <AlertDialogContent className="rounded-xl border border-stone-800 bg-[#121826] text-stone-200 shadow-lg shadow-black/50">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base font-bold text-stone-100">Delete this job posting?</AlertDialogTitle>
             <AlertDialogDescription className="text-xs text-stone-400">

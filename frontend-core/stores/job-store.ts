@@ -136,6 +136,8 @@ export const useJobStore = create<JobState>((set, get) => ({
         id: newJob.id,
         ...toDatabasePayload(newJob),
         source: 'MSOT Admin',
+        is_msot_post: true,
+        student_id: null,
         posted_at: now,
         created_at: now,
         updated_at: now,

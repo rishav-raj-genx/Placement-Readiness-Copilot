@@ -9,7 +9,9 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <ProtectedRoute requiredRole="admin">
-      <AdminShell>{children}</AdminShell>
+      <div className="min-h-screen bg-[#0B0F17] text-stone-200">
+        <AdminShell>{children}</AdminShell>
+      </div>
     </ProtectedRoute>
   );
 }

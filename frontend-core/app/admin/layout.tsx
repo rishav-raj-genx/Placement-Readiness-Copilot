@@ -11,7 +11,9 @@ import { ProtectedRoute } from '@/components/auth/protected-route';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute requiredRole="admin">
-      <AdminShell>{children}</AdminShell>
+      <div className="min-h-screen bg-[#0B0F17] text-stone-200">
+        <AdminShell>{children}</AdminShell>
+      </div>
     </ProtectedRoute>
   );
 }

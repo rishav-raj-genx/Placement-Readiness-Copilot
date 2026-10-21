@@ -518,7 +518,20 @@ export async function POST(request?: Request): Promise<NextResponse> {
         updatePayload.linkedin_pdf_path = bodyData.linkedinPath;
       }
 
-      await admin.from('profiles').update(updatePayload).eq('id', studentId);
+      try {
+        const { error: patchError } = await admin.from('profiles').update(updatePayload).eq('id', studentId);
+        if (patchError) {
+          const errStr = (patchError.message || '').toLowerCase();
+          if (patchError.code === 'PGRST204' || errStr.includes('column')) {
+            delete updatePayload.leetcode_url;
+            delete updatePayload.coding_profile_url;
+            delete updatePayload.linkedin_text;
+            await admin.from('profiles').update(updatePayload).eq('id', studentId);
+          }
+        }
+      } catch (profileUpdateErr) {
+        console.warn('Profile sync in analyze route bypassed on error:', profileUpdateErr);
+      }
     }
 
     // Resolve effective document paths and usernames

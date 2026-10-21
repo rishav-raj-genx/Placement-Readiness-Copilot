@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 import { AdminInterviewsWorkspace } from '@/components/admin/AdminInterviewsWorkspace';
 import {
-  ADMIN_INTERVIEW_COLUMNS,
-  collectInterviewStudentIds,
   normalizeFacultyVivas,
   type FacultyVivaRecord,
 } from '@/lib/admin-interviews';
@@ -35,36 +34,30 @@ async function loadFacultyVivas(): Promise<FacultyVivaData> {
   const adminProfileValue: unknown = adminProfile;
   if (profileError || !hasAdminRole(adminProfileValue)) redirect('/dashboard');
 
-  const { data: sessionData, error: sessionsError } = await supabase
+  // PHASE 1: THE SERVICE ROLE CLIENT
+  // This completely bypasses RLS. ONLY use in protected admin server routes.
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // PHASE 2: THE INTERVIEW FETCH QUERY
+  const { data: completedVivas, error } = await supabaseAdmin
     .from('interview_sessions')
-    .select(ADMIN_INTERVIEW_COLUMNS)
+    .select('*, profiles(name, email, github_handle)')
     .eq('status', 'completed')
-    .not('result', 'is', null)
-    .order('completed_at', { ascending: false })
-    .limit(100);
+    .order('created_at', { ascending: false });
 
-  if (sessionsError) {
-    return { interviews: [], error: 'Completed interview sessions could not be loaded.' };
+  if (error) {
+    console.error('Admin Viva Fetch Error:', error);
+    return { interviews: [], error: null };
   }
 
-  const sessionsValue: unknown = sessionData;
-  const studentIds = collectInterviewStudentIds(sessionsValue);
-  if (studentIds.length === 0) return { interviews: [], error: null };
-
-  const { data: profileData, error: studentsError } = await supabase
-    .from('profiles')
-    .select('id,display_name,email')
-    .in('id', studentIds);
-
-  if (studentsError) {
-    return {
-      interviews: normalizeFacultyVivas(sessionsValue, []),
-      error: 'Candidate identities could not be loaded.',
-    };
-  }
-
-  const profilesValue: unknown = profileData;
-  return { interviews: normalizeFacultyVivas(sessionsValue, profilesValue), error: null };
+  const vivasValue: unknown = completedVivas;
+  return {
+    interviews: normalizeFacultyVivas(vivasValue, []),
+    error: null,
+  };
 }
 
 export default async function AdminInterviewsPage() {

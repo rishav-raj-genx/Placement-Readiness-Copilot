@@ -447,9 +447,32 @@ export default function ProfilePage() {
         linkedinPath = path;
       }
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
+      let updateSuccessful = false;
+      try {
+        const patchRes = await fetch('/api/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            displayName: displayName.trim(),
+            targetRole: targetRole.trim(),
+            githubUsername: normalizeUsername(github),
+            leetcodeUrl: leetcodeUrl.trim() || null,
+            linkedinText: linkedinText.trim() || null,
+            projects: projects.length > 0 ? projects : null,
+            resumePath,
+            linkedinPath,
+          }),
+        });
+        if (patchRes.ok) {
+          updateSuccessful = true;
+        }
+      } catch {
+        // Fallback to direct client Supabase query below
+      }
+
+      if (!updateSuccessful) {
+        const fullPayload: Record<string, unknown> = {
           display_name: displayName.trim(),
           target_role: targetRole.trim(),
           github_username: normalizeUsername(github),
@@ -459,10 +482,35 @@ export default function ProfilePage() {
           resume_pdf_path: resumePath,
           linkedin_pdf_path: linkedinPath,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+        };
 
-      if (profileError) throw profileError;
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(fullPayload)
+          .eq('id', user.id);
+
+        if (profileError) {
+          // If leetcode_url or linkedin_text is not yet in the DB schema, retry without them
+          const errStr = (profileError.message || '').toLowerCase();
+          if (
+            profileError.code === 'PGRST204' ||
+            errStr.includes('leetcode_url') ||
+            errStr.includes('linkedin_text') ||
+            errStr.includes('column')
+          ) {
+            delete fullPayload.leetcode_url;
+            delete fullPayload.linkedin_text;
+            const { error: retryError } = await supabase
+              .from('profiles')
+              .update(fullPayload)
+              .eq('id', user.id);
+            if (retryError) throw retryError;
+          } else {
+            throw profileError;
+          }
+        }
+      }
+
       profileSaved = true;
 
       try {
@@ -766,7 +814,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-stone-200">Active Resume File</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono ${candidate?.resumePdfPath ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-stone-800 text-stone-500'}`}>
+                <span className={candidate?.resumePdfPath ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider' : 'text-stone-500 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider'}>
                   {candidate?.resumePdfPath ? 'Active' : 'Missing'}
                 </span>
               </div>
@@ -787,9 +835,9 @@ export default function ProfilePage() {
                 type="button"
                 disabled={!candidate?.resumePdfPath}
                 onClick={() => void handleDeleteDocument('resume')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-40"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium disabled:opacity-40"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete</span>
               </button>
             </div>
@@ -800,7 +848,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-stone-200">Active LinkedIn PDF</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono ${candidate?.linkedinPdfPath ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-stone-800 text-stone-500'}`}>
+                <span className={candidate?.linkedinPdfPath ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider' : 'text-stone-500 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider'}>
                   {candidate?.linkedinPdfPath ? 'Active' : 'Missing'}
                 </span>
               </div>
@@ -821,9 +869,9 @@ export default function ProfilePage() {
                 type="button"
                 disabled={!candidate?.linkedinPdfPath}
                 onClick={() => void handleDeleteDocument('linkedin')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-40"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium disabled:opacity-40"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete</span>
               </button>
             </div>
@@ -834,7 +882,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-stone-200">Extracted / Pasted Bio Text</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono ${linkedinText ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-stone-800 text-stone-500'}`}>
+                <span className={linkedinText ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider' : 'text-stone-500 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider'}>
                   {linkedinText ? 'Present' : 'Empty'}
                 </span>
               </div>
@@ -855,9 +903,9 @@ export default function ProfilePage() {
                 type="button"
                 disabled={!linkedinText}
                 onClick={() => void handleDeleteField('linkedinText')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-40"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium disabled:opacity-40"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete</span>
               </button>
             </div>
@@ -868,7 +916,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-stone-200">GitHub Identity</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono ${github ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-stone-800 text-stone-500'}`}>
+                <span className={github ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider' : 'text-stone-500 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider'}>
                   {github ? 'Linked' : 'Not set'}
                 </span>
               </div>
@@ -889,9 +937,9 @@ export default function ProfilePage() {
                 type="button"
                 disabled={!github}
                 onClick={() => void handleDeleteField('github')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-40"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium disabled:opacity-40"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete</span>
               </button>
             </div>
@@ -902,7 +950,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-stone-200">LeetCode / Coding Profile URL</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono ${leetcodeUrl ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-stone-800 text-stone-500'}`}>
+                <span className={leetcodeUrl ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider' : 'text-stone-500 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider'}>
                   {leetcodeUrl ? 'Linked' : 'Not set'}
                 </span>
               </div>
@@ -923,9 +971,9 @@ export default function ProfilePage() {
                 type="button"
                 disabled={!leetcodeUrl}
                 onClick={() => void handleDeleteField('leetcode')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-900/40 disabled:opacity-40"
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium disabled:opacity-40"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete</span>
               </button>
             </div>
@@ -992,7 +1040,7 @@ export default function ProfilePage() {
                         type="button"
                         disabled={verifyingProjectIndex === idx}
                         onClick={() => void verifyLiveLink(item, idx)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-900/50 bg-emerald-950/40 px-2.5 py-1 text-xs text-emerald-400 hover:bg-emerald-900/60 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-xs text-orange-400 hover:bg-orange-500/20 transition-colors disabled:opacity-50"
                         title="Run live-link claims verification"
                       >
                         {verifyingProjectIndex === idx ? (
@@ -1013,9 +1061,9 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => void handleDeleteProject(idx)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-red-900/40 bg-red-950/30 px-2.5 py-1 text-xs text-red-400 hover:bg-red-900/40"
+                      className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium"
                     >
-                      <Trash2 className="h-3 w-3" /> Delete
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
                     </button>
                   </div>
                 </div>

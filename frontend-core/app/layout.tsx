@@ -7,11 +7,10 @@ import { displayFont } from '@/lib/fonts';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Hireable Copilot',
-    template: '%s | Hireable Copilot',
+    default: 'Hireable',
+    template: '%s | Hireable',
   },
-  description:
-    'A single workspace for candidate readiness, profile review, interviews, and job applications.',
+  description: 'Autonomous Placement Readiness Platform',
   icons: {
     icon: '/icon.png',
   },

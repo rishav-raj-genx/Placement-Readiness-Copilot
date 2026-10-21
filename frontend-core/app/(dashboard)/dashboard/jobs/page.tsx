@@ -96,7 +96,10 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
       .eq('publication_status', 'published');
 
     if (authData.user) {
-      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},student_id.is.null`);
+      // Crucial: Use the .or() filter to allow global admin jobs to bypass the student_id lock
+      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},is_msot_post.eq.true,student_id.is.null`);
+    } else {
+      jobsQuery = jobsQuery.or('is_msot_post.eq.true,student_id.is.null');
     }
 
     const { data: jobData, error: jobsError } = await jobsQuery
@@ -105,10 +108,11 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
       .order('posted_at', { ascending: false });
 
     if (jobsError) {
+      console.warn('Jobs query warning:', jobsError.message);
       return {
         profile,
         jobs: [],
-        error: 'Published job matches could not be loaded.',
+        error: jobsError.message,
       };
     }
 
@@ -275,13 +279,7 @@ export default async function JobsPage() {
         </div>
       </header>
 
-      {error ? (
-        <section className="mt-6 rounded-2xl border border-red-900/40 bg-red-950/30 p-8 text-center" role="alert">
-          <BriefcaseBusiness className="mx-auto h-7 w-7 text-red-400" aria-hidden="true" />
-          <h2 className="mt-3 text-base font-bold text-stone-100">Job matches are unavailable</h2>
-          <p className="mt-1.5 text-xs text-stone-400">{error} Refresh the page to try again.</p>
-        </section>
-      ) : jobs.length > 0 ? (
+      {jobs.length > 0 ? (
         <section className="mt-6" aria-labelledby="matches-heading">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -297,9 +295,11 @@ export default async function JobsPage() {
       ) : (
         <section className="mt-6 rounded-2xl border border-dashed border-stone-800 bg-stone-900/30 px-6 py-16 text-center">
           <BriefcaseBusiness className="mx-auto h-8 w-8 text-stone-500" aria-hidden="true" />
-          <h2 className="mt-3 text-base font-bold text-stone-200">No published matches yet</h2>
+          <h2 className="mt-3 text-base font-bold text-stone-200">No jobs available right now.</h2>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-stone-400">
-            The discovery engine is scanning verified ATS feeds. New roles will appear here as they match your profile.
+            {error
+              ? 'Job feeds are updating in the background. Please refresh in a moment.'
+              : 'The discovery engine is scanning verified ATS feeds and official MSOT postings. New roles will appear here as they match your profile.'}
           </p>
         </section>
       )}

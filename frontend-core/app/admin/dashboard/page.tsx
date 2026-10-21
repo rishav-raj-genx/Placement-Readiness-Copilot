@@ -33,7 +33,7 @@ export default function AdminDashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-700 bg-stone-800 text-stone-300">
               <Briefcase className="h-5 w-5" />
@@ -44,7 +44,7 @@ export default function AdminDashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-700 bg-stone-800 text-stone-300">
               <CheckCircle2 className="h-5 w-5" />
@@ -55,7 +55,7 @@ export default function AdminDashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-stone-700 bg-stone-800 text-stone-400">
               <XCircle className="h-5 w-5" />
@@ -68,7 +68,7 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
-      <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -97,7 +97,7 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-xl border border-stone-800 bg-[#121826] shadow-none">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-stone-100">Recent postings</CardTitle>
         </CardHeader>

@@ -267,8 +267,12 @@ def review_leetcode(
     _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
 ) -> LeetCodeReview:
     """Fetch LeetCode solved counts and contest rating. Defaults to 0 score without throwing 500."""
-    stats = fetch_leetcode_stats(username)
-    return LeetCodeReview(**stats)
+    try:
+        stats = fetch_leetcode_stats(username)
+        return LeetCodeReview(**stats)
+    except Exception as exc:
+        logger.warning("Error in review_leetcode endpoint for '%s': %s", username, exc)
+        return LeetCodeReview(username=username, exists=False, score=0, error=str(exc))
 
 
 @app.post("/analyze-profile", response_model=AnalyzeProfileResponse)

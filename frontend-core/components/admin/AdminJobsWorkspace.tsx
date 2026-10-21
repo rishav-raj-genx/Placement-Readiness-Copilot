@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { SkillsCombobox } from '@/components/admin/SkillsCombobox';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabase-client';
+import { revalidateJobsCache } from '@/app/actions/revalidate-jobs';
 import type { MsotJobWithApplicants } from '@/lib/msot-jobs';
 import type { DiscoveredJob } from '@/types';
 
@@ -137,11 +138,13 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
         employment_type: form.employmentType,
         publication_status: 'published',
         is_msot_post: true,
+        student_id: null,
         posted_at: now,
         updated_at: now,
       });
       if (error) throw error;
 
+      await revalidateJobsCache().catch(() => null);
       setForm(INITIAL_FORM);
       toast.success('MSOT job published to the student feed.');
       router.refresh();
@@ -155,20 +158,20 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
 
   return (
     <div className="space-y-6 pb-16">
-      <section className="rounded-2xl border border-stone-800 bg-[#28201E] p-6 sm:p-8">
+      <section className="rounded-2xl border border-stone-800 bg-[#121826] p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
-            <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Official opportunities</p>
+            <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Official opportunities</p>
             <h1 className="mt-2 font-[var(--font-display)] text-3xl font-bold tracking-tight text-stone-100 sm:text-4xl">MSOT job board</h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-400">Publish verified partner roles directly to eligible candidates.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3">
-              <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Active posts</p>
+              <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Active posts</p>
               <p className="mt-1 text-2xl font-bold text-stone-100">{jobs.length}</p>
             </div>
             <div className="rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3">
-              <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Applicants</p>
+              <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Applicants</p>
               <p className="mt-1 text-2xl font-bold text-stone-100">{totalApplicants}</p>
             </div>
           </div>
@@ -176,9 +179,9 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <form onSubmit={(event) => void handleSubmit(event)} className="rounded-2xl border border-stone-800 bg-[#28201E] p-5 sm:p-7">
+        <form onSubmit={(event) => void handleSubmit(event)} className="rounded-2xl border border-stone-800 bg-[#121826] p-5 sm:p-7">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-stone-700 bg-stone-800 text-[#D93829]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-orange-500/20 bg-orange-500/10 text-orange-400">
               <Plus className="h-5 w-5" aria-hidden="true" />
             </span>
             <div>
@@ -267,17 +270,17 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-orange-600 active:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4" aria-hidden="true" />}
             {isSubmitting ? 'Publishing…' : 'Publish MSOT job'}
           </button>
         </form>
 
-        <div className="min-w-0 rounded-2xl border border-stone-800 bg-[#28201E] p-5 sm:p-7">
+        <div className="min-w-0 rounded-2xl border border-stone-800 bg-[#121826] p-5 sm:p-7">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-mono text-xs uppercase tracking-wider text-stone-400">Applicant activity</p>
+              <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Applicant activity</p>
               <h2 className="mt-1 text-lg font-bold text-stone-100">Active official posts</h2>
             </div>
             <Users className="h-5 w-5 text-stone-400" aria-hidden="true" />

@@ -72,4 +72,23 @@ describe('faculty viva normalization', () => {
     const [review] = normalizeFacultyVivas([{ ...completedSession, audio_url: 'javascript:alert(1)' }], []);
     expect(review.audioUrl).toBeNull();
   });
+
+  it('correctly extracts candidate identity from joined profiles object', () => {
+    const joinedSession = {
+      ...completedSession,
+      profiles: {
+        name: 'Rohan Sharma',
+        email: 'rohan@example.com',
+        github_handle: 'rohansharma',
+      },
+    };
+    const [review] = normalizeFacultyVivas([joinedSession], []);
+    expect(review.studentName).toBe('Rohan Sharma');
+    expect(review.studentEmail).toBe('rohan@example.com');
+  });
+
+  it('returns empty array when no completed interviews exist or error occurs', () => {
+    expect(normalizeFacultyVivas([], [])).toEqual([]);
+    expect(normalizeFacultyVivas(null, [])).toEqual([]);
+  });
 });

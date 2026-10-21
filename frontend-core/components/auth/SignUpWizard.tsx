@@ -506,7 +506,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       }
 
       if (isSupabaseConfigured && userId && userId !== 'local-preview-user') {
-        await supabase.from('profiles').upsert({
+        const profileUpsertData: Record<string, unknown> = {
           id: userId,
           role: 'student',
           display_name: displayName || 'Candidate',
@@ -519,7 +519,22 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           linkedin_pdf_path: linkedinPath || null,
           onboarding_completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        };
+
+        const { error: upsertErr } = await supabase.from('profiles').upsert(profileUpsertData);
+        if (upsertErr) {
+          const errStr = (upsertErr.message || '').toLowerCase();
+          if (
+            upsertErr.code === 'PGRST204' ||
+            errStr.includes('leetcode_url') ||
+            errStr.includes('linkedin_text') ||
+            errStr.includes('column')
+          ) {
+            delete profileUpsertData.leetcode_url;
+            delete profileUpsertData.linkedin_text;
+            await supabase.from('profiles').upsert(profileUpsertData);
+          }
+        }
       }
 
       await clearPendingSignup();
