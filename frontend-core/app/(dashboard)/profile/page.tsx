@@ -19,6 +19,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { supabase } from '@/lib/supabase-client';
 import { validatePdf, normalizeUsername } from '@/lib/onboarding';
+import { normalizeReadinessScore } from '@/lib/data-adapters';
 
 type DocumentKind = 'resume' | 'linkedin';
 
@@ -97,30 +98,37 @@ export default function ProfilePage() {
       if (profileError) throw profileError;
       profileSaved = true;
 
-      if (documentsChanged) {
-        try {
-          const profileData = {
-            userId: user.id,
-            displayName: displayName.trim(),
-            targetRole: targetRole.trim(),
-            githubUsername: normalizeUsername(github),
-            resumePath,
-            linkedinPath,
-          };
-          const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || 'e2e-internal-token';
-          await fetch('/api/profile/review', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${internalKey}`
-            },
-            body: JSON.stringify(profileData)
-          });
-          await hydrate(user.id);
-        } catch (err: unknown) {
-          console.warn('AI scoring service re-index error bypassed:', err);
+      try {
+        const profileData = {
+          userId: user.id,
+          displayName: displayName.trim(),
+          targetRole: targetRole.trim(),
+          githubUsername: normalizeUsername(github),
+          resumePath,
+          linkedinPath,
+        };
+        const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || 'e2e-internal-token';
+        const response = await fetch('/api/profile/review', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${internalKey}`
+          },
+          body: JSON.stringify(profileData)
+        });
+
+        if (response.ok) {
+          const payload: unknown = await response.json().catch(() => null);
+          if (typeof payload === 'object' && payload !== null && 'readiness' in payload) {
+            const normalized = normalizeReadinessScore((payload as { readiness: unknown }).readiness);
+            if (normalized) {
+              useProfileStore.setState({ readiness: normalized });
+            }
+          }
         }
-      } else {
+        await hydrate(user.id);
+      } catch (err: unknown) {
+        console.warn('AI scoring service re-index error bypassed:', err);
         await hydrate(user.id);
       }
 
