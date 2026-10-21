@@ -17,9 +17,14 @@ import { useJobStore } from '@/stores/job-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 import { isGuestPreviewPathname } from '@/lib/auth-routing';
+import { ProctoredGuard } from '@/components/interview/proctored-guard';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isProctoredSession = Boolean(
+    pathname?.startsWith('/dashboard/interview/session/') ||
+    pathname?.startsWith('/dashboard/interview/coding')
+  );
   const user = useAuthStore((state) => state.user);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const hydrateAuth = useAuthStore((state) => state.hydrate);
@@ -73,6 +78,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [analyzeProfile, hydrateApplications, hydrateJobs, hydrateProfile, user]);
 
   const dataReady = (!user && allowGuest) || Boolean(user?.id && bootstrappedUserId === user.id);
+
+  if (isProctoredSession) {
+    return (
+      <ProtectedRoute requiredRole="student" allowGuest={allowGuest}>
+        <ProctoredGuard>
+          <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+            <PageTransition>
+              {dataReady ? children : (
+                <SegmentedLoader
+                  message="Initializing proctored environment..."
+                  subtitle="Configuring secure assessment session..."
+                  fullScreen
+                />
+              )}
+            </PageTransition>
+          </main>
+        </ProctoredGuard>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute requiredRole="student" allowGuest={allowGuest}>

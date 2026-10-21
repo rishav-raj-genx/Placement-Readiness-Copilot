@@ -73,14 +73,13 @@ export default function CodingInterviewPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-20">
-      <div className="flex items-center justify-between">
-        <Link href="/dashboard/interview">
-          <Button variant="ghost" size="sm" className="text-xs text-stone-400 hover:bg-stone-800 hover:text-stone-200">
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to interview studio
-          </Button>
-        </Link>
-        <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-emerald-400">
-          <Code2 className="h-3.5 w-3.5" /> Round 2: DSA + web dev IDE · Active
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800/60 pb-3">
+        <div className="flex items-center gap-2 rounded-full border border-stone-800 bg-stone-900/90 px-3.5 py-1.5 font-mono text-[11px] font-medium uppercase tracking-wider text-emerald-400">
+          <Code2 className="h-4 w-4 text-[#D93829]" /> Round 2: Technical Assessment &middot; Secure Mode
+        </div>
+        <div className="flex items-center gap-2 text-xs font-mono text-stone-400">
+          <Lock className="h-3.5 w-3.5 text-amber-500" />
+          <span>Navigation Locked &middot; Proctored Environment</span>
         </div>
       </div>
 
