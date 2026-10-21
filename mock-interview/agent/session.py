@@ -195,7 +195,8 @@ class InterviewSession:
     def _evaluate_adaptive_follow_up(self) -> tuple[bool, str | None]:
         """Shared interview policy deciding if a single targeted follow-up is warranted."""
         # Never follow up on the first turn (intro) or if we already followed up on this question
-        if self.question_number == 0 or self._current_question_follow_ups >= 1:
+        follow_up_limit = 2 if self.config.difficulty == "hard" else 1
+        if self.question_number == 0 or self._current_question_follow_ups >= follow_up_limit:
             return False, None
 
         last_student_turn = next(
@@ -211,6 +212,9 @@ class InterviewSession:
         unsure_phrases = ["i don't know", "dont know", "not sure", "no idea", "pass", "skip", "cannot say"]
         if any(p in clean for p in unsure_phrases):
             return False, None
+
+        if self.config.difficulty == "hard" and len(clean.split()) < 20:
+            return True, "Why? How does that scale to 1 million users?"
 
         # 2. Vague or very short answer -> nudge for concrete implementation details once
         words = clean.split()
@@ -303,7 +307,9 @@ def build_question_plan(context: InterviewContext, config: SessionConfig) -> lis
     """Build a structured, configurable question plan conforming to Problem Statement 2."""
     role = _shorten(context.target_role) or "your target role"
     project = _shorten(context.projects[0]) if context.projects else ""
-    skill = _shorten(context.skills[0]) if context.skills else ""
+    skill = _shorten(config.focus_topics[0]) if config.focus_topics else (
+        _shorten(context.skills[0]) if context.skills else ""
+    )
     experience = _shorten(context.experience[0]) if context.experience else ""
     resume_detail = _shorten(context.summary)
 

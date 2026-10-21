@@ -188,7 +188,7 @@ export default function ReviewDetailsPage() {
       ) : (
         <>
           {/* SECTION 1: RESUME AUDIT */}
-          <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
             <CardHeader className="border-b border-stone-800/80 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -217,7 +217,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">ATS Formatting</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {resume?.is_ats_friendly ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Pass (Clean ATS)
                       </span>
                     ) : (
@@ -232,7 +232,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Page Count Budget</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {resume?.is_one_page ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Pass ({resume.page_count || 1} page)
                       </span>
                     ) : (
@@ -247,7 +247,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Action Verbs</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {resume?.uses_action_verbs ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Pass (Strong Verbs)
                       </span>
                     ) : (
@@ -262,7 +262,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Grammar &amp; Spelling</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {!resume?.has_spelling_or_grammar_issues ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Clean (0 errors)
                       </span>
                     ) : (
@@ -311,7 +311,7 @@ export default function ReviewDetailsPage() {
           </Card>
 
           {/* SECTION 2: GITHUB AUDIT */}
-          <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
             <CardHeader className="border-b border-stone-800/80 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -343,8 +343,8 @@ export default function ReviewDetailsPage() {
                         <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> Leaked Keys Detected!
                       </span>
                     ) : (
-                      <span className="text-emerald-400 flex items-center gap-1">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Pass (Zero Leaks)
+                      <span className="text-orange-400 flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-orange-400" /> Pass (Zero Leaks)
                       </span>
                     )}
                   </div>
@@ -354,7 +354,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Pinned Repositories</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {(github?.pinned_repos_count ?? 0) >= 2 ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Pass ({github?.pinned_repos_count} pinned)
                       </span>
                     ) : (
@@ -369,7 +369,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Commit Frequency</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {github?.has_recent_commits ?? true ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Active Recent Commits
                       </span>
                     ) : (
@@ -402,7 +402,7 @@ export default function ReviewDetailsPage() {
           </Card>
 
           {/* SECTION 3: LINKEDIN & READY-TO-PASTE REWRITES */}
-          <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
             <CardHeader className="border-b border-stone-800/80 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -430,7 +430,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Profile Completeness</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {linkedin?.has_complete_profile ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Complete
                       </span>
                     ) : (
@@ -445,7 +445,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Skills Relevance</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {linkedin?.skills_relevant ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Target Role Aligned
                       </span>
                     ) : (
@@ -460,7 +460,7 @@ export default function ReviewDetailsPage() {
                   <span className="text-[10px] font-mono uppercase tracking-wider text-stone-500">Photo Detection</span>
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     {(linkedin?.has_photo ?? linkedin?.photo_detected) ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-orange-400 flex items-center gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" /> Professional Photo
                       </span>
                     ) : (
@@ -499,7 +499,7 @@ export default function ReviewDetailsPage() {
                           >
                             {copiedRewriteIndex === i ? (
                               <>
-                                <Check className="h-3 w-3 text-emerald-400" /> Copied
+                                <Check className="h-3 w-3 text-orange-400" /> Copied
                               </>
                             ) : (
                               <>
@@ -524,7 +524,7 @@ export default function ReviewDetailsPage() {
           </Card>
 
           {/* SECTION 4: RAW GRANULAR JSON INSPECTOR */}
-          <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
             <CardHeader className="border-b border-stone-800/80 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
@@ -546,7 +546,7 @@ export default function ReviewDetailsPage() {
                     onClick={handleCopyRawJson}
                     className="border-stone-800 bg-stone-900 text-xs text-stone-300 hover:bg-stone-800 h-8 gap-1.5"
                   >
-                    {copiedRawJson ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedRawJson ? <Check className="h-3.5 w-3.5 text-orange-400" /> : <Copy className="h-3.5 w-3.5" />}
                     {copiedRawJson ? 'Copied' : 'Copy JSON'}
                   </Button>
                   <Button

@@ -20,7 +20,7 @@ export function CountdownTimer({ startedAt, durationMinutes, onExpire }: Countdo
     return () => window.clearInterval(interval);
   }, [durationMinutes, onExpire, startedAt]);
   const tone = getCountdownTone(remaining);
-  const color = tone === 'green' ? 'text-emerald-300 bg-emerald-400/10' : tone === 'yellow' ? 'text-amber-300 bg-amber-400/10' : 'text-red-300 bg-red-400/10';
+  const color = tone === 'green' ? 'text-orange-400 bg-orange-500/10' : tone === 'yellow' ? 'text-amber-400 bg-amber-500/10' : 'text-red-400 bg-red-500/10';
   const minutes = Math.floor(remaining / 60).toString().padStart(2, '0');
   const seconds = (remaining % 60).toString().padStart(2, '0');
   return <span className={`inline-flex items-center rounded-full px-3 py-1.5 font-mono text-sm ${color}`} aria-live={remaining <= 60 ? 'polite' : 'off'}><Clock className="mr-2 h-3.5 w-3.5" />{minutes}:{seconds}</span>;

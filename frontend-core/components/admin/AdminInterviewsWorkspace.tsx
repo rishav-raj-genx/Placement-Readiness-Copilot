@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
@@ -9,7 +10,9 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Code2,
   Clock3,
+  ExternalLink,
   Loader2,
   MessageSquareText,
   ShieldCheck,
@@ -80,7 +83,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
   const openAudit = (interview: FacultyVivaRecord): void => {
     setSelected(interview);
     setCurrentTime(0);
-    setOverrideScore(String(interview.effectiveScore));
+    setOverrideScore(interview.hasAiScore ? String(interview.effectiveScore) : '');
     setOverrideReason('');
   };
 
@@ -153,7 +156,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
 
   return (
     <div className="space-y-6 pb-16">
-      <section className="rounded-2xl border border-stone-800 bg-[#121826] p-6 sm:p-8">
+      <section className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
             <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Faculty audit queue</p>
@@ -173,7 +176,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
         </div>
       </section>
 
-      <section className="rounded-2xl border border-stone-800 bg-[#121826] p-5 sm:p-7" aria-labelledby="recent-vivas-heading">
+      <section className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 p-5 sm:p-7" aria-labelledby="recent-vivas-heading">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Recent activity</p>
@@ -182,7 +185,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
           <SlidersHorizontal className="h-5 w-5 text-stone-400" aria-hidden="true" />
         </div>
 
-        {loadError && interviews.length > 0 && (
+        {loadError && (
           <div className="mt-5 rounded-xl border border-red-900/50 bg-red-950/40 p-4 text-sm text-red-300" role="alert">{loadError}</div>
         )}
 
@@ -229,8 +232,10 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                     </td>
                     <td className="px-4 py-3.5 text-sm text-stone-300">{interview.targetRole}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <span className="font-mono text-base font-bold text-stone-100">{Math.round(interview.aiScore)}</span>
-                      <span className="text-xs text-stone-500">/100</span>
+                      <span className="font-mono text-base font-bold text-stone-100">
+                        {interview.hasAiScore ? Math.round(interview.aiScore) : '—'}
+                      </span>
+                      {interview.hasAiScore && <span className="text-xs text-stone-500">/100</span>}
                       {interview.override && (
                         <span className="ml-2 rounded border border-orange-500/20 bg-orange-500/10 px-1.5 py-0.5 text-xs font-semibold text-orange-400">
                           → {Math.round(interview.effectiveScore)}
@@ -283,9 +288,9 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 250, damping: 30 }}
-              className="absolute inset-y-0 right-0 w-full max-w-5xl overflow-y-auto border-l border-stone-800 bg-[#121826] shadow-lg shadow-black/50"
+              className="absolute inset-y-0 right-0 w-full max-w-5xl overflow-y-auto border-l border-stone-800 bg-stone-900 shadow-md shadow-black/40"
             >
-              <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-800 bg-[#121826]/95 px-5 py-4 backdrop-blur-sm sm:px-7">
+              <header className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-800 bg-stone-900/95 px-5 py-4 backdrop-blur-sm sm:px-7">
                 <div className="min-w-0">
                   <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Faculty audit</p>
                   <h2 id="viva-audit-title" className="mt-0.5 truncate text-lg font-bold text-stone-100">
@@ -382,8 +387,33 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                   </section>
 
                   <section className="rounded-xl border border-stone-800 bg-stone-900/60 p-5 sm:p-6">
+                    <div className="flex items-center gap-2">
+                      <Code2 className="h-4 w-4 text-orange-400" aria-hidden="true" />
+                      <div>
+                        <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Round 2 evidence</p>
+                        <h3 className="mt-0.5 text-base font-bold text-stone-100">Code snapshot</h3>
+                      </div>
+                    </div>
+                    {selected.codeHistory ? (
+                      <pre className="mt-4 max-h-[28rem] overflow-auto rounded-lg border border-stone-800 bg-stone-950 p-4 text-xs leading-relaxed text-stone-200">
+                        <code>{selected.codeHistory}</code>
+                      </pre>
+                    ) : (
+                      <p className="mt-4 rounded-lg border border-dashed border-stone-800 px-4 py-8 text-center text-xs text-stone-400">
+                        No Round 2 code snapshot was saved for this session.
+                      </p>
+                    )}
+                  </section>
+
+                  <section className="rounded-xl border border-stone-800 bg-stone-900/60 p-5 sm:p-6">
                     <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Evaluation</p>
-                    <h3 className="mt-0.5 text-base font-bold text-stone-100">Rubric breakdown</h3>
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <h3 className="mt-0.5 text-base font-bold text-stone-100">AI evaluation &amp; reasoning</h3>
+                      <p className="font-mono text-lg font-bold text-stone-100">
+                        {selected.hasAiScore ? Math.round(selected.aiScore) : 'Pending'}
+                        {selected.hasAiScore && <span className="text-xs text-stone-500">/100</span>}
+                      </p>
+                    </div>
                     {selected.summary && (
                       <p className="mt-2 text-xs leading-relaxed text-stone-400">{selected.summary}</p>
                     )}
@@ -417,6 +447,19 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
 
                 <div className="space-y-6">
                   <section className="rounded-xl border border-stone-800 bg-stone-900/70 p-5 sm:p-6">
+                    <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Student context</p>
+                    <h3 className="mt-0.5 text-base font-bold text-stone-100">{selected.studentName}</h3>
+                    <p className="mt-1 text-xs text-stone-400">Target role: {selected.targetRole}</p>
+                    <Link
+                      href={selected.profileHref}
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-stone-700 px-3 py-2 text-xs font-semibold text-stone-200 transition hover:border-orange-500 hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                    >
+                      View full profile
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                  </section>
+
+                  <section className="rounded-xl border border-stone-800 bg-stone-900/70 p-5 sm:p-6">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Score control</p>
@@ -429,8 +472,8 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                       <div className="rounded-lg border border-stone-800 bg-stone-950/60 p-3">
                         <p className="font-mono text-xs uppercase tracking-wider text-stone-500">Original AI</p>
                         <p className="mt-1 text-xl font-bold text-stone-100">
-                          {Math.round(selected.aiScore)}
-                          <span className="text-xs text-stone-500">/100</span>
+                          {selected.hasAiScore ? Math.round(selected.aiScore) : 'Pending'}
+                          {selected.hasAiScore && <span className="text-xs text-stone-500">/100</span>}
                         </p>
                       </div>
                       <div className="rounded-lg border border-stone-800 bg-stone-950/60 p-3">
@@ -452,6 +495,19 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                       </div>
                     )}
 
+                    {!selected.override && selected.adminFeedback && (
+                      <div className="mt-3.5 rounded-lg border border-stone-800 bg-stone-950/40 p-3">
+                        <p className="text-xs font-medium text-stone-200">Latest faculty feedback</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-stone-400">{selected.adminFeedback}</p>
+                      </div>
+                    )}
+
+                    {!selected.hasAiScore && (
+                      <p className="mt-3.5 rounded-lg border border-amber-900/60 bg-amber-950/40 p-3 text-xs leading-relaxed text-amber-300">
+                        This completed session has no AI score yet. Transcript and code evidence remain available, but an override cannot be submitted until scoring completes.
+                      </p>
+                    )}
+
                     <form onSubmit={(event) => void handleOverride(event)} className="mt-4 space-y-3.5">
                       <div>
                         <label htmlFor="override-score" className="text-xs font-medium text-stone-300">
@@ -465,7 +521,7 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                           step="0.1"
                           value={overrideScore}
                           onChange={(event) => setOverrideScore(event.target.value)}
-                          disabled={isSaving}
+                          disabled={isSaving || !selected.hasAiScore}
                           className="mt-1.5 h-10 w-full rounded-lg border border-stone-800 bg-stone-950/80 px-3 text-sm text-stone-200 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                         />
                       </div>
@@ -479,18 +535,18 @@ export function AdminInterviewsWorkspace({ interviews, loadError }: AdminIntervi
                           rows={4}
                           value={overrideReason}
                           onChange={(event) => setOverrideReason(event.target.value)}
-                          disabled={isSaving}
+                          disabled={isSaving || !selected.hasAiScore}
                           placeholder="Explain the evidence and rubric basis for changing this score…"
                           className="mt-1.5 w-full resize-y rounded-lg border border-stone-800 bg-stone-950/80 px-3 py-2 text-xs leading-relaxed text-stone-200 outline-none placeholder:text-stone-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
                         />
                       </div>
                       <button
                         type="submit"
-                        disabled={isSaving}
-                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 text-xs font-semibold text-white transition-colors hover:bg-orange-600 active:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isSaving || !selected.hasAiScore}
+                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-red-700 active:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-                        {isSaving ? 'Saving audit…' : 'Confirm score override'}
+                        {isSaving ? 'Saving audit…' : 'Submit Override'}
                       </button>
                     </form>
                   </section>

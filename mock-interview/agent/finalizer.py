@@ -29,14 +29,14 @@ class InterviewFinalizer:
         self._start_time: float = time.monotonic()
         self._result: InterviewResult | None = None
         self._persisted = False
+        self._transcript_persisted = False
         self._lock = Lock()
 
-    MAX_TURN_CHARS = 2000
-    MAX_TRANSCRIPT_TURNS = 50
+    MAX_TRANSCRIPT_TURNS = 500
 
     def record(self, role: str, text: str, timestamp_sec: float | None = None) -> None:
         speaker = "student" if role in {"student", "user"} else "ai"
-        cleaned = text.strip()[: self.MAX_TURN_CHARS]
+        cleaned = text.strip()
         if cleaned and len(self.transcript) < self.MAX_TRANSCRIPT_TURNS:
             ts = timestamp_sec if timestamp_sec is not None else round(time.monotonic() - self._start_time, 1)
             turn_id = len(self.transcript) + 1
@@ -50,6 +50,12 @@ class InterviewFinalizer:
                 student_turns = [turn for turn in self.transcript if turn.speaker == "student"]
                 if not student_turns:
                     raise ValueError("an interview needs at least one candidate answer")
+
+                if self.result_store is not None and not self._transcript_persisted:
+                    if not self.interview_id:
+                        raise ValueError("interview ID is required for transcript persistence")
+                    self.result_store.save_transcript(self.interview_id, self.transcript)
+                    self._transcript_persisted = True
 
                 student_turns_count = len(student_turns)
                 elapsed_sec = time.monotonic() - self._start_time

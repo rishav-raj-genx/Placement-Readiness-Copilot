@@ -13,21 +13,27 @@ function getCorsHeaders(req: Request) {
   };
 }
 
+type Difficulty = "easy" | "medium" | "hard" | "adaptive";
+type ExperienceLevel = "internship" | "entry_level" | "one_to_three" | "three_plus";
+type CompanyType = "product_based" | "startup" | "service_based" | "other";
+type InterviewMode = "voice" | "text";
+type InterviewProvider = "cloud_api" | "ollama_local";
+
 interface SessionRequest {
   studentId?: string;
   targetRole: string;
   jobId?: string;
   resumeId?: string;
-  topics?: string[];
-  difficulty?: string;
-  durationMinutes?: number;
-  experienceLevel?: string;
-  companyType?: string;
+  topics: string[];
+  difficulty: Difficulty;
+  durationMinutes: 15 | 20;
+  experienceLevel: ExperienceLevel;
+  companyType: CompanyType;
   targetCompany?: string;
   customInstructions?: string;
-  focusAreas?: string[];
-  mode?: 'voice' | 'text';
-  provider?: 'cloud_api' | 'ollama_local';
+  focusAreas: string[];
+  mode: InterviewMode;
+  provider: InterviewProvider;
 }
 
 interface StudentInfo {
@@ -79,6 +85,70 @@ function hasWrappingQuotes(value: string): boolean {
     (value.startsWith('"') && value.endsWith('"')) ||
     (value.startsWith("'") && value.endsWith("'"))
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function optionalText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().slice(0, maxLength);
+  return normalized || undefined;
+}
+
+function stringList(value: unknown, maxItems = 8, maxLength = 80): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim().slice(0, maxLength))
+        .filter(Boolean),
+    ),
+  ).slice(0, maxItems);
+}
+
+function enumValue<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return typeof value === "string" && allowed.includes(value as T) ? value as T : fallback;
+}
+
+function parseSessionRequest(value: unknown): SessionRequest | null {
+  if (!isRecord(value)) return null;
+  const targetRole = optionalText(value.targetRole, 120);
+  if (!targetRole) return null;
+
+  const focusAreas = stringList(value.focusAreas ?? value.topics);
+  const durationMinutes = value.durationMinutes === 20 ? 20 : 15;
+
+  return {
+    studentId: optionalText(value.studentId, 64),
+    targetRole,
+    jobId: optionalText(value.jobId, 200),
+    resumeId: optionalText(value.resumeId, 200),
+    topics: focusAreas,
+    focusAreas,
+    difficulty: enumValue(value.difficulty, ["easy", "medium", "hard", "adaptive"] as const, "medium"),
+    durationMinutes,
+    experienceLevel: enumValue(
+      value.experienceLevel,
+      ["internship", "entry_level", "one_to_three", "three_plus"] as const,
+      "entry_level",
+    ),
+    companyType: enumValue(
+      value.companyType,
+      ["product_based", "startup", "service_based", "other"] as const,
+      "other",
+    ),
+    targetCompany: optionalText(value.targetCompany, 120),
+    customInstructions: optionalText(value.customInstructions, 500),
+    mode: enumValue(value.mode, ["voice", "text"] as const, "voice"),
+    provider: enumValue(value.provider, ["cloud_api", "ollama_local"] as const, "cloud_api"),
+  };
 }
 
 // Ambient declaration for IDE TypeScript language services
@@ -137,18 +207,17 @@ Deno.serve(async (req: Request) => {
     const jwtEmail = userData.user.email || "";
 
     // --- Parse request body ---
-    const body: SessionRequest = await req.json();
+    const requestPayload: unknown = await req.json().catch(() => null);
+    const body = parseSessionRequest(requestPayload);
 
-    if (!body.targetRole || body.targetRole.trim() === "") {
+    if (!body) {
       return new Response(
-        JSON.stringify({ error: "targetRole is required" }),
+        JSON.stringify({ error: "A valid targetRole and interview configuration are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate and bound duration between 10 and 30 minutes
-    const validatedDuration = Math.min(Math.max(body.durationMinutes || 20, 10), 30);
-    body.durationMinutes = validatedDuration;
+    const validatedDuration = body.durationMinutes;
 
     // JWT sub is the authoritative student ID. Any studentId in request body is advisory only.
     if (body.studentId && body.studentId !== jwtUserId) {
@@ -162,31 +231,29 @@ Deno.serve(async (req: Request) => {
       jwtEmail.split("@")[0] ||
       "Student";
 
-    const { data: profile } = await serviceClient
+    const { data: profile, error: profileError } = await serviceClient
       .from("profiles")
       .select("id, email, display_name, role, target_role, skills, github_username, resume_pdf_path, linkedin_pdf_path, interview_credits, is_premium, projects")
       .eq("id", jwtUserId)
       .maybeSingle();
+
+    if (profileError || !profile) {
+      console.error("Failed to load candidate profile:", profileError);
+      return new Response(
+        JSON.stringify({ error: "A candidate profile is required before starting an interview" }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (profile?.display_name) {
       studentName = profile.display_name;
     }
 
     // --- Freemium Gatekeeper Check ---
-    const isPremium = profile?.is_premium === true;
-    let interviewCredits = typeof profile?.interview_credits === "number"
+    const isPremium = profile.is_premium === true;
+    const interviewCredits = typeof profile.interview_credits === "number"
       ? profile.interview_credits
-      : null;
-
-    if (interviewCredits === null) {
-      const { count } = await serviceClient
-        .from("interview_sessions")
-        .select("id", { count: "exact", head: true })
-        .or(`student_id.eq.${jwtUserId},user_id.eq.${jwtUserId}`)
-        .in("status", ["completed", "active", "in_progress"]);
-
-      interviewCredits = Math.max(0, 3 - (count || 0));
-    }
+      : 0;
 
     if (!isPremium && interviewCredits <= 0) {
       return new Response(
@@ -304,11 +371,8 @@ Deno.serve(async (req: Request) => {
     const roomName = `interview_${jwtUserId}_${sessionUuid.slice(0, 8)}`;
 
     // --- Build focus areas ---
-    const focusAreas = body.focusAreas || body.topics || [];
-
-    const resolvedDuration = typeof body.durationMinutes === 'number' && body.durationMinutes > 0
-      ? body.durationMinutes
-      : 15;
+    const focusAreas = body.focusAreas;
+    const resolvedDuration = body.durationMinutes;
 
     // --- Build room metadata ---
     const roomMetadata: RoomMetadata = {
@@ -317,9 +381,9 @@ Deno.serve(async (req: Request) => {
         id: jwtUserId,
         name: studentName,
         email: jwtEmail,
-        targetRole: profile?.target_role || body.targetRole,
-        skills: profile && Array.isArray(profile.skills) ? profile.skills : [],
-        githubUsername: profile?.github_username || "",
+        targetRole: body.targetRole,
+        skills: Array.isArray(profile.skills) ? profile.skills : [],
+        githubUsername: profile.github_username || "",
       },
       resume: resumeInfo,
       job: jobInfo,
@@ -327,8 +391,8 @@ Deno.serve(async (req: Request) => {
       config: body,
       durationMinutes: resolvedDuration,
       target_duration_minutes: resolvedDuration,
-      mode: body.mode || 'voice',
-      provider: body.provider || 'cloud_api',
+      mode: body.mode,
+      provider: body.provider,
     };
 
     const metadataJson = JSON.stringify(roomMetadata);
@@ -355,18 +419,6 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "Failed to create interview session record" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    // --- Decrement interview_credits for non-premium user ---
-    if (!isPremium) {
-      try {
-        await serviceClient
-          .from("profiles")
-          .update({ interview_credits: Math.max(0, interviewCredits - 1) })
-          .eq("id", jwtUserId);
-      } catch (err) {
-        console.warn("Failed to decrement interview_credits on profiles:", err);
-      }
     }
 
     // --- Create LiveKit room and generate participant token ---
@@ -419,7 +471,7 @@ Deno.serve(async (req: Request) => {
         console.error("Failed to create or verify existing LiveKit room:", fallbackErr);
         await serviceClient
           .from("interview_sessions")
-          .update({ status: "failed" })
+          .update({ status: "error" })
           .eq("id", interviewId);
         // Fail closed!
         return new Response(
@@ -435,7 +487,7 @@ Deno.serve(async (req: Request) => {
     if (!roomCreated) {
       await serviceClient
         .from("interview_sessions")
-        .update({ status: "failed" })
+        .update({ status: "error" })
         .eq("id", interviewId);
       return new Response(
         JSON.stringify({ error: "Failed to establish LiveKit room", interviewId }),
@@ -463,7 +515,7 @@ Deno.serve(async (req: Request) => {
       }
       await serviceClient
         .from("interview_sessions")
-        .update({ status: "failed" })
+        .update({ status: "error" })
         .eq("id", interviewId);
       return new Response(
         JSON.stringify({
@@ -495,10 +547,46 @@ Deno.serve(async (req: Request) => {
 
     const token = await livekitToken.toJwt();
 
-    // Update session status to 'active'
+    let remainingCredits = interviewCredits;
+    if (!isPremium) {
+      const { data: creditBalance, error: creditError } = await serviceClient.rpc(
+        "consume_interview_credit",
+        { p_user_id: jwtUserId, p_interview_id: interviewId },
+      );
+
+      if (creditError || typeof creditBalance !== "number") {
+        console.error("Failed to consume interview credit:", creditError);
+        try {
+          await roomService.deleteRoom(roomName);
+        } catch (deleteError) {
+          console.warn("Failed to delete room after credit-consumption failure:", deleteError);
+        }
+        await serviceClient
+          .from("interview_sessions")
+          .update({ status: "error" })
+          .eq("id", interviewId);
+
+        const exhausted = creditError?.code === "P0001";
+        return new Response(
+          JSON.stringify({
+            error: exhausted
+              ? "Premium required. Out of credits."
+              : "Unable to reserve an interview credit. Please try again.",
+          }),
+          {
+            status: exhausted ? 403 : 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      remainingCredits = creditBalance;
+    }
+
+    // Mark the authoritative backend session as in progress.
     const { error: activeUpdateErr } = await serviceClient
       .from("interview_sessions")
-      .update({ status: "active", started_at: new Date().toISOString() })
+      .update({ status: "in_progress", started_at: new Date().toISOString() })
       .eq("id", interviewId);
     if (activeUpdateErr) {
       console.warn("Warning: Failed to update interview_session status to active:", activeUpdateErr);
@@ -511,6 +599,7 @@ Deno.serve(async (req: Request) => {
         roomName,
         token,
         interviewId,
+        remainingCredits,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

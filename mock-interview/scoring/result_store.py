@@ -8,8 +8,10 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Protocol
 from urllib import request
+from urllib.error import HTTPError, URLError
+from uuid import uuid4
 
-from scoring.schemas import DimensionScore, InterviewResult
+from scoring.schemas import DimensionScore, InterviewResult, TranscriptTurn
 
 
 class ResultStore(Protocol):
@@ -17,6 +19,8 @@ class ResultStore(Protocol):
 
 
 class InterviewSessionResultStore(Protocol):
+    def save_transcript(self, interview_id: str, transcript: list[TranscriptTurn]) -> None: ...
+
     def save(self, interview_id: str, result: InterviewResult) -> None: ...
 
 
@@ -124,8 +128,23 @@ class SupabaseInterviewSessionStore:
             raise PersistenceError("Supabase persistence is not configured")
         is_abandoned = getattr(result, "is_abandoned", False)
         status_val = "abandoned" if is_abandoned else getattr(result, "session_status", "completed")
+        transcript = [turn.model_dump(mode="json") for turn in result.transcript]
+        viva_scores = {
+            "interview_score": result.interview_score,
+            "dimensions": {
+                key: value.model_dump(mode="json")
+                for key, value in result.dimensions.items()
+            },
+            "summary": result.summary,
+            "strengths": result.strengths,
+            "improvement_areas": result.improvement_areas,
+            "evaluation_mode": result.evaluation_mode,
+            "is_fallback": result.is_fallback,
+        }
         payload = {
             "result": result.model_dump(mode="json"),
+            "transcript": transcript,
+            "viva_scores": viva_scores,
             "status": status_val,
             "completed_at": datetime.now(UTC).isoformat() if status_val == "completed" else None,
         }
@@ -146,10 +165,53 @@ class SupabaseInterviewSessionStore:
             with request.urlopen(req, timeout=15) as response:
                 if response.status >= 300:
                     raise PersistenceError("Supabase rejected the interview session result")
+                _require_updated_row(response, interview_id)
         except PersistenceError:
             raise
         except Exception as exc:
             raise PersistenceError("Supabase interview session persistence failed") from exc
+
+    def save_transcript(self, interview_id: str, transcript: list[TranscriptTurn]) -> None:
+        if not interview_id:
+            raise PersistenceError("interview ID is required")
+        if not self.url or not self.service_key:
+            raise PersistenceError("Supabase persistence is not configured")
+
+        payload = {
+            "transcript": [turn.model_dump(mode="json") for turn in transcript],
+        }
+        req = request.Request(
+            f"{self.url}/rest/v1/interview_sessions?id=eq.{interview_id}&status=in.(created,in_progress,active)",
+            data=json.dumps(payload).encode(),
+            headers={
+                "apikey": self.service_key,
+                "Authorization": f"Bearer {self.service_key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+            method="PATCH",
+        )
+        try:
+            with request.urlopen(req, timeout=15) as response:
+                if response.status >= 300:
+                    raise PersistenceError("Supabase rejected the interview transcript")
+                _require_updated_row(response, interview_id)
+        except PersistenceError:
+            raise
+        except Exception as exc:
+            raise PersistenceError("Supabase transcript persistence failed") from exc
+
+
+def _require_updated_row(response: object, interview_id: str) -> None:
+    read = getattr(response, "read", None)
+    if not callable(read):
+        return
+    raw = read()
+    if not raw:
+        raise PersistenceError(f"Interview session {interview_id} was not updated")
+    parsed = json.loads(raw.decode() if isinstance(raw, bytes) else str(raw))
+    if not isinstance(parsed, list) or len(parsed) != 1:
+        raise PersistenceError(f"Interview session {interview_id} was not updated")
 
 
 # In-memory registry for completed Round 1 sessions
@@ -228,8 +290,8 @@ def has_completed_round1(
             if isinstance(data2, list) and len(data2) > 0:
                 _COMPLETED_ROUND1_STUDENTS.add(clean_id)
                 return True
-    except Exception:
-        pass
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return False
 
     return False
 
@@ -238,30 +300,41 @@ def save_coding_interview_session(
     student_id: str,
     problem_id: str,
     result: object,
+    code: str,
+    language: str,
     url: str | None = None,
     service_key: str | None = None,
-) -> None:
+) -> str:
     """Persist a completed Round 2 coding practice session into interview_sessions."""
     supabase_url = (url or os.getenv("SUPABASE_URL", "")).rstrip("/")
     key = service_key or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    if not supabase_url or not key or not student_id:
-        return
+    if not supabase_url or not key:
+        raise PersistenceError("Supabase persistence is not configured")
+    if not student_id:
+        raise PersistenceError("student identity is required")
+    if not code.strip():
+        raise PersistenceError("coding submission is empty")
 
     res_dict = result.model_dump() if hasattr(result, "model_dump") else (result if isinstance(result, dict) else {})
     score_val = float(res_dict.get("overall_score", 85.0))
+    interview_id = f"coding_{uuid4()}"
 
     payload = {
+        "id": interview_id,
+        "user_id": str(student_id),
         "student_id": str(student_id),
+        "livekit_room_name": interview_id,
         "target_role": "Software Engineer (DSA & Web Dev)",
         "status": "completed",
-        "score": score_val,
         "config": {
             "type": "coding",
             "round": 2,
             "problem_id": problem_id,
+            "language": language,
         },
         "result": {
             "interview_score": score_val,
+            "transcript": [],
             "coding_result": res_dict,
             "summary": res_dict.get("code_quality_feedback", "Round 2 coding evaluation completed."),
             "strengths": res_dict.get("strengths", []),
@@ -269,6 +342,9 @@ def save_coding_interview_session(
             "evaluation_mode": res_dict.get("evaluation_mode", "static_ast_analysis"),
             "test_execution_status": res_dict.get("test_execution_status", "sandbox_pending"),
         },
+        "transcript": [],
+        "code_history": code,
+        "viva_scores": res_dict,
         "completed_at": datetime.now(UTC).isoformat(),
         "created_at": datetime.now(UTC).isoformat(),
     }
@@ -286,7 +362,12 @@ def save_coding_interview_session(
             method="POST",
         )
         with request.urlopen(req, timeout=10) as resp:
-            pass
-    except Exception:
-        pass
+            if resp.status >= 300:
+                raise PersistenceError("Supabase rejected the coding interview session")
+    except PersistenceError:
+        raise
+    except Exception as exc:
+        raise PersistenceError("Supabase coding-session persistence failed") from exc
+
+    return interview_id
 

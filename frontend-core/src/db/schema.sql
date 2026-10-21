@@ -102,8 +102,11 @@ CREATE TABLE IF NOT EXISTS interview_sessions (
     resume_id TEXT,
     config JSONB DEFAULT '{}'::jsonb,
     room_metadata JSONB,
-    status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'active', 'completed', 'abandoned', 'error')),
+    status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'in_progress', 'completed', 'abandoned', 'error')),
     result JSONB,
+    transcript JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(transcript) = 'array'),
+    code_history TEXT,
+    viva_scores JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(viva_scores) = 'object'),
     contract_version TEXT GENERATED ALWAYS AS (result->>'contract_version') STORED,
     interview_score NUMERIC(5, 2) GENERATED ALWAYS AS (NULLIF(result->>'interview_score', '')::numeric) STORED,
     started_at TIMESTAMPTZ,
@@ -121,6 +124,9 @@ ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS job_id TEXT;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS resume_id TEXT;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS room_metadata JSONB;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS transcript JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS code_history TEXT;
+ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS viva_scores JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();

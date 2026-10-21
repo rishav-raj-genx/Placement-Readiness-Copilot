@@ -173,6 +173,32 @@ def test_session_adaptive_follow_up_policy():
     assert "trade-off" in q3.lower() or "fastapi" in q3.lower()
 
 
+def test_hard_session_uses_focus_topic_and_aggressive_scale_probe():
+    from scoring.schemas import SessionConfig
+
+    session = InterviewSession(
+        InterviewContext(
+            target_role="Backend Engineer",
+            projects=["Payments Engine"],
+            skills=["Python"],
+        ),
+        FakeLLM(),
+        config=SessionConfig(
+            difficulty="hard",
+            focus_topics=["Distributed Systems"],
+            technical_question_count=2,
+            project_deep_dive_count=1,
+            hr_question_count=1,
+        ),
+    )
+    session.greeting()
+    session.next_question()
+    session.accept_answer("I built services.")
+
+    assert session.next_question() == "Why? How does that scale to 1 million users?"
+    assert any("Distributed Systems" in question for question in session.questions)
+
+
 def test_transcript_turns_include_timestamps_and_turn_ids():
     session = InterviewSession(
         InterviewContext(candidate_name="Meera"),

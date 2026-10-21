@@ -83,14 +83,14 @@ function AdminNavigation({ collapsed = false, onNavigate }: AdminNavigationProps
                 'flex items-center rounded-xl py-3 text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-2' : 'gap-3 px-4',
                 active
-                  ? 'border-l-4 border-orange-500 bg-gradient-to-r from-orange-500/10 to-transparent text-orange-500'
+                  ? 'border-l-4 border-red-600 bg-red-600/10 text-red-600'
                   : 'text-stone-400 hover:text-stone-200'
               )}
             >
               <Icon
                 className={cn(
                   'h-5 w-5 shrink-0 transition-colors',
-                  active ? 'text-orange-500' : 'text-stone-400 group-hover:text-stone-200'
+                  active ? 'text-red-600' : 'text-stone-400 group-hover:text-stone-200'
                 )}
                 aria-hidden="true"
               />
@@ -192,9 +192,9 @@ export function AdminShell({ children }: AdminShellProps) {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#0B0F17] text-stone-200">
+    <div className="relative min-h-screen overflow-x-hidden bg-stone-950 text-stone-200">
       <aside className={cn(
-        'fixed bottom-4 left-4 top-4 z-40 hidden h-[calc(100vh-2rem)] flex-col rounded-2xl border border-stone-800 bg-[#121826] shadow-lg shadow-black/50 transition-[width] duration-200 lg:flex',
+        'fixed bottom-4 left-4 top-4 z-40 hidden h-[calc(100vh-2rem)] flex-col rounded-2xl border border-stone-800 bg-stone-950 shadow-md shadow-black/40 transition-[width] duration-200 lg:flex',
         collapsed ? 'w-[72px]' : 'w-64',
       )}>
         <div className="flex flex-col h-full">
@@ -258,7 +258,7 @@ export function AdminShell({ children }: AdminShellProps) {
         'relative z-10 min-h-screen transition-[padding] duration-200 lg:pl-72',
         collapsed && 'lg:pl-24',
       )}>
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-stone-800 bg-[#0B0F17]/95 px-4 backdrop-blur-sm lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-stone-800 bg-stone-950/95 px-4 backdrop-blur-sm lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <button
@@ -269,7 +269,7 @@ export function AdminShell({ children }: AdminShellProps) {
                 <Menu className="h-5 w-5" aria-hidden="true" />
               </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 border-stone-800 bg-[#121826] p-0 text-stone-200">
+            <SheetContent side="left" className="w-72 border-r border-stone-800 bg-stone-950 p-0 text-stone-200">
               <div className="flex h-full flex-col">
                 <SheetHeader className="border-b border-stone-800 p-4 text-left">
                   <SheetTitle className="flex items-center gap-3 text-stone-100">

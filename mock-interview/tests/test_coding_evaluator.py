@@ -149,6 +149,7 @@ def test_round1_gating_and_activation(monkeypatch):
     from scoring.result_store import record_round1_completed
 
     monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-internal-secret")
+    monkeypatch.setattr("app.save_coding_interview_session", lambda *args, **kwargs: "coding_test_123")
     app = create_app(require_auth=True)
     client = TestClient(app)
     headers = {"Authorization": "Bearer test-internal-secret"}

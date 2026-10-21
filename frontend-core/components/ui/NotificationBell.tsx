@@ -31,7 +31,7 @@ function formatRelativeTime(timestamp: string, now: number | null): string {
 }
 
 function NotificationTypeIcon({ type }: Pick<NotificationItem, 'type'>) {
-  if (type === 'success') return <CircleCheck className="h-4 w-4 text-emerald-400" />;
+  if (type === 'success') return <CircleCheck className="h-4 w-4 text-orange-500" />;
   if (type === 'warning') return <AlertTriangle className="h-4 w-4 text-amber-400" />;
   return <Info className="h-4 w-4 text-[#D93829]" />;
 }

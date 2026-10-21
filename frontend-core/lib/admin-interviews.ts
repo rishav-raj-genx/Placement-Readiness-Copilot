@@ -10,6 +10,8 @@ export const ADMIN_INTERVIEW_COLUMNS = [
   'status',
   'result',
   'transcript',
+  'code_history',
+  'viva_scores',
   'interview_score',
   'audio_url',
   'completed_at',
@@ -18,6 +20,10 @@ export const ADMIN_INTERVIEW_COLUMNS = [
   'score_override_reason',
   'score_overridden_by_name',
   'score_overridden_at',
+  'admin_score',
+  'admin_feedback',
+  'admin_scored_by_name',
+  'admin_scored_at',
 ].join(',');
 
 export interface VivaTranscriptTurn {
@@ -48,13 +54,18 @@ export interface FacultyVivaRecord {
   studentName: string;
   studentEmail: string;
   targetRole: string;
+  profileHref: string;
   aiScore: number;
   effectiveScore: number;
+  hasAiScore: boolean;
+  adminScore: number | null;
+  adminFeedback: string;
   aiConfidence: number | null;
   needsReview: boolean;
   completedAt: string;
   summary: string;
   transcript: VivaTranscriptTurn[];
+  codeHistory: string | null;
   audioUrl: string | null;
   rubric: VivaRubricScore[];
   override: VivaScoreOverride | null;
@@ -111,7 +122,7 @@ function titleCase(value: string): string {
 
 function normalizeTranscript(value: unknown): VivaTranscriptTurn[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((item, index): VivaTranscriptTurn[] => {
+  const turns = value.flatMap((item, index): VivaTranscriptTurn[] => {
     if (!isRecord(item)) return [];
     const speakerValue = readString(item.speaker);
     const speaker = speakerValue === 'student' ? 'student' : speakerValue === 'ai' || speakerValue === 'interviewer' ? 'ai' : null;
@@ -125,6 +136,17 @@ function normalizeTranscript(value: unknown): VivaTranscriptTurn[] {
       timestampSeconds: Math.max(0, timestampSeconds ?? 0),
     }];
   });
+
+  const firstTimestamp = turns.find((turn) => turn.timestampSeconds > 0)?.timestampSeconds;
+  if (firstTimestamp === undefined || firstTimestamp < 100_000_000) return turns;
+  const milliseconds = firstTimestamp > 100_000_000_000;
+  return turns.map((turn) => ({
+    ...turn,
+    timestampSeconds: Math.max(
+      0,
+      (turn.timestampSeconds - firstTimestamp) / (milliseconds ? 1000 : 1),
+    ),
+  }));
 }
 
 function normalizeRubric(result: UnknownRecord): VivaRubricScore[] {
@@ -194,7 +216,7 @@ export function normalizeFacultyVivas(
     if (!isRecord(item)) return [];
     const id = readString(item.id);
     const studentId = readString(item.student_id) || readString(item.user_id);
-    const targetRole = readString(item.target_role);
+    const targetRole = readString(item.target_role) || 'Target role unavailable';
     const rawResult = item.result;
     const result = isRecord(rawResult)
       ? rawResult
@@ -209,8 +231,11 @@ export function normalizeFacultyVivas(
           })()
         : null;
     const resultRecord = result ?? {};
-    const effectiveScore = readNumber(item.interview_score) ?? readNumber(resultRecord.interview_score ?? resultRecord.finalScore);
-    if (!id || !studentId || !targetRole || effectiveScore === null) return [];
+    const vivaScoresRecord = isRecord(item.viva_scores) ? item.viva_scores : {};
+    const resultAiScore = readNumber(item.interview_score)
+      ?? readNumber(vivaScoresRecord.interview_score)
+      ?? readNumber(resultRecord.interview_score ?? resultRecord.finalScore);
+    if (!id || !studentId) return [];
 
     const joinedProfile = isRecord(item.profiles)
       ? item.profiles
@@ -229,9 +254,24 @@ export function normalizeFacultyVivas(
       candidate?.email ||
       '';
 
-    const aiScore = readNumber(item.original_ai_score) ?? effectiveScore;
-    const aiConfidence = normalizeConfidence(resultRecord.ai_confidence ?? resultRecord.confidence);
-    const overriddenAt = readString(item.score_overridden_at);
+    const aiScoreValue = readNumber(item.original_ai_score) ?? resultAiScore;
+    const adminScore = readNumber(item.admin_score);
+    const legacyOverriddenAt = readString(item.score_overridden_at);
+    const effectiveScore = adminScore
+      ?? (legacyOverriddenAt ? resultAiScore : aiScoreValue)
+      ?? 0;
+    const aiConfidence = normalizeConfidence(
+      vivaScoresRecord.ai_confidence
+      ?? vivaScoresRecord.confidence
+      ?? resultRecord.ai_confidence
+      ?? resultRecord.confidence,
+    );
+    const overriddenAt = readString(item.admin_scored_at) || legacyOverriddenAt;
+    const adminFeedback = readString(item.admin_feedback) || readString(item.score_override_reason);
+    const rubric = normalizeRubric(vivaScoresRecord);
+    const transcriptValue = Array.isArray(item.transcript) && item.transcript.length > 0
+      ? item.transcript
+      : resultRecord.transcript;
 
     return [{
       id,
@@ -239,18 +279,25 @@ export function normalizeFacultyVivas(
       studentName,
       studentEmail,
       targetRole,
-      aiScore: Math.min(100, Math.max(0, aiScore)),
+      profileHref: `/admin-students/${encodeURIComponent(studentId)}`,
+      aiScore: Math.min(100, Math.max(0, aiScoreValue ?? 0)),
       effectiveScore: Math.min(100, Math.max(0, effectiveScore)),
+      hasAiScore: aiScoreValue !== null,
+      adminScore: adminScore === null ? null : Math.min(100, Math.max(0, adminScore)),
+      adminFeedback,
       aiConfidence,
       needsReview: aiConfidence !== null && aiConfidence < LOW_CONFIDENCE_THRESHOLD,
       completedAt: readString(item.completed_at) || readString(item.created_at),
-      summary: readString(resultRecord.summary),
-      transcript: normalizeTranscript(resultRecord.transcript ?? item.transcript),
+      summary: readString(vivaScoresRecord.summary) || readString(resultRecord.summary),
+      transcript: normalizeTranscript(transcriptValue),
+      codeHistory: readString(item.code_history) || readString(resultRecord.code_history) || null,
       audioUrl: readHttpUrl(item.audio_url) ?? readHttpUrl(resultRecord.audio_url),
-      rubric: normalizeRubric(resultRecord),
+      rubric: rubric.length > 0 ? rubric : normalizeRubric(resultRecord),
       override: overriddenAt ? {
-        reason: readString(item.score_override_reason),
-        facultyName: readString(item.score_overridden_by_name) || 'MSOT Staff',
+        reason: adminFeedback,
+        facultyName: readString(item.admin_scored_by_name)
+          || readString(item.score_overridden_by_name)
+          || 'MSOT Staff',
         overriddenAt,
       } : null,
     }];

@@ -91,6 +91,7 @@ def results_event(result: InterviewResult) -> dict[str, object]:
             "evaluationMode": result.evaluation_mode,
             "rubricVersion": result.rubric_version,
             "isProvisional": getattr(result, "is_provisional", False) or result.is_fallback,
+            "transcript": [turn.model_dump(mode="json") for turn in result.transcript],
             "categoryScores": [
                 {
                     "category": category,

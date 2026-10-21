@@ -86,14 +86,7 @@ async def entrypoint(ctx: JobContext) -> None:
     interview_id = _interview_id(metadata)
     student_id = _student_id(metadata)
 
-    target_duration = _duration_from_metadata(metadata)
-    session_config = SessionConfig(
-        target_duration_minutes=target_duration,
-        technical_question_count=6,
-        project_deep_dive_count=2,
-        hr_question_count=1,
-        role_category=context.target_role or "backend",
-    )
+    session_config = _session_config_from_metadata(metadata, context)
     instructions = _interview_instructions(context, session_config)
 
     # Selectable hosted vs local Ollama mode with strict privacy policy
@@ -232,15 +225,16 @@ async def entrypoint(ctx: JobContext) -> None:
                         reliable=True,
                     )
             # Only record Round 1 as completed if the session was truly completed, not abandoned
-            if not getattr(result, "is_abandoned", False) and getattr(result, "session_status", "completed") == "completed":
-                if student_id:
-                    record_round1_completed(student_id)
-                if interview_id:
-                    record_round1_completed(interview_id)
+            if (
+                not getattr(result, "is_abandoned", False)
+                and getattr(result, "session_status", "completed") == "completed"
+                and student_id
+            ):
+                record_round1_completed(student_id)
             async with finalization_lock:
                 finalization_state = "succeeded"
             return True
-        except (RuntimeError, ValueError, OSError, Exception) as exc:
+        except (RuntimeError, ValueError, TypeError, OSError) as exc:
             logger.error("Finalization attempt failed (retryable): %s", exc)
             async with finalization_lock:
                 finalization_state = "failed_retryable"
@@ -299,6 +293,51 @@ def _duration_from_metadata(metadata: Mapping[str, object]) -> int:
     return 15
 
 
+def _session_config_from_metadata(
+    metadata: Mapping[str, object],
+    context: InterviewContext,
+) -> SessionConfig:
+    raw_config = metadata.get("config")
+    config = raw_config if isinstance(raw_config, Mapping) else {}
+
+    difficulty_value = str(config.get("difficulty") or metadata.get("difficulty") or "medium").lower()
+    difficulty = difficulty_value if difficulty_value in {"easy", "medium", "hard", "adaptive"} else "medium"
+
+    raw_topics = (
+        config.get("focusAreas")
+        or config.get("focus_topics")
+        or config.get("topics")
+        or metadata.get("focusAreas")
+        or metadata.get("focus_topics")
+        or []
+    )
+    focus_topics = []
+    if isinstance(raw_topics, list):
+        focus_topics = [
+            item.strip()[:80]
+            for item in raw_topics
+            if isinstance(item, str) and item.strip()
+        ][:8]
+
+    experience_level = str(
+        config.get("experienceLevel")
+        or config.get("experience_level")
+        or metadata.get("experienceLevel")
+        or "entry_level"
+    )[:40]
+
+    return SessionConfig(
+        target_duration_minutes=_duration_from_metadata(metadata),
+        technical_question_count=6,
+        project_deep_dive_count=2,
+        hr_question_count=1,
+        role_category=context.target_role or "backend",
+        difficulty=difficulty,
+        focus_topics=focus_topics,
+        experience_level=experience_level,
+    )
+
+
 def _resume_from_room_metadata(metadata: str) -> dict[str, object]:
     if not metadata:
         return {}
@@ -346,18 +385,36 @@ def _interview_instructions(context: InterviewContext, config: SessionConfig) ->
         for idx, item in enumerate(plan)
     )
 
+    focus_topics = ", ".join(config.focus_topics) if config.focus_topics else "resume-grounded engineering topics"
+    if config.difficulty == "hard":
+        difficulty_instructions = (
+            "- Act as a Principal Staff Engineer at a FAANG company.\n"
+            "- Do not provide hints unless explicitly asked.\n"
+            "- Probe deeply into system architecture, scalability bottlenecks, memory management, and time/space complexity trade-offs.\n"
+            "- If the candidate gives a superficial answer, aggressively ask 'Why?' and 'How does that scale to 1 million users?'\n"
+        )
+    else:
+        difficulty_instructions = (
+            "- Ask at most ONE concise follow-up per question when an answer is incomplete. "
+            "If the candidate passes, move supportively to the next question.\n"
+        )
+
     return (
         f"You are an experienced, empathetic, and professional mock interviewer conducting a {config.target_duration_minutes}-minute "
         f"technical and behavioral session for the {context.target_role or config.role_category} position.\n\n"
+        f"Configured difficulty: {config.difficulty.upper()}\n"
+        f"Candidate experience level: {config.experience_level}\n"
+        f"Required focus topics: {focus_topics}\n\n"
         "### Canonical Question Plan (Must Follow in Order)\n"
         f"{plan_lines}\n\n"
         "### Interview Conduct Guidelines\n"
         "- Speak with a calm, conversational, professional cadence. Do not sound robotic.\n"
         "- Ask questions one at a time. Never dump multiple questions simultaneously.\n"
         "- Active Listening: Before asking the next primary question, briefly acknowledge a concrete point from the candidate's answer.\n"
-        "- Adaptive Follow-up: Ask at most ONE concise follow-up per question if the candidate gives a very brief or incomplete answer. If the candidate passes or says 'I don't know', do not grill them—supportively move to the next question.\n"
+        f"{difficulty_instructions}"
         f"- Target {config.target_duration_minutes} minutes and wrap up by {config.effective_max_minutes} minutes.\n"
         "- Never reveal live scores or grading during the conversation.\n"
+        "- At the end of Round 1, explicitly direct the candidate to Round 2 in the Monaco IDE, where they must write and execute actual code. Explain that correctness plus measured time and space complexity will be graded.\n"
         f"- Verified Candidate Context: {context.model_dump_json(exclude_none=True)}\n\n"
         "When all questions are answered or when the candidate asks to finish, warmly thank them for their time, acknowledge the conclusion of the session, and explain that detailed diagnostic feedback is ready on their dashboard."
     )

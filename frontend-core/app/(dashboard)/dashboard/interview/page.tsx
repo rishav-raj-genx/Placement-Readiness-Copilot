@@ -45,6 +45,7 @@ export default function ConfigureInterviewPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const profile = useProfileStore((state) => state.profile);
+  const hydrateProfile = useProfileStore((state) => state.hydrate);
   const { startInterview, setCreating, setCreateError, isCreating, createError } = useLiveKitInterviewStore();
 
   const isPremium = profile?.isPremium === true;
@@ -136,6 +137,7 @@ export default function ConfigureInterviewPage() {
         provider,
       };
       const session = await createInterviewSession(request);
+      await hydrateProfile(user.id);
       startInterview(
         session.interviewId,
         session.roomName,
@@ -250,7 +252,7 @@ export default function ConfigureInterviewPage() {
               You have used your 3 free AI mock interviews. Unlimited interviews, advanced analytics, and priority MSOT job matching require a Premium upgrade. Payment gateway integration is pending—please contact a platform Admin to verify your payment and manually unlock your account.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <div className="inline-flex items-center gap-2 rounded-xl border border-orange-500/40 bg-gradient-to-r from-orange-500/20 to-red-600/20 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-orange-300 shadow-inner">
+              <div className="inline-flex items-center gap-2 rounded-xl border border-orange-500/40 bg-orange-600/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-orange-300">
                 <span className="h-2 w-2 rounded-full bg-orange-400 animate-pulse" />
                 Admin Verification Required
               </div>
@@ -439,7 +441,7 @@ export default function ConfigureInterviewPage() {
                     : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
                 }`}
               >
-                <Cpu className="h-3.5 w-3.5 text-emerald-400" />
+                <Cpu className="h-3.5 w-3.5 text-orange-500" />
                 Ollama (Local)
               </button>
             </div>

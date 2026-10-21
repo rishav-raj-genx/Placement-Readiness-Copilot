@@ -195,8 +195,8 @@ export function ProctoredGuard({ children }: ProctoredGuardProps) {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs">
             <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isWindowFocused ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${isWindowFocused ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isWindowFocused ? 'bg-orange-500' : 'bg-amber-500'}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isWindowFocused ? 'bg-orange-600' : 'bg-amber-600'}`} />
             </span>
             <span className="font-mono text-[11px] text-stone-400 hidden md:inline">
               {isWindowFocused ? 'Focused on assessment' : 'Window out of focus'}
@@ -227,7 +227,7 @@ export function ProctoredGuard({ children }: ProctoredGuardProps) {
 
       {/* Proctored Warning Dialog on Navigation Attempt */}
       <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
-        <AlertDialogContent className="border border-red-900/60 bg-[#28201E] text-stone-100 max-w-md">
+        <AlertDialogContent className="border border-stone-800 bg-stone-900 shadow-md shadow-black/40 text-stone-100 max-w-md">
           <AlertDialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-950/60 border border-red-800 text-red-400 shrink-0">
@@ -252,7 +252,7 @@ export function ProctoredGuard({ children }: ProctoredGuardProps) {
           <div className="my-2 rounded-xl border border-stone-800 bg-stone-900/80 p-3.5 space-y-2 text-xs font-mono">
             <div className="flex items-center justify-between text-stone-400">
               <span>Current Status:</span>
-              <span className="text-emerald-400 font-semibold">Active Assessment</span>
+              <span className="text-orange-500 font-semibold">Active Assessment</span>
             </div>
             <div className="flex items-center justify-between text-stone-400">
               <span>Time Elapsed:</span>
@@ -260,7 +260,7 @@ export function ProctoredGuard({ children }: ProctoredGuardProps) {
             </div>
             <div className="flex items-center justify-between text-stone-400">
               <span>Tab Switches Logged:</span>
-              <span className={tabSwitchCount > 0 ? 'text-amber-400 font-semibold' : 'text-emerald-400'}>
+              <span className={tabSwitchCount > 0 ? 'text-amber-500 font-semibold' : 'text-orange-500'}>
                 {tabSwitchCount} incident{tabSwitchCount !== 1 ? 's' : ''}
               </span>
             </div>

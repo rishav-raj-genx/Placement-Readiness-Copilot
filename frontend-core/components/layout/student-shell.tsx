@@ -37,7 +37,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#1a1310] text-stone-200">
       <aside className={cn(
-        'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-stone-800 bg-[#28201E] transition-[width] duration-200 md:flex',
+        'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-stone-800 bg-stone-950 transition-[width] duration-200 md:flex',
         collapsed ? 'w-[72px]' : 'w-64'
       )}>
         <div className={cn(
@@ -85,14 +85,14 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className={cn('min-h-screen transition-[padding] duration-200 md:pl-64', collapsed && 'md:pl-[72px]')}>
-        <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-stone-800 bg-[#28201E]/95 px-4 backdrop-blur-sm md:hidden">
+        <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-stone-800 bg-stone-950/95 px-4 backdrop-blur-sm md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open navigation" className="text-stone-300 hover:bg-stone-800">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 border-stone-800 bg-[#28201E] p-0 text-stone-200">
+            <SheetContent side="left" className="w-72 border-stone-800 bg-stone-950 p-0 text-stone-200">
               <SheetHeader className="border-b border-stone-800 p-4 text-left">
                 <SheetTitle className="flex items-center gap-2 text-stone-100">
                   <HireableLogo size={24} />

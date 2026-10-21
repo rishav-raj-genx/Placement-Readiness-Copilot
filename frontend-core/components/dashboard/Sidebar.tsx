@@ -80,14 +80,14 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
                 'flex items-center rounded-xl py-3 text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-2' : 'gap-3 px-4',
                 active
-                  ? 'border-l-4 border-orange-500 bg-gradient-to-r from-orange-500/10 to-transparent text-orange-500'
+                  ? 'border-l-4 border-red-600 bg-red-600/10 text-red-600'
                   : 'text-stone-400 hover:text-stone-200'
               )}
             >
               <Icon
                 className={cn(
                   'h-5 w-5 shrink-0 transition-colors',
-                  active ? 'text-orange-500' : 'text-stone-500 group-hover:text-stone-200'
+                  active ? 'text-red-600' : 'text-stone-500 group-hover:text-stone-200'
                 )}
                 aria-hidden="true"
               />
@@ -202,7 +202,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-800">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-600 transition-all duration-500"
+                  className="h-full rounded-full bg-orange-600 transition-all duration-500"
                   style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
                 />
               </div>
@@ -225,7 +225,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
               collapsed ? '' : 'flex-1 gap-2.5'
             )}
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-xs font-bold text-white">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-600 text-xs font-bold text-white">
               {initials}
             </span>
             {!collapsed && (

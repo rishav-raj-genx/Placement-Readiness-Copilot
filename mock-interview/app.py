@@ -28,7 +28,10 @@ from scoring.coding_evaluator import (
     evaluate_coding_submission,
 )
 from scoring.result_store import (
+    InterviewSessionResultStore,
+    PersistenceError,
     ResultStore,
+    SupabaseInterviewSessionStore,
     SupabaseResultStore,
     has_completed_round1,
     record_round1_completed,
@@ -57,6 +60,7 @@ def create_app(
     stt: SpeechToText | None = None,
     tts: TextToSpeech | None = None,
     result_store: ResultStore | None = None,
+    session_result_store: InterviewSessionResultStore | None = None,
     require_auth: bool = True,
     runtime_mode: str = "live",
 ) -> FastAPI:
@@ -67,6 +71,7 @@ def create_app(
     speech_to_text = stt or DeepgramSTT()
     text_to_speech = tts or DeepgramTTS()
     persistence = result_store or SupabaseResultStore()
+    session_persistence = session_result_store or SupabaseInterviewSessionStore()
 
     @app.get("/health")
     async def health() -> dict[str, object]:
@@ -179,26 +184,29 @@ def create_app(
             ) from exc
 
         # Only persist to interview_sessions if this is a final submission (not a test run)
-        persisted = False
-        persistence_error = None
+        persisted_interview_id: str | None = None
         effective_student_id = student_for_gating or verified_student_id
         if submission.action != "run" and effective_student_id and effective_student_id not in {"service_caller", "unknown"}:
             try:
-                await asyncio.to_thread(
+                persisted_interview_id = await asyncio.to_thread(
                     save_coding_interview_session,
                     effective_student_id,
                     submission.problem_id,
                     result,
+                    submission.code,
+                    submission.language,
                 )
-                persisted = True
-            except Exception as exc:  # noqa: BLE001
-                persistence_error = str(exc)
+            except PersistenceError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Coding evaluation succeeded, but its evidence could not be saved.",
+                ) from exc
 
         return {
             "status": "ok",
             "round1_completed": True,
-            "persisted": persisted,
-            "persistence_error": persistence_error,
+            "persisted": persisted_interview_id is not None,
+            "interview_id": persisted_interview_id,
             "result": result.model_dump(),
         }
 
@@ -207,6 +215,7 @@ def create_app(
         await websocket.accept()
         session: InterviewSession | None = None
         student_id: str | None = None
+        interview_id: str | None = None
         try:
             while True:
                 raw_message = await websocket.receive_json()
@@ -217,7 +226,15 @@ def create_app(
 
                 # Check duration limit if session is active
                 if session is not None and session.elapsed_seconds >= session.config.effective_max_minutes * 60:
+                    if interview_id:
+                        await asyncio.to_thread(
+                            session_persistence.save_transcript,
+                            interview_id,
+                            session.transcript,
+                        )
                     result = await asyncio.to_thread(session.finish)
+                    if interview_id:
+                        await asyncio.to_thread(session_persistence.save, interview_id, result)
                     if persistence is not None and student_id is not None:
                         await asyncio.to_thread(persistence.save, student_id, result)
                     if student_id and not getattr(result, "is_abandoned", False) and not getattr(result, "is_provisional", False):
@@ -241,6 +258,12 @@ def create_app(
                         student_id = authenticate_student(
                             message.get("auth_token"), message.get("student_id")
                         )
+                    raw_interview_id = message.get("interview_id")
+                    interview_id = (
+                        raw_interview_id.strip()
+                        if isinstance(raw_interview_id, str) and raw_interview_id.strip()
+                        else None
+                    )
                     cfg_raw = message.get("session_config")
                     cfg = SessionConfig.model_validate(cfg_raw) if isinstance(cfg_raw, dict) else None
                     session = InterviewSession(adapt_resume(resume_raw), scoring_llm, config=cfg)
@@ -277,7 +300,15 @@ def create_app(
                 elif event == "finish":
                     if session is None:
                         raise ValueError("send a start event before finishing")
+                    if interview_id:
+                        await asyncio.to_thread(
+                            session_persistence.save_transcript,
+                            interview_id,
+                            session.transcript,
+                        )
                     result = await asyncio.to_thread(session.finish)
+                    if interview_id:
+                        await asyncio.to_thread(session_persistence.save, interview_id, result)
                     if persistence is not None and student_id is not None:
                         await asyncio.to_thread(persistence.save, student_id, result)
                     if student_id and not getattr(result, "is_abandoned", False) and not getattr(result, "is_provisional", False):

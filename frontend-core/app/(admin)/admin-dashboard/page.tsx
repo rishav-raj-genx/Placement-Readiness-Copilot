@@ -4,7 +4,7 @@ import { BriefcaseBusiness, Mic2, ArrowRight } from 'lucide-react';
 export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-stone-800 bg-[#121826] p-6 sm:p-8">
+      <section className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 p-6 sm:p-8">
         <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Staff workspace</p>
         <h1 className="mt-2 font-[var(--font-display)] text-3xl font-bold tracking-tight text-stone-100 sm:text-4xl">
           MSOT command center
@@ -17,7 +17,7 @@ export default function AdminDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-2">
         <Link
           href="/admin-jobs"
-          className="group rounded-xl border border-orange-500/20 hover:border-orange-500/50 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all bg-[#121826] p-5"
+          className="group rounded-xl border border-stone-800 hover:border-orange-500/50 bg-stone-900 shadow-md shadow-black/40 transition-all p-5"
         >
           <div className="flex items-center justify-between">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-orange-500/20 bg-orange-500/10 text-orange-400">
@@ -33,7 +33,7 @@ export default function AdminDashboardPage() {
 
         <Link
           href="/admin-interviews"
-          className="group rounded-xl border border-orange-500/20 hover:border-orange-500/50 hover:shadow-[0_0_20px_rgba(249,115,22,0.15)] transition-all bg-[#121826] p-5"
+          className="group rounded-xl border border-stone-800 hover:border-orange-500/50 bg-stone-900 shadow-md shadow-black/40 transition-all p-5"
         >
           <div className="flex items-center justify-between">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-orange-500/20 bg-orange-500/10 text-orange-400">

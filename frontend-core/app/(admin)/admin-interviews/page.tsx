@@ -34,30 +34,59 @@ async function loadFacultyVivas(): Promise<FacultyVivaData> {
   const adminProfileValue: unknown = adminProfile;
   if (profileError || !hasAdminRole(adminProfileValue)) redirect('/dashboard');
 
-  // PHASE 1: THE SERVICE ROLE CLIENT
-  // This completely bypasses RLS. ONLY use in protected admin server routes.
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  try {
+    // This completely bypasses RLS. ONLY use in protected admin server routes.
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
 
-  // PHASE 2: THE INTERVIEW FETCH QUERY
-  const { data: completedVivas, error } = await supabaseAdmin
-    .from('interview_sessions')
-    .select('*, profiles(name, email, github_handle)')
-    .eq('status', 'completed')
-    .order('created_at', { ascending: false });
+    let { data: completedVivas, error } = await supabaseAdmin
+      .from('interview_sessions')
+      .select('*, profiles(name, email, github_handle)')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Admin Viva Fetch Error:', error);
-    return { interviews: [], error: null };
+    if (error) {
+      console.error('Admin Viva Fetch Error:', error);
+      const retry = await supabaseAdmin
+        .from('interview_sessions')
+        .select('*, profiles!fk_interview_sessions_user_profile(name, email, github_handle)')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      if (!retry.error) {
+        completedVivas = retry.data;
+        error = null;
+      }
+    }
+
+    if (error) {
+      console.error('Admin Viva Fetch Error:', error);
+      return {
+        interviews: [],
+        error: null,
+      };
+    }
+
+    const vivasValue: unknown = completedVivas;
+    return {
+      interviews: normalizeFacultyVivas(vivasValue, []),
+      error: null,
+    };
+  } catch (err) {
+    console.error('Admin Viva Fetch Error:', err);
+    return {
+      interviews: [],
+      error: null,
+    };
   }
-
-  const vivasValue: unknown = completedVivas;
-  return {
-    interviews: normalizeFacultyVivas(vivasValue, []),
-    error: null,
-  };
 }
 
 export default async function AdminInterviewsPage() {

@@ -38,6 +38,9 @@ class SessionConfig(BaseModel):
     project_deep_dive_count: int = Field(default=1, ge=1, le=3)
     hr_question_count: int = Field(default=1, ge=1, le=3)
     role_category: str = "backend"
+    difficulty: Literal["easy", "medium", "hard", "adaptive"] = "medium"
+    focus_topics: list[str] = Field(default_factory=list, max_length=8)
+    experience_level: str = "entry_level"
     question_source: Literal["curated_bank", "template", "custom"] = "curated_bank"
 
     @property

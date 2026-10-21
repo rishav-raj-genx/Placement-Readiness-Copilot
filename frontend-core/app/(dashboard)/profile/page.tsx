@@ -787,7 +787,7 @@ export default function ProfilePage() {
           <button
             type="submit"
             disabled={isSaving || isAnalyzing}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-7 py-3 text-xs font-bold text-white shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-all hover:from-orange-600 hover:to-red-700 active:scale-[0.98] disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 px-7 py-3 text-xs font-bold text-white shadow-md shadow-black/40 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
             <span>{isAnalyzing ? 'Recalculating Scores...' : isSaving ? 'Saving Changes...' : 'Save Profile Changes'}</span>
@@ -796,7 +796,7 @@ export default function ProfilePage() {
       </form>
 
       {/* PHASE 2: COMPREHENSIVE MANAGE DATA SECTION */}
-      <section aria-labelledby="manage-data-heading" className="rounded-2xl border border-stone-800 bg-[#28201E]/90 p-6 shadow-md shadow-black/40 sm:p-8 space-y-6">
+      <section aria-labelledby="manage-data-heading" className="rounded-2xl border border-stone-800 bg-stone-900/90 p-6 shadow-md shadow-black/40 sm:p-8 space-y-6">
         <div className="flex items-center justify-between border-b border-stone-800 pb-4">
           <div>
             <h2 id="manage-data-heading" className="font-display text-xl font-bold text-stone-100">
@@ -1104,7 +1104,7 @@ export default function ProfilePage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-md rounded-2xl border border-stone-800 bg-[#28201E] p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40">
             <div className="flex items-center justify-between border-b border-stone-800 pb-3">
               <h3 className="font-display text-base font-bold text-stone-100">
                 {editingField === 'github'
@@ -1169,7 +1169,7 @@ export default function ProfilePage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-md rounded-2xl border border-stone-800 bg-[#28201E] p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40">
             <div className="flex items-center justify-between border-b border-stone-800 pb-3">
               <h3 className="font-display text-base font-bold text-stone-100">
                 {editingProjectIndex !== null ? 'Edit Project' : 'Add Project Details'}
@@ -1264,7 +1264,7 @@ export default function ProfilePage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-md rounded-2xl border border-red-900 bg-[#28201E] p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-red-900 bg-stone-900 p-6 shadow-md shadow-black/40">
             <div className="flex items-center gap-3 text-red-500">
               <AlertTriangle className="h-6 w-6" />
               <h3 className="font-display text-lg font-bold text-stone-100">Delete Account & Data</h3>

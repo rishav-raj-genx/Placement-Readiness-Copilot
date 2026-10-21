@@ -586,8 +586,8 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
               <h2 className="font-[var(--font-display)] text-sm font-bold text-stone-100">
                 Conversational Intake Assistant
               </h2>
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-950/40 px-2 py-0.5 text-[10px] font-medium text-orange-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-pulse" />
                 Live
               </span>
             </div>
@@ -839,20 +839,20 @@ function StatusPill({
       className={clsx(
         'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
         isComplete
-          ? 'border border-emerald-500/40 bg-emerald-950/40 text-emerald-300'
+          ? 'border border-orange-500/40 bg-orange-950/40 text-orange-400'
           : 'border border-stone-800 bg-stone-900/40 text-stone-400'
       )}
     >
       {isComplete ? (
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-orange-400 shrink-0" />
       ) : (
         <Circle className="h-3 w-3 text-stone-600 shrink-0" />
       )}
       <span>{label}</span>
       {isComplete && detail ? (
-        <span className="max-w-[120px] truncate text-emerald-400/80">({detail})</span>
+        <span className="max-w-[120px] truncate text-orange-400/80">({detail})</span>
       ) : null}
-      {isComplete ? <span className="font-bold text-emerald-400">✅</span> : null}
+      {isComplete ? <span className="font-bold text-orange-400">✅</span> : null}
     </div>
   );
 }

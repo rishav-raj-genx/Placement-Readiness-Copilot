@@ -119,7 +119,7 @@ export function InterviewAuditPlayer({ audioUrl, transcript }: InterviewAuditPla
   }, [transcript, searchQuery]);
 
   return (
-    <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none overflow-hidden">
+    <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 overflow-hidden">
       <CardHeader className="border-b border-stone-800/80 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
@@ -141,7 +141,7 @@ export function InterviewAuditPlayer({ audioUrl, transcript }: InterviewAuditPla
               disabled={transcript.length === 0}
               className="border-stone-800 bg-stone-900 text-xs text-stone-300 hover:bg-stone-800 h-8 gap-1.5"
             >
-              {hasCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+              {hasCopied ? <Check className="h-3.5 w-3.5 text-orange-600" /> : <Copy className="h-3.5 w-3.5" />}
               {hasCopied ? 'Copied' : 'Copy transcript'}
             </Button>
           </div>
@@ -320,7 +320,7 @@ export function InterviewAuditPlayer({ audioUrl, transcript }: InterviewAuditPla
                       className={`grid h-7 w-7 place-items-center rounded-lg border text-xs ${
                         isInterviewer
                           ? 'border-red-900/40 bg-red-950/40 text-red-400'
-                          : 'border-emerald-900/40 bg-emerald-950/40 text-emerald-400'
+                          : 'border-orange-900/40 bg-orange-950/40 text-orange-400'
                       }`}
                     >
                       {isInterviewer ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}

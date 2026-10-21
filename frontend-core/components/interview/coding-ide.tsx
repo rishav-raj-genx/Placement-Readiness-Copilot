@@ -496,12 +496,12 @@ export function CodingIDE() {
                   : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
               }`}
             >
-              {isEvaluated && <Check className="h-3.5 w-3.5 text-emerald-400" />}
+              {isEvaluated && <Check className="h-3.5 w-3.5 text-orange-600" />}
               <span>{prob.title}</span>
               <span
                 className={`rounded px-1.5 py-0.5 text-[10px] font-mono ${
                   prob.difficulty === 'Easy'
-                    ? 'border border-emerald-900/40 bg-emerald-950/40 text-emerald-300'
+                    ? 'border border-orange-900/40 bg-orange-950/40 text-orange-400'
                     : prob.difficulty === 'Medium'
                     ? 'border border-amber-900/40 bg-amber-950/40 text-amber-300'
                     : 'border border-red-900/40 bg-red-950/40 text-red-300'
@@ -517,7 +517,7 @@ export function CodingIDE() {
       {/* Main IDE Workspace: Problem Spec on Left, HackerRank / Judge0 Code Workspace on Right */}
       <div className="grid gap-6 lg:grid-cols-12 items-start">
         {/* Left Column (5 cols on lg): Problem Spec & AI Feedback Hub */}
-        <div className="lg:col-span-5 flex flex-col rounded-2xl border border-stone-800 bg-[#28201E] overflow-hidden shadow-xl">
+        <div className="lg:col-span-5 flex flex-col rounded-2xl border border-stone-800 bg-stone-900 overflow-hidden shadow-md shadow-black/40">
           {/* Navigation Tabs Header */}
           <div className="flex border-b border-stone-800 bg-stone-950 p-1.5">
             <button
@@ -556,7 +556,7 @@ export function CodingIDE() {
                     variant="outline"
                     className={`font-mono text-xs ${
                       activeProblem.difficulty === 'Easy'
-                        ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
+                        ? 'border-orange-800 bg-orange-950/40 text-orange-400'
                         : activeProblem.difficulty === 'Medium'
                         ? 'border-amber-800 bg-amber-950/40 text-amber-300'
                         : 'border-red-800 bg-red-950/40 text-red-300'
@@ -682,7 +682,7 @@ export function CodingIDE() {
                         <ul className="mt-1 space-y-1 text-xs text-stone-400">
                           {evaluation.strengths.map((s, i) => (
                             <li key={i} className="flex items-center gap-1.5">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                              <CheckCircle2 className="h-3.5 w-3.5 text-orange-600 shrink-0" />
                               {s}
                             </li>
                           ))}
@@ -843,7 +843,7 @@ export function CodingIDE() {
                   <AlertTriangle className="h-3.5 w-3.5" /> Compile Error
                 </span>
               ) : testOutput ? (
-                <span className="flex items-center gap-1.5 text-xs font-mono font-medium text-emerald-400">
+                <span className="flex items-center gap-1.5 text-xs font-mono font-medium text-orange-600">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   {testOutput.filter((t) => t.passed).length}/{testOutput.length} Tests Passed
                 </span>
@@ -875,9 +875,9 @@ export function CodingIDE() {
                 className="h-10 px-4 sm:px-5 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all hover:border-stone-600 active:scale-[0.98]"
               >
                 {isRunningTests ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                  <Loader2 className="h-4 w-4 animate-spin text-orange-600" />
                 ) : (
-                  <Play className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />
+                  <Play className="h-4 w-4 text-orange-600 fill-orange-600/20" />
                 )}
                 <span>Run Code</span>
               </Button>
@@ -885,7 +885,7 @@ export function CodingIDE() {
               <Button
                 onClick={handleSubmitSolution}
                 disabled={isEvaluating}
-                className="h-10 px-5 sm:px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-[0.98]"
+                className="h-10 px-5 sm:px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-black/40 transition-all active:scale-[0.98]"
               >
                 {isEvaluating ? (
                   <Loader2 className="h-4 w-4 animate-spin text-white" />
@@ -951,8 +951,8 @@ export function CodingIDE() {
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800 pb-3">
                     <div className="flex items-center gap-2">
                       {testOutput.every((t) => t.passed) ? (
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-orange-600">
+                          <CheckCircle2 className="h-4 w-4 text-orange-600" />
                           Accepted ({testOutput.length}/{testOutput.length} test cases passed)
                         </span>
                       ) : (
@@ -976,7 +976,7 @@ export function CodingIDE() {
                           }`}
                         >
                           {tc.passed ? (
-                            <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                            <CheckCircle2 className="h-3 w-3 text-orange-600" />
                           ) : (
                             <XCircle className="h-3 w-3 text-red-400" />
                           )}
@@ -1003,7 +1003,7 @@ export function CodingIDE() {
                             variant="outline"
                             className={
                               testOutput[selectedTestCaseIndex].passed
-                                ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
+                                ? 'border-orange-800 bg-orange-950/40 text-orange-400'
                                 : 'border-red-800 bg-red-950/40 text-red-300'
                             }
                           >
@@ -1026,7 +1026,7 @@ export function CodingIDE() {
                           <span className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider">Your Output</span>
                           <pre className={`mt-1 rounded-lg border p-2.5 whitespace-pre-wrap overflow-x-auto ${
                             testOutput[selectedTestCaseIndex].passed
-                              ? 'border-emerald-900/60 bg-emerald-950/30 text-emerald-200'
+                              ? 'border-orange-900/60 bg-orange-950/30 text-orange-300'
                               : 'border-red-900/60 bg-red-950/30 text-red-200'
                           }`}>
                             {testOutput[selectedTestCaseIndex].error ? (
@@ -1051,7 +1051,7 @@ export function CodingIDE() {
                 <div className="rounded-xl border border-dashed border-stone-800 bg-stone-950/40 p-5 text-center">
                   <Terminal className="mx-auto h-5 w-5 text-stone-500" />
                   <p className="mt-2 text-xs text-stone-400 font-sans">
-                    Click <span className="font-semibold text-stone-200">&quot;Run Code&quot;</span> to compile and test with sample inputs, or <span className="font-semibold text-emerald-400">&quot;Submit Code&quot;</span> for full AI evaluation and scoring.
+                    Click <span className="font-semibold text-stone-200">&quot;Run Code&quot;</span> to compile and test with sample inputs, or <span className="font-semibold text-orange-600">&quot;Submit Code&quot;</span> for full AI evaluation and scoring.
                   </p>
                 </div>
               )}
@@ -1120,8 +1120,8 @@ export function CodingIDE() {
 
       {/* Final Completion Modal: Automatic on completing all problems */}
       <AlertDialog open={isInterviewCompleted} onOpenChange={setIsInterviewCompleted}>
-        <AlertDialogContent className="border border-emerald-900/60 bg-[#28201E] text-center max-w-md">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-950/60 border border-emerald-800 text-emerald-400">
+        <AlertDialogContent className="border border-stone-800 bg-stone-900 shadow-md shadow-black/40 text-center max-w-md">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-950/60 border border-orange-800 text-orange-400">
             <Sparkles className="h-7 w-7" />
           </div>
           <AlertDialogHeader className="text-center">
@@ -1133,9 +1133,9 @@ export function CodingIDE() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="my-2 rounded-xl border border-stone-800 bg-stone-900/80 p-4 text-center">
+          <div className="my-2 rounded-xl border border-stone-800 bg-stone-950/80 p-4 text-center">
             <span className="text-[11px] font-mono uppercase tracking-wider text-stone-500">Overall Coding Score</span>
-            <p className="text-3xl font-bold text-emerald-400 mt-1">{averageScore || 85} / 100</p>
+            <p className="text-3xl font-bold text-orange-600 mt-1">{averageScore || 85} / 100</p>
             <p className="text-[11px] text-stone-400 mt-1">{totalEvaluatedCount} challenges evaluated</p>
           </div>
 

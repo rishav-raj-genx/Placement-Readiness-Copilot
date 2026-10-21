@@ -36,14 +36,14 @@ export function TopHeader() {
   const pageTitle = getPageTitle(pathname);
 
   return (
-    <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-stone-800 bg-[#28201E]/95 px-6 backdrop-blur-sm md:flex">
+    <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-stone-800 bg-stone-950/95 px-6 backdrop-blur-sm md:flex">
       {pageTitle && <p className="text-sm font-semibold text-stone-200">{pageTitle}</p>}
       <div className="ml-auto flex items-center gap-2">
         <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-200">
           {user ? (typeof score === 'number' ? `${Math.round(score)}% ready` : 'Analysis pending') : 'Preview mode'}
         </span>
         {isPremium ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-400">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
             Premium Active
           </span>

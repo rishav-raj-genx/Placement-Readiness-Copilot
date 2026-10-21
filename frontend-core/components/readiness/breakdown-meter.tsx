@@ -29,7 +29,7 @@ export function BreakdownMeter({ label, value, maxPoints = 20 }: BreakdownMeterP
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-stone-800" aria-hidden="true">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-600 transition-[width] duration-500 ease-out"
+          className="h-full rounded-full bg-red-600 transition-[width] duration-500 ease-out"
           style={{ width: `${score}%` }}
         />
       </div>

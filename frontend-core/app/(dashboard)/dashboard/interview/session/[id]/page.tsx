@@ -61,7 +61,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   const [connectionAttempted, setConnectionAttempted] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const finishTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const transcriptsRef = useRef<LiveKitTranscriptPayload[]>([]);
 
   const isLiveKitId = id.startsWith('intv_');
 
@@ -70,10 +69,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     liveKitStore.updateCurrentQuestion(p);
   }, [liveKitStore]);
   const handleTranscript = useCallback((p: LiveKitTranscriptPayload) => {
-    transcriptsRef.current = [
-      ...transcriptsRef.current.filter((t) => t.id !== p.id),
-      p,
-    ];
     liveKitStore.addTranscript({
       id: p.id || `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       speaker: p.speaker,
@@ -119,25 +114,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       localStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
       localStorage.setItem('interview_round1_completed', 'true');
     }
-    const fullTranscript = transcriptsRef.current.length > 0
-      ? transcriptsRef.current
-      : (liveKitStore.currentInterview?.transcripts || []);
-    try {
-      await supabase
-        .from('interview_sessions')
-        .update({
-          status: 'completed',
-          result: {
-            ...p,
-            transcript: fullTranscript,
-          },
-          transcript: fullTranscript,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-    } catch {
-      // Safe fallback
-    }
     liveKitStore.setResults(p);
     if (user?.id) {
       void useProfileStore.getState().analyze(user.id);
@@ -151,6 +127,8 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     topics?: string[];
     mode?: string;
     durationMinutes?: number;
+    difficulty?: 'easy' | 'medium' | 'hard' | 'adaptive';
+    experienceLevel?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -171,6 +149,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
             topics,
             mode: typeof cfg.mode === 'string' ? cfg.mode : undefined,
             durationMinutes: typeof cfg.durationMinutes === 'number' ? cfg.durationMinutes : undefined,
+            difficulty: cfg.difficulty === 'easy' || cfg.difficulty === 'medium' || cfg.difficulty === 'hard' || cfg.difficulty === 'adaptive'
+              ? cfg.difficulty
+              : undefined,
+            experienceLevel: typeof cfg.experienceLevel === 'string' ? cfg.experienceLevel : undefined,
           });
         }
       } catch {
@@ -270,43 +252,11 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     void finalizeRecording();
     toast.info('Finishing interview and compiling results...');
 
-    // Compile results immediately from whatever answers/transcripts exist
-    const resultsPayload = livekit.results || livekit.compileResultsNow();
-
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
-      localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
-      localStorage.setItem('interview_round1_completed', 'true');
-    }
-
-    markRound1Completed(user?.id);
-    liveKitStore.setResults(resultsPayload);
-
-    const fullTranscript = livekit.transcripts.length > 0 ? livekit.transcripts : liveKitStore.currentInterview?.transcripts || [];
-    try {
-      await supabase
-        .from('interview_sessions')
-        .update({
-          status: 'completed',
-          result: {
-            ...resultsPayload,
-            transcript: fullTranscript,
-          },
-          transcript: fullTranscript,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-    } catch {
-      // Safe fallback
-    }
-
-    await livekit.disconnect().catch(() => undefined);
-    if (user?.id) {
-      void useProfileStore.getState().analyze(user.id);
-    }
-    toast.success('Results generated! Redirecting to evaluation...');
-    router.push(`/dashboard/interview/results/${id}`);
-  }, [finalizeRecording, isFinishing, livekit, id, liveKitStore, router, user?.id]);
+    finishTimeoutRef.current = setTimeout(() => {
+      setIsFinishing(false);
+      toast.error('The interview is still being finalized. Your transcript is saved; retry shortly.');
+    }, 20_000);
+  }, [finalizeRecording, isFinishing, livekit]);
 
   // Connect to LiveKit room using the session data stored by the configure page
   useEffect(() => {
@@ -378,8 +328,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           targetRole={effectiveTargetRole}
           durationMinutes={liveKitStore.currentInterview?.durationMinutes || sessionMeta?.durationMinutes || 15}
           topics={effectiveTopics}
+          difficulty={sessionMeta?.difficulty}
+          experienceLevel={sessionMeta?.experienceLevel}
           userId={user?.id}
-          onFinish={async (resultsPayload, finalTranscripts) => {
+          onFinish={async (resultsPayload) => {
             if (typeof window !== 'undefined') {
               sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
               localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
@@ -387,23 +339,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
             }
             markRound1Completed(user?.id);
             liveKitStore.setResults(resultsPayload);
-
-            try {
-              await supabase
-                .from('interview_sessions')
-                .update({
-                  status: 'completed',
-                  result: {
-                    ...resultsPayload,
-                    transcript: finalTranscripts,
-                  },
-                  transcript: finalTranscripts,
-                  completed_at: new Date().toISOString(),
-                })
-                .eq('id', id);
-            } catch {
-              // Safe fallback
-            }
 
             if (user?.id) {
               void useProfileStore.getState().analyze(user.id);
@@ -608,10 +543,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                       <Volume2 className="h-3.5 w-3.5 animate-pulse" /> AI Interviewer speaking...
                     </span>
                   ) : livekit.isMicrophoneEnabled ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-3 py-1 text-xs text-emerald-300">
+                    <div className="flex items-center gap-2 rounded-lg border border-orange-900/60 bg-orange-950/40 px-3 py-1 text-xs text-orange-400">
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
                       </span>
                       <span>Listening &middot; Speak aloud</span>
                     </div>
@@ -631,7 +566,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                     }}
                     className={`h-7 rounded-lg px-2.5 text-[11px] font-semibold transition-colors ${
                       livekit.isMicrophoneEnabled
-                        ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
+                        ? 'border-orange-800 bg-orange-950/40 text-orange-400 hover:bg-orange-900/50'
                         : 'bg-[#D93829] hover:bg-[#C22F21] text-white'
                     }`}
                   >
@@ -675,8 +610,8 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                       Oral Viva &middot; Live Voice Canvas
                     </Badge>
                     {livekit.isMicrophoneEnabled && !livekit.isInterviewerSpeaking && (
-                      <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="flex items-center gap-1.5 text-[10px] text-orange-400 font-mono">
+                        <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-pulse" />
                         Live Voice-to-Text Active
                       </span>
                     )}

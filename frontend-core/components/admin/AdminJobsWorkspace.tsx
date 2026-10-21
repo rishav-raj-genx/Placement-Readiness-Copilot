@@ -158,7 +158,7 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
 
   return (
     <div className="space-y-6 pb-16">
-      <section className="rounded-2xl border border-stone-800 bg-[#121826] p-6 sm:p-8">
+      <section className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div>
             <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Official opportunities</p>
@@ -179,7 +179,7 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <form onSubmit={(event) => void handleSubmit(event)} className="rounded-2xl border border-stone-800 bg-[#121826] p-5 sm:p-7">
+        <form onSubmit={(event) => void handleSubmit(event)} className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 p-5 sm:p-7">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-orange-500/20 bg-orange-500/10 text-orange-400">
               <Plus className="h-5 w-5" aria-hidden="true" />
@@ -270,14 +270,14 @@ export function AdminJobsWorkspace({ jobs, loadError }: AdminJobsWorkspaceProps)
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-orange-600 active:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-red-700 active:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4" aria-hidden="true" />}
             {isSubmitting ? 'Publishing…' : 'Publish MSOT job'}
           </button>
         </form>
 
-        <div className="min-w-0 rounded-2xl border border-stone-800 bg-[#121826] p-5 sm:p-7">
+        <div className="min-w-0 rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40 p-5 sm:p-7">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-mono text-xs uppercase tracking-wider text-orange-400">Applicant activity</p>

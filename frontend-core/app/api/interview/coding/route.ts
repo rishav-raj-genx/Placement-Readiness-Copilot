@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getOptionalInterviewBaseUrl, serviceRequest } from '@/lib/backend-services';
 import { execFileSync } from 'child_process';
+import { randomUUID } from 'crypto';
 import vm from 'vm';
 import ts from 'typescript';
+import { createServerSessionClient } from '@/lib/supabase-session-server';
+import { createSupabaseServiceClient } from '@/lib/supabase-service-server';
 
 export const runtime = 'nodejs';
 
@@ -27,6 +30,83 @@ interface CodingProblemSpec {
   test_cases: TestCaseSpec[];
   optimal_time_complexity: string;
   optimal_space_complexity: string;
+}
+
+interface PersistCodingAssessmentInput {
+  userId: string;
+  problem: CodingProblemSpec;
+  language: string;
+  code: string;
+  followUpAnswer?: string;
+  result: Record<string, unknown>;
+  testCases: unknown[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+async function persistCodingAssessment(input: PersistCodingAssessmentInput): Promise<string> {
+  const admin = createSupabaseServiceClient();
+  const { data: profile, error: profileError } = await admin
+    .from('profiles')
+    .select('target_role')
+    .eq('id', input.userId)
+    .maybeSingle();
+
+  if (profileError) throw new Error(`Unable to load coding candidate profile: ${profileError.message}`);
+
+  const interviewId = `coding_${randomUUID()}`;
+  const score = typeof input.result.overall_score === 'number' ? input.result.overall_score : 0;
+  const vivaScores = {
+    overall_score: score,
+    passed_tests: input.result.passed_tests,
+    total_tests: input.result.total_tests,
+    estimated_time_complexity: input.result.estimated_time_complexity,
+    estimated_space_complexity: input.result.estimated_space_complexity,
+    optimal_time_complexity: input.result.optimal_time_complexity,
+    optimal_space_complexity: input.result.optimal_space_complexity,
+    complexity_comparison: input.result.complexity_comparison,
+    strengths: input.result.strengths,
+    improvement_areas: input.result.improvement_areas,
+    follow_up_answer: input.followUpAnswer || null,
+    test_cases: input.testCases,
+  };
+
+  const { error } = await admin.from('interview_sessions').insert({
+    id: interviewId,
+    user_id: input.userId,
+    student_id: input.userId,
+    livekit_room_name: interviewId,
+    target_role: profile?.target_role || 'Software Engineer (DSA & Web Dev)',
+    config: {
+      type: 'coding',
+      round: 2,
+      problem_id: input.problem.id,
+      language: input.language,
+    },
+    room_metadata: {},
+    status: 'completed',
+    result: {
+      interview_score: score,
+      transcript: [],
+      coding_result: input.result,
+      summary: input.result.code_quality_feedback || 'Round 2 coding evaluation completed.',
+      strengths: input.result.strengths || [],
+      improvement_areas: input.result.improvement_areas || [],
+    },
+    transcript: [],
+    code_history: input.code,
+    viva_scores: vivaScores,
+    completed_at: new Date().toISOString(),
+  });
+
+  if (error) throw new Error(`Unable to persist coding assessment: ${error.message}`);
+  return interviewId;
 }
 
 const FALLBACK_CODING_PROBLEMS: CodingProblemSpec[] = [
@@ -1257,18 +1337,51 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const body = await req.json().catch(() => ({}));
-  const { action, problem_id, language, code, follow_up_answer } = body as {
-    action?: 'run' | 'submit';
-    problem_id?: string;
-    language?: string;
-    code?: string;
-    follow_up_answer?: string;
-  };
+  const supabase = createServerSessionClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
 
-  const problem = FALLBACK_CODING_PROBLEMS.find((p) => p.id === problem_id) || FALLBACK_CODING_PROBLEMS[0];
+  const rawBody: unknown = await req.json().catch(() => null);
+  if (!isRecord(rawBody)) {
+    return NextResponse.json({ error: 'A JSON request body is required.' }, { status: 400 });
+  }
+
+  const action = rawBody.action === 'run' || rawBody.action === 'submit' ? rawBody.action : undefined;
+  if (!action) {
+    return NextResponse.json({ error: 'action must be either run or submit.' }, { status: 400 });
+  }
+  const problem_id = optionalString(rawBody.problem_id);
+  const language = optionalString(rawBody.language);
+  const code = optionalString(rawBody.code);
+  const follow_up_answer = optionalString(rawBody.follow_up_answer);
+
+  const problem = FALLBACK_CODING_PROBLEMS.find((candidate) => candidate.id === problem_id);
+  if (!problem) {
+    return NextResponse.json({ error: 'Unknown coding problem.' }, { status: 400 });
+  }
   const cleanedCode = (code || '').trim();
+  if (!cleanedCode) {
+    return NextResponse.json({ error: 'Code is required.' }, { status: 400 });
+  }
   const lang = (language || 'javascript').toLowerCase();
+
+  const persistSubmission = async (
+    result: Record<string, unknown>,
+    testCases: unknown[] = [],
+  ): Promise<string | null> => {
+    if (action === 'run') return null;
+    return persistCodingAssessment({
+      userId: authData.user.id,
+      problem,
+      language: lang,
+      code: cleanedCode,
+      followUpAnswer: follow_up_answer,
+      result,
+      testCases,
+    });
+  };
 
   // Execute code in target runtime (Python or JS/TS)
   const execResult =
@@ -1277,50 +1390,56 @@ export async function POST(req: Request): Promise<NextResponse> {
       : executeJsCode(problem.id, cleanedCode);
 
   if (execResult.status === 'compile_error') {
+    const result: Record<string, unknown> = {
+      problem_id: problem.id,
+      problem_title: problem.title,
+      overall_score: 0,
+      passed_tests: 0,
+      total_tests: problem.test_cases.length,
+      estimated_time_complexity: 'Compilation Failed',
+      estimated_space_complexity: 'Compilation Failed',
+      optimal_time_complexity: problem.optimal_time_complexity,
+      optimal_space_complexity: problem.optimal_space_complexity,
+      complexity_comparison: execResult.error?.message || 'Code contains syntax errors.',
+      code_quality_feedback: execResult.error?.details || 'Resolve the compilation error before submitting.',
+      strengths: [],
+      improvement_areas: ['Fix syntax errors to achieve a working build.'],
+      interviewer_follow_up: 'How do you configure linter and TypeScript compiler checks in CI/CD?',
+      optimal_code_diff_note: 'Ensure syntax is free of compilation errors.',
+    };
+    const interviewId = await persistSubmission(result);
     return NextResponse.json({
       status: 'compile_error',
       error: execResult.error,
-      result: {
-        problem_id: problem.id,
-        problem_title: problem.title,
-        overall_score: 25,
-        passed_tests: 0,
-        total_tests: problem.test_cases.length,
-        estimated_time_complexity: 'Compilation Failed',
-        estimated_space_complexity: 'Compilation Failed',
-        optimal_time_complexity: problem.optimal_time_complexity,
-        optimal_space_complexity: problem.optimal_space_complexity,
-        complexity_comparison: execResult.error?.message || 'Code contains syntax errors.',
-        code_quality_feedback: execResult.error?.details || 'Resolve the compilation error before submitting.',
-        strengths: [],
-        improvement_areas: ['Fix syntax errors to achieve a working build.'],
-        interviewer_follow_up: 'How do you configure linter and TypeScript compiler checks in CI/CD?',
-        optimal_code_diff_note: 'Ensure syntax is free of compilation errors.',
-      },
+      interview_id: interviewId,
+      result,
     });
   }
 
   if (execResult.status === 'runtime_error') {
+    const result: Record<string, unknown> = {
+      problem_id: problem.id,
+      problem_title: problem.title,
+      overall_score: 0,
+      passed_tests: 0,
+      total_tests: problem.test_cases.length,
+      estimated_time_complexity: 'Runtime Exception',
+      estimated_space_complexity: 'Runtime Exception',
+      optimal_time_complexity: problem.optimal_time_complexity,
+      optimal_space_complexity: problem.optimal_space_complexity,
+      complexity_comparison: execResult.error?.message || 'Code threw an unhandled exception at runtime.',
+      code_quality_feedback: execResult.error?.details || 'Check edge cases, indexing bounds, and key existence.',
+      strengths: ['Logic structure exists but encountered runtime exception'],
+      improvement_areas: ['Add defensive guards for uninitialized keys or boundary indices.'],
+      interviewer_follow_up: 'How do you handle runtime exceptions gracefully in high-availability services?',
+      optimal_code_diff_note: 'Ensure error handling covers boundary conditions.',
+    };
+    const interviewId = await persistSubmission(result);
     return NextResponse.json({
       status: 'runtime_error',
       error: execResult.error,
-      result: {
-        problem_id: problem.id,
-        problem_title: problem.title,
-        overall_score: 35,
-        passed_tests: 0,
-        total_tests: problem.test_cases.length,
-        estimated_time_complexity: 'Runtime Exception',
-        estimated_space_complexity: 'Runtime Exception',
-        optimal_time_complexity: problem.optimal_time_complexity,
-        optimal_space_complexity: problem.optimal_space_complexity,
-        complexity_comparison: execResult.error?.message || 'Code threw an unhandled exception at runtime.',
-        code_quality_feedback: execResult.error?.details || 'Check edge cases, indexing bounds, and key existence.',
-        strengths: ['Logic structure exists but encountered runtime exception'],
-        improvement_areas: ['Add defensive guards for uninitialized keys or boundary indices.'],
-        interviewer_follow_up: 'How do you handle runtime exceptions gracefully in high-availability services?',
-        optimal_code_diff_note: 'Ensure error handling covers boundary conditions.',
-      },
+      interview_id: interviewId,
+      result,
     });
   }
 
@@ -1350,10 +1469,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     score = Math.round((passedCount / totalCount) * 75) + (hasOptimalPattern ? 20 : 10);
   }
 
-  return NextResponse.json({
-    status: 'ok',
-    test_cases: testCases,
-    result: {
+  const result: Record<string, unknown> = {
       problem_id: problem.id,
       problem_title: problem.title,
       overall_score: Math.min(100, score),
@@ -1388,6 +1504,13 @@ export async function POST(req: Request): Promise<NextResponse> {
           ? 'What is the distinction between debouncing and throttling, and in what UX scenarios would you prefer throttling?'
           : 'How would you add randomized jitter to the backoff delay to prevent thousands of clients from synchronizing retries during an outage?',
       optimal_code_diff_note: 'Solution aligns well with production standard implementations.',
-    },
+  };
+  const interviewId = await persistSubmission(result, testCases);
+
+  return NextResponse.json({
+    status: 'ok',
+    interview_id: interviewId,
+    test_cases: testCases,
+    result,
   });
 }

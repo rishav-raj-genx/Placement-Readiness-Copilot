@@ -102,7 +102,9 @@ logger = logging.getLogger("mock-interview-worker")
 # Configuration
 # ---------------------------------------------------------------------------
 
-WORKER_IDENTITY = "mock-interview"
+# Retained only as a prototype reference. Production dispatches target the
+# canonical worker in mock-interview/livekit_worker.py.
+WORKER_IDENTITY = "mock-interview-legacy-disabled"
 MAX_QUESTIONS = 4
 INTERVIEW_TIMEOUT_SECONDS = 30 * 60  # 30 minutes (matches token TTL)
 SILENCE_TIMEOUT_SECONDS = 120        # disconnect after 2 min of silence

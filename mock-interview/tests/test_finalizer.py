@@ -24,6 +24,10 @@ class CountingLLM:
 class RetryStore:
     def __init__(self) -> None:
         self.calls = 0
+        self.transcript_calls = 0
+
+    def save_transcript(self, interview_id, transcript) -> None:
+        self.transcript_calls += 1
 
     def save(self, interview_id, result) -> None:
         self.calls += 1
@@ -68,3 +72,40 @@ def test_persistence_retry_does_not_repeat_scoring_call() -> None:
     assert result.interview_score == 81
     assert llm.calls == 1
     assert store.calls == 2
+    assert store.transcript_calls == 1
+
+
+def test_scorer_failure_still_persists_raw_transcript() -> None:
+    class FailingLLM:
+        def complete(self, system_prompt: str, user_prompt: str) -> object:
+            raise RuntimeError("scorer unavailable")
+
+    class RecordingStore:
+        def __init__(self) -> None:
+            self.transcript = []
+            self.saved_result = None
+
+        def save_transcript(self, interview_id, transcript) -> None:
+            self.transcript = list(transcript)
+
+        def save(self, interview_id, result) -> None:
+            self.saved_result = result
+
+    store = RecordingStore()
+    finalizer = InterviewFinalizer(
+        InterviewContext(skills=["Python"]),
+        FailingLLM(),
+        result_store=store,
+        interview_id="intv-fallback",
+    )
+    finalizer.record("assistant", "Explain your design.")
+    finalizer.record("user", "I used queues and retries.")
+
+    result = finalizer.finish()
+
+    assert [turn.text for turn in store.transcript] == [
+        "Explain your design.",
+        "I used queues and retries.",
+    ]
+    assert store.saved_result is result
+    assert result.is_fallback is True

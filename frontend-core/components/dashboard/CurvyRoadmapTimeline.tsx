@@ -195,10 +195,9 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                 <motion.button
                   type="button"
                   onClick={() => setActiveNode(node.id)}
-                  className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-xl border bg-stone-950 outline-none transition-shadow hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] focus-visible:ring-2 focus-visible:ring-red-600 md:col-start-2 md:justify-self-center"
+                  className="relative col-start-1 row-start-1 grid h-14 w-14 place-items-center self-center rounded-xl border bg-stone-950 outline-none transition-colors hover:border-stone-700 focus-visible:ring-2 focus-visible:ring-red-600 md:col-start-2 md:justify-self-center shadow-md shadow-black/40"
                   style={{
-                    borderColor: reached ? '#F97316' : 'rgba(255,255,255,0.16)',
-                    boxShadow: reached ? '0 0 15px rgba(249,115,22,0.3)' : 'none',
+                    borderColor: reached ? '#D93829' : '#292524',
                   }}
                   whileHover={reduceMotion ? undefined : { scale: 1.08, rotate: 2 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.96 }}
@@ -207,12 +206,12 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                 >
                   {reached && !reduceMotion && (
                     <motion.span
-                      className="absolute inset-[-4px] rounded-xl border border-orange-500 opacity-60"
+                      className="absolute inset-[-4px] rounded-xl border border-red-600 opacity-60"
                       animate={{ opacity: 0.6 }}
                       transition={{ duration: 0 }}
                     />
                   )}
-                  <Icon className="h-6 w-6" style={{ color: reached ? '#F97316' : presentation.color }} aria-hidden="true" />
+                  <Icon className="h-6 w-6" style={{ color: reached ? '#D93829' : presentation.color }} aria-hidden="true" />
                   <span className="absolute -bottom-3 rounded-full bg-stone-800 px-2 py-0.5 text-xs font-bold text-stone-300">{node.id}</span>
                 </motion.button>
 
@@ -221,7 +220,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                   whileInView={{ opacity: 1, y: 0, rotateY: 0 }}
                   viewport={{ once: true, amount: 0.25 }}
                   transition={{ type: 'spring', stiffness: 110, damping: 20 }}
-                  className={`col-start-2 row-start-1 rounded-2xl border bg-stone-900 p-5 shadow-md shadow-black/40 transition hover:shadow-[0_0_15px_rgba(249,115,22,0.2)] sm:p-7 ${node.side === 'left' ? 'md:col-start-1' : 'md:col-start-3'} ${selected ? 'border-[#D93829]' : 'border-stone-800'}`}
+                  className={`col-start-2 row-start-1 rounded-2xl border bg-stone-900 p-5 shadow-md shadow-black/40 transition hover:border-stone-700 sm:p-7 ${node.side === 'left' ? 'md:col-start-1' : 'md:col-start-3'} ${selected ? 'border-[#D93829]' : 'border-stone-800'}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -236,7 +235,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
 
                   <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]" aria-label={`${node.title} weighted progress`}>
                     <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-600"
+                      className="h-full rounded-full bg-red-600"
                       initial={reduceMotion ? false : { width: 0 }}
                       whileInView={{ width: `${meterWidth}%` }}
                       viewport={{ once: true }}
@@ -254,7 +253,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                       node.status === 'In progress'
                         ? 'text-orange-400 border border-orange-500/30 bg-orange-500/10'
                         : node.status === 'Ready'
-                          ? 'text-emerald-400 border border-emerald-500/30 bg-emerald-500/10'
+                          ? 'text-orange-400 border border-orange-500/30 bg-orange-500/10'
                           : node.status === 'Action required'
                             ? 'text-rose-400 border border-rose-500/30 bg-rose-500/10'
                             : 'text-stone-400 border border-stone-800 bg-stone-900'
@@ -263,7 +262,7 @@ export function CurvyRoadmapTimeline({ nodes = buildDashboardRoadmap(null) }: Cu
                         node.status === 'In progress'
                           ? 'bg-orange-400'
                           : node.status === 'Ready'
-                            ? 'bg-emerald-400'
+                            ? 'bg-orange-400'
                             : node.status === 'Action required'
                               ? 'bg-rose-400'
                               : 'bg-stone-500'

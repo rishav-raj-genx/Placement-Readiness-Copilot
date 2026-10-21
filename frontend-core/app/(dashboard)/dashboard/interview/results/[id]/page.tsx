@@ -234,7 +234,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         <DemoLabel />
       </div>
 
-      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col items-center">
@@ -267,7 +267,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-stone-200">Topic performance</CardTitle>
             <CardDescription className="text-xs text-stone-400">Score by interview topic</CardDescription>
@@ -283,7 +283,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-stone-200">Evaluation breakdown</CardTitle>
             <CardDescription className="text-xs text-stone-400">Per-question scores by category</CardDescription>
@@ -305,24 +305,24 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-400" />
+              <TrendingUp className="h-4 w-4 text-orange-600" />
               <CardTitle className="text-sm font-semibold text-stone-200">Strengths</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-1.5">
               {feedback.strongestTopics.map((topic) => (
-                <Badge key={topic} variant="secondary" className="border border-emerald-900/40 bg-emerald-950/30 text-xs text-emerald-300">
+                <Badge key={topic} variant="secondary" className="border border-orange-900/40 bg-orange-950/30 text-xs text-orange-400">
                   {topic}
                 </Badge>
               ))}
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Target className="h-4 w-4 text-[#D93829]" />
@@ -341,7 +341,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         </Card>
       </div>
 
-      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-stone-400" />
@@ -359,7 +359,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold text-stone-200">Question-by-question feedback</CardTitle>
@@ -388,7 +388,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
                     <p className="text-xs font-medium text-stone-200">{question?.questionText}</p>
                   </div>
                   <div className="flex flex-col items-end shrink-0">
-                    <span className={`font-mono text-base font-bold ${qf.score >= 70 ? 'text-emerald-400' : qf.score >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                    <span className={`font-mono text-base font-bold ${qf.score >= 70 ? 'text-red-600' : qf.score >= 50 ? 'text-amber-500' : 'text-stone-400'}`}>
                       {qf.score}
                     </span>
                     <span className="font-mono text-[10px] text-stone-500">score</span>
@@ -405,9 +405,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
                   <div>Clarity: <span className="font-mono font-medium text-stone-200">{qf.answerClarity}</span></div>
                   <div>Communication: <span className="font-mono font-medium text-stone-200">{qf.communicationQuality}</span></div>
                 </div>
-                {qf.strengths.length > 0 && <div className="text-xs"><span className="text-emerald-400 font-medium">Strengths: </span><span className="text-stone-400">{qf.strengths.join(', ')}</span></div>}
-                {qf.weaknesses.length > 0 && <div className="text-xs"><span className="text-amber-400 font-medium">Weaknesses: </span><span className="text-stone-400">{qf.weaknesses.join(', ')}</span></div>}
-                {qf.missingConcepts.length > 0 && <div className="text-xs"><span className="text-red-400 font-medium">Missing: </span><span className="text-stone-400">{qf.missingConcepts.join(', ')}</span></div>}
+                {qf.strengths.length > 0 && <div className="text-xs"><span className="text-orange-600 font-medium">Strengths: </span><span className="text-stone-400">{qf.strengths.join(', ')}</span></div>}
+                {qf.weaknesses.length > 0 && <div className="text-xs"><span className="text-amber-500 font-medium">Weaknesses: </span><span className="text-stone-400">{qf.weaknesses.join(', ')}</span></div>}
+                {qf.missingConcepts.length > 0 && <div className="text-xs"><span className="text-red-600 font-medium">Missing: </span><span className="text-stone-400">{qf.missingConcepts.join(', ')}</span></div>}
                 {qf.suggestedImprovements.length > 0 && <div className="text-xs"><span className="text-stone-400 font-medium">Suggested: </span><span className="text-stone-400">{qf.suggestedImprovements.join(', ')}</span></div>}
               </div>
             );
@@ -553,15 +553,15 @@ function LiveKitResultsView({
 
       {/* Multi-Round Total Overview Banner OR Round 2 Call-to-action */}
       {round2Completed ? (
-        <Card className="rounded-2xl border-2 border-emerald-500/60 bg-gradient-to-r from-[#172219] via-[#28201E] to-[#172219] shadow-2xl">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardContent className="p-6 md:p-8 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-stone-800/80 pb-5">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-emerald-600 text-white font-mono text-[10px] px-3 py-0.5">
+                  <Badge className="bg-red-600 text-white font-mono text-[10px] px-3 py-0.5">
                     TOTAL INTERVIEW COMPLETED
                   </Badge>
-                  <span className="font-mono text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="font-mono text-xs text-orange-400 font-semibold flex items-center gap-1">
                     <Sparkles className="h-3.5 w-3.5" /> Full Multi-Round Synthesis
                   </span>
                 </div>
@@ -573,10 +573,10 @@ function LiveKitResultsView({
                 </p>
               </div>
 
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-emerald-800/80 bg-emerald-950/60 p-4 min-w-[170px] shrink-0 text-center shadow-lg">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">Total Composite Score</span>
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-stone-800 bg-stone-950/80 p-4 min-w-[170px] shrink-0 text-center shadow-md shadow-black/40">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-orange-400 font-bold">Total Composite Score</span>
                 <span className="text-3xl font-extrabold text-stone-100 mt-1 font-mono">{compositeScore} / 100</span>
-                <Badge variant="outline" className="border-emerald-700 bg-emerald-900/50 text-[10px] font-mono text-emerald-300 mt-1.5">
+                <Badge variant="outline" className="border-stone-700 bg-stone-900 text-[10px] font-mono text-stone-300 mt-1.5">
                   {compositeScore >= 80 ? 'Strong Hire • High Readiness' : compositeScore >= 65 ? 'Hire • Solid Foundations' : 'Practice Recommended'}
                 </Badge>
               </div>
@@ -584,10 +584,10 @@ function LiveKitResultsView({
 
             {/* Side-by-Side Dual-Round Score Comparison */}
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-4 space-y-2.5">
+              <div className="rounded-xl border border-stone-800 bg-stone-950/60 p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#D93829]/20 text-[#D93829]">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600/20 text-red-600">
                       <Radio className="h-4 w-4" />
                     </div>
                     <div>
@@ -595,18 +595,18 @@ function LiveKitResultsView({
                       <p className="text-[11px] text-stone-400">Oral theory &amp; systems architecture</p>
                     </div>
                   </div>
-                  <span className="font-mono text-lg font-bold text-emerald-400">{results.finalScore}/100</span>
+                  <span className="font-mono text-lg font-bold text-orange-400">{results.finalScore}/100</span>
                 </div>
-                <div className="rounded-lg bg-stone-950/60 p-2.5 text-xs text-stone-300 leading-relaxed">
+                <div className="rounded-lg bg-stone-900/60 p-2.5 text-xs text-stone-300 leading-relaxed">
                   <span className="text-stone-400 font-medium">Viva Summary: </span>
                   {results.summary}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-4 space-y-2.5">
+              <div className="rounded-xl border border-stone-800 bg-stone-950/60 p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-600/20 text-orange-400">
                       <Code2 className="h-4 w-4" />
                     </div>
                     <div>
@@ -614,9 +614,9 @@ function LiveKitResultsView({
                       <p className="text-[11px] text-stone-400">Live implementation &amp; algorithmic tests</p>
                     </div>
                   </div>
-                  <span className="font-mono text-lg font-bold text-emerald-400">{effectiveCodingScore}/100</span>
+                  <span className="font-mono text-lg font-bold text-orange-400">{effectiveCodingScore}/100</span>
                 </div>
-                <div className="rounded-lg bg-stone-950/60 p-2.5 text-xs text-stone-300 flex items-center justify-between">
+                <div className="rounded-lg bg-stone-900/60 p-2.5 text-xs text-stone-300 flex items-center justify-between">
                   <span>{evaluatedChallengesCount} challenges solved &amp; evaluated</span>
                   <Link href="/dashboard/interview/coding">
                     <Button variant="ghost" size="sm" className="h-6 text-[11px] text-stone-300 hover:text-white px-2">
@@ -630,15 +630,15 @@ function LiveKitResultsView({
         </Card>
       ) : (
         /* Round 2 Coding Challenge Unlocked Banner */
-        <Card className="rounded-2xl border-2 border-[#D93829]/60 bg-gradient-to-r from-[#28201E] via-[#331c19] to-[#28201E] shadow-xl shadow-red-950/20">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-[#D93829] text-white font-mono text-[10px] px-2.5 py-0.5">
+                  <Badge className="bg-red-600 text-white font-mono text-[10px] px-2.5 py-0.5">
                     ROUND 1 COMPLETED
                   </Badge>
-                  <span className="font-mono text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="font-mono text-xs text-orange-400 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Round 2 IDE Unlocked
                   </span>
                 </div>
@@ -650,7 +650,7 @@ function LiveKitResultsView({
                 </p>
               </div>
               <Link href="/dashboard/interview/coding">
-                <Button className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 shrink-0">
+                <Button className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold text-xs px-6 py-3 rounded-xl shadow-md shadow-black/40 flex items-center gap-2 shrink-0">
                   <Code2 className="h-4 w-4" /> Start Round 2 Coding IDE <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -660,7 +660,7 @@ function LiveKitResultsView({
       )}
 
       {/* Overall Score */}
-      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col items-center">
@@ -686,7 +686,7 @@ function LiveKitResultsView({
               <div className="flex items-center gap-2 text-xs">
                 <Award className="h-4 w-4 text-[#D93829]" />
                 <span className="font-medium text-stone-300">Readiness delta: </span>
-                <span className={`font-mono font-bold ${results.overallReadinessDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-mono font-bold ${results.overallReadinessDelta >= 0 ? 'text-orange-600' : 'text-amber-500'}`}>
                   {results.overallReadinessDelta >= 0 ? '+' : ''}{results.overallReadinessDelta}
                 </span>
               </div>
@@ -706,7 +706,7 @@ function LiveKitResultsView({
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-stone-200">Category performance</CardTitle>
             <CardDescription className="text-xs text-stone-400">Score vs benchmark by category</CardDescription>
@@ -723,7 +723,7 @@ function LiveKitResultsView({
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-stone-200">Score vs benchmark</CardTitle>
             <CardDescription className="text-xs text-stone-400">Category scores compared to the benchmark</CardDescription>
@@ -744,7 +744,7 @@ function LiveKitResultsView({
       </div>
 
       {/* Category Scores Detail */}
-      <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+      <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-stone-200">Category breakdown</CardTitle>
           <CardDescription className="text-xs text-stone-400">Detailed scores, strengths, and critiques per category</CardDescription>
@@ -758,17 +758,17 @@ function LiveKitResultsView({
                   <p className="text-xs font-semibold text-stone-200">{cs.category}</p>
                 </div>
                 <div className="flex flex-col items-end shrink-0">
-                  <span className={`font-mono text-base font-bold ${cs.score >= cs.benchmark ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span className={`font-mono text-base font-bold ${cs.score >= cs.benchmark ? 'text-red-600' : 'text-amber-500'}`}>
                     {cs.score}
                   </span>
                   <span className="font-mono text-[10px] text-stone-500">benchmark: {cs.benchmark}</span>
                 </div>
               </div>
               {cs.strengths.length > 0 && (
-                <div className="text-xs"><span className="text-emerald-400 font-medium">Strengths: </span><span className="text-stone-400">{cs.strengths.join(', ')}</span></div>
+                <div className="text-xs"><span className="text-orange-600 font-medium">Strengths: </span><span className="text-stone-400">{cs.strengths.join(', ')}</span></div>
               )}
               {cs.critiques.length > 0 && (
-                <div className="text-xs"><span className="text-amber-400 font-medium">Critiques: </span><span className="text-stone-400">{cs.critiques.join(', ')}</span></div>
+                <div className="text-xs"><span className="text-amber-500 font-medium">Critiques: </span><span className="text-stone-400">{cs.critiques.join(', ')}</span></div>
               )}
             </div>
           ))}
@@ -777,7 +777,7 @@ function LiveKitResultsView({
 
       {/* Suggested Fixes */}
       {results.suggestedFixes.length > 0 && (
-        <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+        <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-[#D93829]" />

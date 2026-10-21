@@ -335,7 +335,7 @@ export default function ActionPlanPage() {
             onClick={() => void handleReanalyze()}
             disabled={isAnalyzing || loading}
             variant="outline"
-            className="border-stone-800 bg-[#28201E] text-xs font-semibold text-stone-200 hover:border-[#D93829]/60 hover:bg-stone-900 gap-1.5"
+            className="border-stone-800 bg-stone-900 text-xs font-semibold text-stone-200 hover:border-[#D93829]/60 hover:bg-stone-800 gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isAnalyzing ? 'animate-spin text-[#D93829]' : ''}`} />
             {isAnalyzing ? 'Evaluating...' : 'Re-Evaluate Profile'}
@@ -344,7 +344,7 @@ export default function ActionPlanPage() {
           <Button
             onClick={handleDownloadJson}
             variant="outline"
-            className="border-stone-800 bg-[#28201E] text-xs font-semibold text-stone-300 hover:border-stone-700 hover:bg-stone-900 gap-1.5"
+            className="border-stone-800 bg-stone-900 text-xs font-semibold text-stone-300 hover:border-stone-700 hover:bg-stone-800 gap-1.5"
             title="Download uncompressed evaluation JSON"
           >
             <Download className="h-3.5 w-3.5 text-stone-400" />
@@ -498,7 +498,7 @@ export default function ActionPlanPage() {
           {/* SECTION 1: RESUME DIAGNOSTICS                                  */}
           {/* ============================================================== */}
           <section id="resume" className="scroll-mt-32 space-y-4">
-            <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+            <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
               <CardHeader className="border-b border-stone-800/80 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -629,7 +629,7 @@ export default function ActionPlanPage() {
           {/* SECTION 2: GITHUB & CODEBASE AUDIT                             */}
           {/* ============================================================== */}
           <section id="github" className="scroll-mt-32 space-y-4">
-            <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+            <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
               <CardHeader className="border-b border-stone-800/80 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -739,7 +739,7 @@ export default function ActionPlanPage() {
           {/* SECTION 3: PROJECT & LIVE LINK ANALYSIS                        */}
           {/* ============================================================== */}
           <section id="projects" className="scroll-mt-32 space-y-4">
-            <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+            <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
               <CardHeader className="border-b border-stone-800/80 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -895,7 +895,7 @@ export default function ActionPlanPage() {
           {/* SECTION 4: LINKEDIN & NETWORK PROFILE                          */}
           {/* ============================================================== */}
           <section id="linkedin" className="scroll-mt-32 space-y-4">
-            <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+            <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
               <CardHeader className="border-b border-stone-800/80 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -1053,7 +1053,7 @@ export default function ActionPlanPage() {
           {/* SECTION 5: CODING PRACTICE (LEETCODE)                          */}
           {/* ============================================================== */}
           <section id="leetcode" className="scroll-mt-32 space-y-4">
-            <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+            <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
               <CardHeader className="border-b border-stone-800/80 pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -1235,7 +1235,7 @@ export default function ActionPlanPage() {
                       </a>
                     )}
                     <Link href="/dashboard/interview/coding">
-                      <Button size="sm" className="bg-[#D93829] text-white hover:bg-red-600 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] text-xs font-semibold gap-1.5">
+                      <Button size="sm" className="bg-[#D93829] text-white hover:bg-red-600 text-xs font-semibold gap-1.5 shadow-md shadow-black/40">
                         <Code2 className="h-3.5 w-3.5" /> Launch Coding IDE
                       </Button>
                     </Link>
@@ -1295,16 +1295,16 @@ function DiagnosticItem({ label, passed, detail, required }: DiagnosticItemProps
     <div
       className={`rounded-xl border p-3 transition ${
         passed
-          ? 'border-orange-500/20 bg-[#0B0F17]'
+          ? 'border-orange-500/20 bg-stone-900'
           : 'border-red-500/30 bg-red-950/10'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-stone-200 truncate">{label}</span>
         {passed ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-orange-500 bg-orange-500/10 p-1 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.2)]" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-orange-500 bg-orange-500/10 p-1 rounded-full" />
         ) : (
-          <XCircle className="h-4 w-4 shrink-0 text-red-500 bg-red-500/10 p-1 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.2)]" />
+          <XCircle className="h-4 w-4 shrink-0 text-red-500 bg-red-500/10 p-1 rounded-full" />
         )}
       </div>
       <p className={`mt-1.5 text-[11px] font-medium leading-tight ${passed ? 'text-stone-300' : 'text-red-300/90'}`}>

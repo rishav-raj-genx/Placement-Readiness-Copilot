@@ -1,5 +1,11 @@
 
-from livekit_worker import _duration_from_metadata, _resume_from_room_metadata
+from livekit_worker import (
+    _duration_from_metadata,
+    _interview_instructions,
+    _resume_from_room_metadata,
+    _session_config_from_metadata,
+)
+from scoring.schemas import InterviewContext
 
 
 def test_duration_from_metadata_exact_20_minutes():
@@ -37,3 +43,39 @@ def test_local_provider_disables_deepgram():
     provider_val = str(metadata.get("provider", "")).lower()
     is_local = provider_val in ("ollama_local", "ollama", "local")
     assert is_local is True
+
+
+def test_hard_configuration_reads_nested_metadata_and_builds_faang_prompt():
+    context = InterviewContext(target_role="Backend Engineer", skills=["Python"])
+    metadata = {
+        "config": {
+            "durationMinutes": 20,
+            "difficulty": "hard",
+            "focusAreas": ["Distributed Systems", "Memory Management"],
+            "experienceLevel": "three_plus",
+        }
+    }
+
+    config = _session_config_from_metadata(metadata, context)
+    prompt = _interview_instructions(context, config)
+
+    assert config.difficulty == "hard"
+    assert config.focus_topics == ["Distributed Systems", "Memory Management"]
+    assert config.experience_level == "three_plus"
+    assert "Act as a Principal Staff Engineer at a FAANG company." in prompt
+    assert "Do not provide hints unless explicitly asked." in prompt
+    assert "scalability bottlenecks, memory management" in prompt
+    assert "How does that scale to 1 million users?" in prompt
+    assert "Distributed Systems, Memory Management" in prompt
+    assert "Monaco IDE" in prompt
+
+
+def test_invalid_configuration_falls_back_to_medium_defaults():
+    context = InterviewContext(target_role="Frontend Engineer")
+    config = _session_config_from_metadata(
+        {"config": {"difficulty": "impossible", "focusAreas": "not-a-list"}},
+        context,
+    )
+
+    assert config.difficulty == "medium"
+    assert config.focus_topics == []

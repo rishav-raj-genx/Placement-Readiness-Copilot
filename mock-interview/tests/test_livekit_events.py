@@ -43,6 +43,7 @@ def test_events_match_frontend_namespaced_contract():
     assert transcript["payload"]["final"] is True
     assert results["event"] == "interview:results"
     assert results["payload"]["finalScore"] == 88
+    assert results["payload"]["transcript"][0]["text"] == "My answer"
     assert finish == {
         "event": "interview:finish",
         "payload": {"reason": "student_requested"},

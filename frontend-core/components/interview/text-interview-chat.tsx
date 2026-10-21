@@ -28,6 +28,8 @@ interface TextInterviewChatProps {
   targetRole: string;
   durationMinutes: number;
   topics?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard' | 'adaptive';
+  experienceLevel?: string;
   userId?: string;
   onFinish: (result: LiveKitResultsPayload, transcripts: LiveKitTranscriptEntry[]) => Promise<void>;
   onAbandon?: () => void;
@@ -38,6 +40,8 @@ export function TextInterviewChat({
   targetRole,
   durationMinutes,
   topics,
+  difficulty = 'medium',
+  experienceLevel = 'entry_level',
   userId,
   onFinish,
   onAbandon,
@@ -87,11 +91,15 @@ export function TextInterviewChat({
           ws.send(
             JSON.stringify({
               event: 'start',
+              interview_id: interviewId,
               auth_token: authToken,
               student_id: userId,
               session_config: {
                 target_duration_minutes: durationMinutes,
                 role_category: targetRole,
+                difficulty,
+                focus_topics: topics || [],
+                experience_level: experienceLevel,
               },
               resume: {
                 name: 'Candidate',
@@ -176,7 +184,7 @@ export function TextInterviewChat({
         socketRef.current.close();
       }
     };
-  }, [durationMinutes, onFinish, targetRole, topics, userId]);
+  }, [difficulty, durationMinutes, experienceLevel, interviewId, onFinish, targetRole, topics, userId]);
 
   const handleSendAnswer = () => {
     const text = inputAnswer.trim();
@@ -284,7 +292,7 @@ export function TextInterviewChat({
                       className={`grid h-7 w-7 place-items-center rounded-lg border text-xs ${
                         isInterviewer
                           ? 'border-red-900/40 bg-red-950/40 text-red-400'
-                          : 'border-emerald-900/40 bg-emerald-950/40 text-emerald-400'
+                          : 'border-orange-900/40 bg-orange-950/40 text-orange-400'
                       }`}
                     >
                       {isInterviewer ? <Bot className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
@@ -339,7 +347,7 @@ export function TextInterviewChat({
                 <Button
                   onClick={handleSendAnswer}
                   disabled={!inputAnswer.trim() || isWaitingResponse || status !== 'connected'}
-                  className="bg-[#D93829] hover:bg-[#C22F21] text-white font-semibold text-xs px-4 py-2 rounded-xl gap-1.5 shadow-md disabled:opacity-50"
+                  className="bg-[#D93829] hover:bg-[#C22F21] text-white font-semibold text-xs px-4 py-2 rounded-xl gap-1.5 shadow-md shadow-black/40 disabled:opacity-50"
                 >
                   <Send className="h-3.5 w-3.5" /> Submit Answer
                 </Button>
@@ -348,7 +356,7 @@ export function TextInterviewChat({
                   <Button
                     onClick={() => void handleFinish()}
                     disabled={status === 'finishing'}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-4 py-2 rounded-xl gap-1.5 shadow-md"
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs px-4 py-2 rounded-xl gap-1.5 shadow-md shadow-black/40"
                   >
                     <Sparkles className="h-3.5 w-3.5" /> Finish &amp; Score
                   </Button>
