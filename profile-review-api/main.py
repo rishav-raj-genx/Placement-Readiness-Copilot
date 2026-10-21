@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from typing import Annotated
 
@@ -17,6 +18,9 @@ from ai_reviewer import (
     get_backend_status,
 )
 from github_service import fetch_github_data
+
+logger = logging.getLogger("profile_review_api")
+logging.basicConfig(level=logging.INFO)
 
 MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -98,6 +102,7 @@ def verify_service_token(authorization: Annotated[str | None, Header()] = None) 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid service token.",
         )
+
     return token
 
 
@@ -136,7 +141,6 @@ def _parse_pdf_bytes_sync(pdf_bytes: bytes) -> tuple[str, int, bool]:
 async def extract_pdf_text(file: UploadFile) -> ExtractedPdf:
     _validate_pdf_headers(file)
 
-    # Ingress check: reject oversize headers before buffering
     if file.size and file.size > MAX_PDF_SIZE_BYTES:
         raise HTTPException(status_code=413, detail="The uploaded PDF exceeds the 10 MB limit.")
 
@@ -153,7 +157,6 @@ async def extract_pdf_text(file: UploadFile) -> ExtractedPdf:
 
     pdf_bytes = b"".join(chunks)
 
-    # Run synchronous PyMuPDF parsing in worker thread to prevent event loop blocking
     extracted_text, page_count, is_truncated = await asyncio.to_thread(_parse_pdf_bytes_sync, pdf_bytes)
 
     return ExtractedPdf(
@@ -179,6 +182,31 @@ async def review_resume(
 ) -> ReviewResult:
     extracted = await extract_pdf_text(file)
     return evaluate_text(extracted.text, extracted.page_count)
+
+
+@app.post("/review/github", response_model=GithubReview)
+@app.get("/review/github/{username}", response_model=GithubReview)
+def review_github(
+    username: str,
+    _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
+) -> GithubReview:
+    try:
+        data = fetch_github_data(username)
+        return evaluate_github(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except GithubException as exc:
+        logger.error("GitHub service exception for user %s: %s", username, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"GitHub service error: {exc}",
+        ) from exc
+    except Exception as exc:
+        logger.error("Unexpected GitHub evaluation error for user %s: %s", username, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"GitHub evaluation failed: {exc}",
+        ) from exc
 
 
 @app.post("/analyze-profile", response_model=AnalyzeProfileResponse)
@@ -210,9 +238,12 @@ async def analyze_profile(
     linkedin_review = None
     if linkedin_pdf is not None:
         extracted_linkedin = await extract_pdf_text(linkedin_pdf)
-        linkedin_review = evaluate_linkedin_text(extracted_linkedin.text)
+        linkedin_review = evaluate_linkedin_text(
+            extracted_linkedin.text,
+            resume_context=extracted_resume.text,
+        )
 
-    # Subtotal calculation over available document reviews (does NOT replace composite readiness score)
+    # Subtotal calculation over available document reviews
     scores = [resume_review.score]
     if github_review is not None:
         scores.append(github_review.score)
@@ -226,6 +257,6 @@ async def analyze_profile(
         github_review=github_review,
         linkedin_review=linkedin_review,
         document_review_subtotal=subtotal_score,
-        total_readiness_score=subtotal_score,  # Alias for backward compatibility
+        total_readiness_score=subtotal_score,
         github_error=github_error,
     )

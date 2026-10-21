@@ -33,6 +33,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/auth-store';
+import { useProfileStore } from '@/stores/profile-store';
 
 // Dynamically import Monaco Editor to avoid SSR window issues
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -442,6 +444,10 @@ export function CodingIDE() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('interview_round2_completed', 'true');
       sessionStorage.setItem('interview_round2_completed', 'true');
+    }
+    const currentUserId = useAuthStore.getState().user?.id;
+    if (currentUserId) {
+      void useProfileStore.getState().analyze(currentUserId);
     }
     setIsInterviewCompleted(true);
     setShowEndInterviewDialog(false);

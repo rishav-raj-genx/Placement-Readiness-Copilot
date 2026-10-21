@@ -27,6 +27,17 @@ export function validatePdf(file: File): string | null {
   return null;
 }
 
+export function validateResumeFile(file: File): string | null {
+  const name = file.name.toLowerCase();
+  const isPdf = file.type === 'application/pdf' || name.endsWith('.pdf');
+  const isDocx =
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    name.endsWith('.docx');
+  if (!isPdf && !isDocx) return 'Only PDF (.pdf) and Word (.docx) files are accepted.';
+  if (file.size > MAX_PDF_BYTES) return 'Document files must be 10 MB or smaller.';
+  return null;
+}
+
 export function normalizeGithubUsername(value: string): string {
   const withoutPrefix = value
     .trim()

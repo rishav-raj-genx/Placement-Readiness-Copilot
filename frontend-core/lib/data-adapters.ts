@@ -150,12 +150,12 @@ export function normalizeDiscoveredJobs(value: unknown): JobPosting[] {
 }
 
 export function isApplicationStatus(value: string): value is ApplicationStatus {
-  return ['saved', 'applied', 'shortlisted', 'interviewing', 'offer', 'rejected'].includes(value);
+  return ['saved', 'applied', 'shortlisted', 'interview', 'interviewing', 'offer', 'rejected'].includes(value);
 }
 
-function normalizeApplicationStatus(value: unknown): ApplicationStatus {
+export function normalizeApplicationStatus(value: unknown): ApplicationStatus {
   const normalized = readString(value).toLowerCase();
-  if (normalized === 'interview') return 'interviewing';
+  if (normalized === 'interview' || normalized === 'interviewing') return 'interview';
   return isApplicationStatus(normalized) ? normalized : 'saved';
 }
 
@@ -182,6 +182,7 @@ export function normalizeApplications(value: unknown): JobApplication[] {
       applicationDate: (appliedAt || createdAt).slice(0, 10),
       notes: readString(item.notes) || undefined,
       jobPostingUrl: readString(item.url) || undefined,
+      followUpDate: readString(item.follow_up_date) || undefined,
       createdAt,
     }];
   });

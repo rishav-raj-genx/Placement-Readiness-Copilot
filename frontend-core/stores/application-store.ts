@@ -28,6 +28,12 @@ function statusAppliedAt(status: ApplicationStatus, date: string): string | null
   return status === 'saved' ? null : `${date}T00:00:00.000Z`;
 }
 
+function formatFollowUpDate(date?: string): string | null {
+  if (!date) return null;
+  if (date.includes('T')) return date;
+  return `${date}T00:00:00.000Z`;
+}
+
 export const useApplicationStore = create<ApplicationState>((set, get) => ({
   applications: [],
   isHydrated: false,
@@ -87,6 +93,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
           url: newApplication.jobPostingUrl || null,
           status: newApplication.status,
           applied_at: statusAppliedAt(newApplication.status, newApplication.applicationDate),
+          follow_up_date: formatFollowUpDate(newApplication.followUpDate),
           notes: newApplication.notes || null,
           created_at: createdAt,
           updated_at: createdAt,
@@ -120,6 +127,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
           url: next.jobPostingUrl || null,
           status: next.status,
           applied_at: statusAppliedAt(next.status, next.applicationDate),
+          follow_up_date: formatFollowUpDate(next.followUpDate),
           notes: next.notes || null,
           updated_at: new Date().toISOString(),
         })

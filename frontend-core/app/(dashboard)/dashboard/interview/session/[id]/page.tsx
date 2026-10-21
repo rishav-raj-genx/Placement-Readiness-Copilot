@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Brain,
   Mic,
@@ -35,6 +35,7 @@ import { useInterviewRecorder } from '@/hooks/useInterviewRecorder';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { useInterviewStore } from '@/stores/interview-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useProfileStore } from '@/stores/profile-store';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase-client';
 import { markRound1Completed } from '@/lib/round-status';
@@ -49,6 +50,7 @@ import { normalizeInterviewResult } from '@/lib/interview-result-adapter';
 import { AudioWaveform } from '@/components/interview/audio-waveform';
 import { CountdownTimer } from '@/components/interview/countdown-timer';
 import { TranscriptDrawer } from '@/components/interview/transcript-drawer';
+import { TextInterviewChat } from '@/components/interview/text-interview-chat';
 
 export default function InterviewSessionPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -136,6 +138,9 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       // Safe fallback
     }
     liveKitStore.setResults(p);
+    if (user?.id) {
+      void useProfileStore.getState().analyze(user.id);
+    }
     toast.success('Interview completed! Viewing results...');
     router.push(`/dashboard/interview/results/${id}`);
   }, [finalizeRecording, id, liveKitStore, router, user?.id]);
@@ -143,6 +148,8 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   const [sessionMeta, setSessionMeta] = useState<{
     targetRole?: string;
     topics?: string[];
+    mode?: string;
+    durationMinutes?: number;
   } | null>(null);
   const [fallbackTyping, setFallbackTyping] = useState(false);
 
@@ -162,6 +169,8 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           setSessionMeta({
             targetRole: data.target_role || undefined,
             topics,
+            mode: typeof cfg.mode === 'string' ? cfg.mode : undefined,
+            durationMinutes: typeof cfg.durationMinutes === 'number' ? cfg.durationMinutes : undefined,
           });
         }
       } catch {
@@ -169,6 +178,13 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       }
     })();
   }, [id]);
+
+  const searchParams = useSearchParams();
+  const queryMode = searchParams.get('mode');
+  const isTextMode =
+    queryMode === 'text' ||
+    liveKitStore.currentInterview?.mode === 'text' ||
+    sessionMeta?.mode === 'text';
 
   const effectiveTargetRole =
     liveKitStore.currentInterview?.targetRole ||
@@ -253,13 +269,16 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     }
 
     await livekit.disconnect().catch(() => undefined);
+    if (user?.id) {
+      void useProfileStore.getState().analyze(user.id);
+    }
     toast.success('Results generated! Redirecting to evaluation...');
     router.push(`/dashboard/interview/results/${id}`);
   }, [finalizeRecording, isFinishing, livekit, id, liveKitStore, router, user?.id]);
 
   // Connect to LiveKit room using the session data stored by the configure page
   useEffect(() => {
-    if (!isLiveKitId || connectionAttempted) return;
+    if (!isLiveKitId || connectionAttempted || isTextMode) return;
     if (!user) return;
 
     const stored = liveKitStore.currentInterview;
@@ -314,6 +333,56 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   // Only persisted LiveKit session IDs are valid.
   if (!isLiveKitId) {
     return null;
+  }
+
+  if (isTextMode) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <TextInterviewChat
+          interviewId={id}
+          targetRole={effectiveTargetRole}
+          durationMinutes={liveKitStore.currentInterview?.durationMinutes || sessionMeta?.durationMinutes || 15}
+          topics={effectiveTopics}
+          userId={user?.id}
+          onFinish={async (resultsPayload, finalTranscripts) => {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
+              localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
+              localStorage.setItem('interview_round1_completed', 'true');
+            }
+            markRound1Completed(user?.id);
+            liveKitStore.setResults(resultsPayload);
+
+            try {
+              await supabase
+                .from('interview_sessions')
+                .update({
+                  status: 'completed',
+                  result: {
+                    ...resultsPayload,
+                    transcript: finalTranscripts,
+                  },
+                  transcript: finalTranscripts,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', id);
+            } catch {
+              // Safe fallback
+            }
+
+            if (user?.id) {
+              void useProfileStore.getState().analyze(user.id);
+            }
+
+            toast.success('Interview completed! Viewing results...');
+            router.push(`/dashboard/interview/results/${id}`);
+          }}
+          onAbandon={() => {
+            router.push('/dashboard/interview');
+          }}
+        />
+      </div>
+    );
   }
 
   // Finishing state display

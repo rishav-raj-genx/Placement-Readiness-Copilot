@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS profiles (
     linkedin_url TEXT,
     resume_pdf_path TEXT,
     linkedin_pdf_path TEXT,
+    linkedin_text TEXT,
+    leetcode_url TEXT,
+    coding_profile_url TEXT,
     interview_credits INTEGER DEFAULT 3,
     is_premium BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -236,6 +239,7 @@ CREATE TABLE IF NOT EXISTS application_tracker (
         )
     ),
     applied_at TIMESTAMPTZ,
+    follow_up_date TIMESTAMPTZ,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -243,6 +247,7 @@ CREATE TABLE IF NOT EXISTS application_tracker (
 );
 
 CREATE INDEX IF NOT EXISTS idx_app_tracker_student ON application_tracker(student_id, status);
+CREATE INDEX IF NOT EXISTS idx_app_tracker_follow_up ON application_tracker(follow_up_date);
 
 -- --------------------------------------------------------------------
 -- 5. Student Placement Readiness Scores Table (Module 4)

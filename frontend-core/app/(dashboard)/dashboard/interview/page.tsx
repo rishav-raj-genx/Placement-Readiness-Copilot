@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Code2, Loader2, Lock, Mic2, Plus, Radio, X } from 'lucide-react';
+import { ArrowRight, Check, Cloud, Code2, Cpu, Loader2, Lock, MessageSquare, Mic2, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,7 @@ import { checkRound1Completed } from '@/lib/round-status';
 import type { CompanyType, Difficulty, ExperienceLevel, LiveKitSessionRequest } from '@/types';
 import { toast } from 'sonner';
 
-const durations = [15, 30, 45] as const;
+const durations = [15, 20] as const;
 const difficulties: Difficulty[] = ['easy', 'medium', 'hard', 'adaptive'];
 
 function Field({
@@ -58,6 +58,8 @@ export default function ConfigureInterviewPage() {
   const [topicInput, setTopicInput] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [durationMinutes, setDurationMinutes] = useState<number>(15);
+  const [mode, setMode] = useState<'voice' | 'text'>('voice');
+  const [provider, setProvider] = useState<'cloud_api' | 'ollama_local'>('cloud_api');
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('entry_level');
   const [companyType, setCompanyType] = useState<CompanyType>('other');
   const [targetCompany, setTargetCompany] = useState('');
@@ -130,6 +132,8 @@ export default function ConfigureInterviewPage() {
         companyType,
         targetCompany: targetCompany.trim() || undefined,
         customInstructions: customInstructions.trim() || undefined,
+        mode,
+        provider,
       };
       const session = await createInterviewSession(request);
       startInterview(
@@ -139,9 +143,11 @@ export default function ConfigureInterviewPage() {
         session.serverUrl,
         session.token,
         durationMinutes,
-        focusTopics
+        focusTopics,
+        mode,
+        provider
       );
-      router.push(`/dashboard/interview/session/${session.interviewId}`);
+      router.push(`/dashboard/interview/session/${session.interviewId}?mode=${mode}&provider=${provider}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create the interview.';
       setCreateError(message);
@@ -360,7 +366,7 @@ export default function ConfigureInterviewPage() {
           </Field>
 
           <Field label="Duration">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {durations.map((minutes) => (
                 <button
                   key={minutes}
@@ -375,6 +381,67 @@ export default function ConfigureInterviewPage() {
                   {minutes} min
                 </button>
               ))}
+            </div>
+          </Field>
+        </div>
+
+        {/* Mode & Engine Provider Toggles */}
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <Field label="Interview mode" hint="Select real-time voice or keyboard chat">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('voice')}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                  mode === 'voice'
+                    ? 'border-[#D93829] bg-[#D93829]/10 text-stone-100 font-semibold'
+                    : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
+                }`}
+              >
+                <Mic2 className="h-3.5 w-3.5 text-[#D93829]" />
+                Voice Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('text')}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                  mode === 'text'
+                    ? 'border-[#D93829] bg-[#D93829]/10 text-stone-100 font-semibold'
+                    : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
+                }`}
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-[#D93829]" />
+                Text Mode
+              </button>
+            </div>
+          </Field>
+
+          <Field label="AI engine provider" hint="Local mode disables Deepgram cloud audio">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setProvider('cloud_api')}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                  provider === 'cloud_api'
+                    ? 'border-stone-700 bg-stone-800 text-stone-100 font-semibold'
+                    : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
+                }`}
+              >
+                <Cloud className="h-3.5 w-3.5 text-blue-400" />
+                Cloud API
+              </button>
+              <button
+                type="button"
+                onClick={() => setProvider('ollama_local')}
+                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                  provider === 'ollama_local'
+                    ? 'border-stone-700 bg-stone-800 text-stone-100 font-semibold'
+                    : 'border-stone-800 bg-stone-900 text-stone-400 hover:border-stone-700 hover:text-stone-200'
+                }`}
+              >
+                <Cpu className="h-3.5 w-3.5 text-emerald-400" />
+                Ollama (Local)
+              </button>
             </div>
           </Field>
         </div>

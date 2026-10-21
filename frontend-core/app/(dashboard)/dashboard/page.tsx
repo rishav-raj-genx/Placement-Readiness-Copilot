@@ -37,17 +37,19 @@ const GUEST_MOCK_READINESS: ReadinessScore = {
   readinessLevel: 'Not ready',
   topActions: [],
   breakdown: {
-    resume: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
-    github: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
-    projects: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
-    linkedin: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
-    mock_interview: { rawScore: 0, weight: 0.2, weightedPoints: 0, present: false },
+    resume: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
+    github: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
+    projects: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
+    linkedin: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
+    mock_interview: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
+    coding_practice: { rawScore: 0, weight: 0.16, weightedPoints: 0, present: false },
   },
 };
 
 const QUICK_LINKS = [
   { href: '/dashboard/interview', label: 'Interview Studio', description: 'Round 1 technical viva & speech practice', icon: Mic2 },
   { href: '/dashboard/interview/coding', label: 'Coding IDE', description: 'Round 2 DSA & web dev challenge', icon: Code2 },
+  { href: '/dashboard/review-details', label: 'Detailed Review', description: 'Pass/fail audit, rewrites & raw JSON', icon: Trophy },
   { href: '/dashboard/tracker', label: 'Applications', description: 'Internshala-style ATS pipeline tracker', icon: KanbanSquare },
   { href: '/dashboard/jobs', label: 'Jobs & Internships', description: 'Verified role matches & 1-click apply', icon: BriefcaseBusiness },
   { href: '/dashboard/profile', label: 'Profile Evidence', description: 'Manage resume, GitHub, and credentials', icon: Files },
@@ -93,6 +95,23 @@ export default function DashboardHomePage() {
     }));
   }, [user, visibleReadiness]);
   const nextBestActions = useMemo(() => {
+    if (visibleReadiness?.topActions && visibleReadiness.topActions.length > 0) {
+      return visibleReadiness.topActions.slice(0, 5).map((act, index) => {
+        const cat = (act.category || '').toLowerCase();
+        const href = cat.includes('interview')
+          ? '/dashboard/interview'
+          : cat.includes('coding')
+            ? '/dashboard/interview/coding'
+            : '/dashboard/profile';
+        return {
+          category: (act.category || `action-${index}`) as any,
+          title: act.title,
+          description: act.description || `Potential point gain: +${act.potentialPointGain ?? 0}`,
+          href: user ? href : '/auth',
+          score: Math.max(0, 100 - (act.potentialPointGain ?? 0)),
+        };
+      });
+    }
     const actions = buildNextBestActions(visibleReadiness);
     return user ? actions : actions.map((action) => ({ ...action, href: '/auth' }));
   }, [user, visibleReadiness]);
@@ -266,12 +285,23 @@ export default function DashboardHomePage() {
         <section id="readiness-breakdown" aria-labelledby="breakdown-heading" className="scroll-mt-24 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="rounded-2xl border border-stone-800 bg-stone-900 p-6 sm:p-7">
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div><p className="text-xs font-semibold text-stone-400">Evidence reviewed</p><h2 id="breakdown-heading" className="mt-1 text-xl font-bold text-stone-100">Readiness breakdown</h2></div>
-              <p className="text-xs text-stone-500">Five categories · 100 total points</p>
+              <div>
+                <p className="text-xs font-semibold text-stone-400">Evidence reviewed</p>
+                <h2 id="breakdown-heading" className="mt-1 text-xl font-bold text-stone-100">Readiness breakdown</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/dashboard/review-details"
+                  className="text-xs text-[#D93829] hover:underline font-medium"
+                >
+                  View Granular Diagnostic &rarr;
+                </Link>
+                <span className="text-xs text-stone-500">Six evaluation pillars &middot; 100 total points</span>
+              </div>
             </div>
             <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
               {READINESS_CATEGORY_LABELS.map(({ key, label }) => (
-                <div key={key} className={key === 'mock_interview' ? 'md:col-span-2' : undefined}>
+                <div key={key}>
                   <BreakdownMeter label={label} value={visibleReadiness?.breakdown[key]} />
                 </div>
               ))}

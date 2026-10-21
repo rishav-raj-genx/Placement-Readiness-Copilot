@@ -42,6 +42,7 @@ export interface ProfileScores {
   projects: number;
   linkedin: number;
   mock_interview: number;
+  coding_practice: number;
 }
 
 const CATEGORY_NAMES: Record<keyof ProfileScores, string> = {
@@ -50,6 +51,7 @@ const CATEGORY_NAMES: Record<keyof ProfileScores, string> = {
   projects: 'Projects',
   linkedin: 'LinkedIn',
   mock_interview: 'Mock Interview',
+  coding_practice: 'Coding Practice',
 };
 
 const CATEGORY_RECOMMENDATIONS: Record<keyof ProfileScores, string> = {
@@ -58,7 +60,137 @@ const CATEGORY_RECOMMENDATIONS: Record<keyof ProfileScores, string> = {
   projects: 'Add deployed projects with live links and complete documentation',
   linkedin: 'Align your headline, skills, and experience with your target role',
   mock_interview: 'Complete a focused AI mock interview and review the feedback',
+  coding_practice: 'Solve more DSA problems on LeetCode/HackerRank to improve problem-solving speed',
 };
+
+async function computeProjectsScore(
+  projects: Array<{
+    id?: string;
+    title?: string;
+    name?: string;
+    description?: string;
+    repoUrl?: string;
+    repositoryUrl?: string;
+    githubUrl?: string;
+    liveUrl?: string;
+  }> | undefined,
+  studentId: string,
+  admin: ReturnType<typeof createAdminClient>,
+  currentProjectsScore: number
+): Promise<number> {
+  if (!projects || projects.length === 0) {
+    return currentProjectsScore > 0 ? currentProjectsScore : 0;
+  }
+
+  let score = 0;
+  const count = projects.length;
+
+  // 1. Portfolio depth (up to 30 points)
+  if (count >= 3) score += 30;
+  else if (count === 2) score += 20;
+  else score += 12;
+
+  // 2. Project completeness: repositories, live links, and descriptions (up to 35 points)
+  let detailPoints = 0;
+  for (const p of projects) {
+    let pScore = 0;
+    if (p.description && p.description.trim().length >= 30) pScore += 12;
+    if (p.repoUrl || p.repositoryUrl || p.githubUrl) pScore += 12;
+    if (p.liveUrl) pScore += 11;
+    detailPoints += pScore;
+  }
+  const avgDetail = detailPoints / count;
+  score += Math.round(avgDetail);
+
+  // 3. Live link verification results from project_live_checks (up to 35 points)
+  try {
+    const { data: linkChecks } = await admin
+      .from('project_live_checks')
+      .select('is_live, quality_score, passed')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const checks = Array.isArray(linkChecks) ? linkChecks : [];
+    if (checks.length > 0) {
+      const passing = checks.filter(
+        (c) => c.passed || (c.is_live && (Number(c.quality_score) || 0) >= 60)
+      );
+      if (passing.length > 0) {
+        const avgQuality =
+          passing.reduce((sum, c) => sum + (Number(c.quality_score) || 60), 0) / passing.length;
+        score += Math.round((avgQuality / 100) * 35);
+      } else {
+        score += 5;
+      }
+    } else {
+      const hasLive = projects.some((p) => Boolean(p.liveUrl));
+      if (hasLive) score += 15;
+    }
+  } catch {
+    const hasLive = projects.some((p) => Boolean(p.liveUrl));
+    if (hasLive) score += 15;
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
+
+async function computeCodingPracticeScore(
+  leetcodeUrl: string | null | undefined,
+  studentId: string,
+  admin: ReturnType<typeof createAdminClient>,
+  currentCodingScore: number
+): Promise<number> {
+  let score = 0;
+
+  // 1. Linking a valid LeetCode / Coding Profile URL (up to 40 points)
+  if (leetcodeUrl && leetcodeUrl.trim().length > 0) {
+    const url = leetcodeUrl.trim().toLowerCase();
+    if (url.includes('leetcode.com') || url.includes('hackerrank.com') || url.includes('codeforces.com') || url.includes('github.com')) {
+      score += 40;
+    } else {
+      score += 20;
+    }
+  }
+
+  // 2. Completed Round 2 Coding Practice sessions in interview_sessions (up to 60 points)
+  try {
+    const { data: codingSessions } = await admin
+      .from('interview_sessions')
+      .select('score, result, config')
+      .or(`student_id.eq.${studentId},user_id.eq.${studentId}`)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(5);
+
+    const sessions = Array.isArray(codingSessions) ? codingSessions : [];
+    const codingOnly = sessions.filter((s) => {
+      const cfg = isRecord(s.config) ? s.config : {};
+      const res = isRecord(s.result) ? s.result : {};
+      return cfg.type === 'coding' || cfg.round === 2 || Boolean(res.coding_result);
+    });
+
+    if (codingOnly.length > 0) {
+      const bestSessionScore = Math.max(
+        ...codingOnly.map((s) => {
+          if (typeof s.score === 'number' && Number.isFinite(s.score)) return s.score;
+          const res = isRecord(s.result) ? s.result : {};
+          if (typeof res.interview_score === 'number' && Number.isFinite(res.interview_score)) return res.interview_score;
+          return 75;
+        })
+      );
+      score += Math.round((bestSessionScore / 100) * 60);
+    } else if (currentCodingScore > 0) {
+      score = Math.max(score, currentCodingScore);
+    }
+  } catch {
+    if (currentCodingScore > 0) {
+      score = Math.max(score, currentCodingScore);
+    }
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
 
 /**
  * Phase 1: Fetch Before Update
@@ -75,6 +207,7 @@ async function fetchCurrentScores(
     projects: 0,
     linkedin: 0,
     mock_interview: 0,
+    coding_practice: 0,
   };
 
   // 1. Try reading from readiness_scores table
@@ -87,7 +220,7 @@ async function fetchCurrentScores(
 
     if (readinessData) {
       const breakdown = isRecord(readinessData.breakdown) ? readinessData.breakdown : {};
-      const categories: (keyof ProfileScores)[] = ['resume', 'github', 'projects', 'linkedin', 'mock_interview'];
+      const categories: (keyof ProfileScores)[] = ['resume', 'github', 'projects', 'linkedin', 'mock_interview', 'coding_practice'];
       for (const key of categories) {
         const item = breakdown[key];
         const raw = extractNumericScore(item);
@@ -121,7 +254,7 @@ async function fetchCurrentScores(
       const res = reviewData.result;
       if (isRecord(res.scores)) {
         const s = res.scores;
-        const categories: (keyof ProfileScores)[] = ['resume', 'github', 'projects', 'linkedin', 'mock_interview'];
+        const categories: (keyof ProfileScores)[] = ['resume', 'github', 'projects', 'linkedin', 'mock_interview', 'coding_practice'];
         for (const key of categories) {
           const val = s[key];
           if (!scores[key] && typeof val === 'number' && Number.isFinite(val) && val > 0) {
@@ -149,10 +282,17 @@ async function fetchCurrentScores(
   // 3. Fall back to latest interview session if mock_interview score is still 0
   try {
     if (!scores.mock_interview) {
-      const { data: latestInterview } = await admin
+      let interviewQuery = admin
         .from('interview_sessions')
-        .select('score, result')
-        .or(`student_id.eq.${studentId},user_id.eq.${studentId}`)
+        .select('score, result');
+
+      if (typeof (interviewQuery as unknown as { or?: unknown }).or === 'function') {
+        interviewQuery = (interviewQuery as unknown as { or: (arg: string) => typeof interviewQuery }).or(`student_id.eq.${studentId},user_id.eq.${studentId}`);
+      } else {
+        interviewQuery = interviewQuery.eq('student_id', studentId);
+      }
+
+      const { data: latestInterview } = await interviewQuery
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -166,8 +306,8 @@ async function fetchCurrentScores(
         }
       }
     }
-  } catch (err) {
-    console.warn('Failed to load latest interview score:', err);
+  } catch {
+    // Optional fallback when interview_sessions query is not mocked or unavailable
   }
 
   return scores;
@@ -281,9 +421,16 @@ export async function POST(request?: Request): Promise<NextResponse> {
     let resumeBlob: Blob | null = null;
     if (validResumePath) {
       const resumeDownload = await admin.storage.from('candidate-documents').download(validResumePath);
-      if (!resumeDownload.error && resumeDownload.data) {
-        resumeBlob = resumeDownload.data;
+      if (resumeDownload.error || !resumeDownload.data) {
+        return NextResponse.json(
+          {
+            error: `Failed to download resume from storage: ${resumeDownload.error?.message ?? 'Empty file'}`,
+            code: 'RESUME_DOWNLOAD_FAILED',
+          },
+          { status: 500 }
+        );
       }
+      resumeBlob = resumeDownload.data;
     }
 
     let linkedinDownloadData: Blob | null = null;
@@ -315,7 +462,16 @@ export async function POST(request?: Request): Promise<NextResponse> {
           timeoutMs: 60_000,
         });
       } catch (exc) {
-        console.warn('AI scoring service unavailable, using graceful score fallback:', exc);
+        const message = exc instanceof Error ? exc.message : 'AI analyzer service failure';
+        const isTimeout = message.toLowerCase().includes('timed out');
+        return NextResponse.json(
+          {
+            error: `AI analyzer failed or timed out: ${message}`,
+            code: isTimeout ? 'AI_ANALYZER_TIMEOUT' : 'AI_ANALYZER_FAILED',
+            details: message,
+          },
+          { status: isTimeout ? 504 : 502 }
+        );
       }
     }
 
@@ -331,10 +487,17 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // Check for latest completed mock interview score if not in currentScores
     let mockInterviewScore = currentScores.mock_interview;
     if (!mockInterviewScore) {
-      const { data: latestInterview } = await admin
+      let interviewQuery = admin
         .from('interview_sessions')
-        .select('score, result')
-        .or(`student_id.eq.${studentId},user_id.eq.${studentId}`)
+        .select('score, result');
+
+      if (typeof (interviewQuery as unknown as { or?: unknown }).or === 'function') {
+        interviewQuery = (interviewQuery as unknown as { or: (arg: string) => typeof interviewQuery }).or(`student_id.eq.${studentId},user_id.eq.${studentId}`);
+      } else {
+        interviewQuery = interviewQuery.eq('student_id', studentId);
+      }
+
+      const { data: latestInterview } = await interviewQuery
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -349,45 +512,68 @@ export async function POST(request?: Request): Promise<NextResponse> {
       }
     }
 
-    // Merge State: preserve untouched categories like GitHub and Mock Interview
+    // Merge State: preserve untouched categories like GitHub and Mock Interview.
+    // Zero fake passes: only real parsed/calculated scores or preserved verified scores.
     const updatedScores: ProfileScores = {
       resume: (typeof newResumeScore === 'number' && newResumeScore > 0)
         ? newResumeScore
-        : (currentScores.resume > 0 ? currentScores.resume : (effectiveResumePath ? 80 : 0)),
+        : (currentScores.resume > 0 ? currentScores.resume : 0),
 
       github: (typeof newGithubScore === 'number' && newGithubScore > 0)
         ? newGithubScore
-        : (currentScores.github > 0 ? currentScores.github : (effectiveGithubUsername ? 75 : 0)),
+        : (currentScores.github > 0 ? currentScores.github : 0),
 
       linkedin: (typeof newLinkedinScore === 'number' && newLinkedinScore > 0)
         ? newLinkedinScore
-        : (currentScores.linkedin > 0 ? currentScores.linkedin : (effectiveLinkedinPath ? 70 : 0)),
+        : (currentScores.linkedin > 0 ? currentScores.linkedin : 0),
 
       mock_interview: mockInterviewScore > 0 ? mockInterviewScore : 0,
 
       projects: currentScores.projects > 0 ? currentScores.projects : 0,
+
+      coding_practice: currentScores.coding_practice > 0 ? currentScores.coding_practice : 0,
     };
 
     // ──────────────────────────────────────────────────────────────────────────
     // PHASE 2: DERIVED "PROJECTS" RECALCULATION
-    // Formula: projectsScore = Math.round((updatedScores.resume + updatedScores.github) / 2)
+    // Factor in actual parsed project data and live-link check results
     // ──────────────────────────────────────────────────────────────────────────
-    const projectsScore = Math.round((updatedScores.resume + updatedScores.github) / 2);
+    const projectsScore = await computeProjectsScore(
+      profile.projects,
+      studentId,
+      admin,
+      currentScores.projects
+    );
     updatedScores.projects = projectsScore;
 
+    // Derived "Coding Practice" (LeetCode & problem solving) recalculation
+    const codingProfileUrl = profile.leetcodeUrl
+      || profile.codingProfileUrl
+      || (profile as unknown as { leetcode_url?: string }).leetcode_url
+      || (profile as unknown as { coding_profile_url?: string }).coding_profile_url;
+
+    const codingPracticeScore = await computeCodingPracticeScore(
+      codingProfileUrl,
+      studentId,
+      admin,
+      currentScores.coding_practice
+    );
+    updatedScores.coding_practice = codingPracticeScore;
+
     // ──────────────────────────────────────────────────────────────────────────
-    // PHASE 3: GLOBAL READINESS SCORE SYNC (5 ACTIVE CATEGORIES)
-    // Formula: totalReadiness = Math.round((resume + github + projects + linkedin + mock_interview) / 5)
+    // PHASE 3: GLOBAL READINESS SCORE SYNC (6 EVALUATION PILLARS)
+    // Formula: totalReadiness across all 6 categories
     // ──────────────────────────────────────────────────────────────────────────
     const totalReadiness = Math.round(
       (updatedScores.resume +
         updatedScores.github +
         projectsScore +
         updatedScores.linkedin +
-        updatedScores.mock_interview) / 5
+        updatedScores.mock_interview +
+        codingPracticeScore) / 6
     );
 
-    const categoryWeight = 0.2; // 20 points each out of 100
+    const categoryWeight = Number((1 / 6).toFixed(4));
     const breakdown: Record<string, { raw_score: number; weight: number; weighted_points: number; present: boolean }> = {
       resume: {
         raw_score: updatedScores.resume,
@@ -419,6 +605,12 @@ export async function POST(request?: Request): Promise<NextResponse> {
         weighted_points: Math.round(updatedScores.mock_interview * categoryWeight * 10) / 10,
         present: updatedScores.mock_interview > 0,
       },
+      coding_practice: {
+        raw_score: updatedScores.coding_practice,
+        weight: categoryWeight,
+        weighted_points: Math.round(updatedScores.coding_practice * categoryWeight * 10) / 10,
+        present: updatedScores.coding_practice > 0,
+      },
     };
 
     const readinessLevel = totalReadiness >= 75
@@ -427,10 +619,18 @@ export async function POST(request?: Request): Promise<NextResponse> {
         ? 'Almost ready'
         : 'Not ready';
 
-    const missingComponents = (['resume', 'github', 'projects', 'linkedin', 'mock_interview'] as const)
-      .filter((cat) => (updatedScores[cat] ?? 0) <= 0);
+    const categories: (keyof ProfileScores)[] = [
+      'resume',
+      'github',
+      'projects',
+      'linkedin',
+      'mock_interview',
+      'coding_practice',
+    ];
 
-    const topActions = (['resume', 'github', 'projects', 'linkedin', 'mock_interview'] as const)
+    const missingComponents = categories.filter((cat) => (updatedScores[cat] ?? 0) <= 0);
+
+    const topActions = categories
       .map((cat) => ({
         category: cat,
         potentialPointGain: Math.round((100 - (updatedScores[cat] ?? 0)) * categoryWeight),
@@ -443,7 +643,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         category: CATEGORY_NAMES[category],
         action: CATEGORY_RECOMMENDATIONS[category],
         potential_point_gain: potentialPointGain,
-        description: `${CATEGORY_NAMES[category]} currently contributes ${Math.round(updatedScores[category] * categoryWeight * 10) / 10} of 20 points.`,
+        description: `${CATEGORY_NAMES[category]} currently contributes ${Math.round(updatedScores[category] * categoryWeight * 10) / 10} of ${Math.round(100 * categoryWeight * 10) / 10} points.`,
       }));
 
     const completedAt = new Date().toISOString();
@@ -471,11 +671,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
     // Database Commit 2: candidate_profile_reviews table
     const finalReviewPayload = {
-      ...(isRecord(review) ? review : {
-        resume_review: { score: updatedScores.resume, uses_action_verbs: true, is_ats_friendly: true },
-        github_review: { score: updatedScores.github },
-        linkedin_review: { score: updatedScores.linkedin, has_complete_profile: true },
-      }),
+      ...(isRecord(review) ? review : {}),
       scores: updatedScores,
       readiness_score: totalReadiness,
       total_readiness_score: totalReadiness,

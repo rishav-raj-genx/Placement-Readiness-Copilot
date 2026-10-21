@@ -114,10 +114,17 @@ describe('dashboard readiness roadmap', () => {
     });
   });
 
-  it('creates two actionable recommendations from the lowest scores', () => {
+  it('creates actionable recommendations from the lowest scores, returning all 5 prioritized actions', () => {
     const actions = buildNextBestActions(readiness);
 
-    expect(actions.map((action) => action.category)).toEqual(['github', 'projects']);
+    expect(actions).toHaveLength(5);
+    expect(actions.map((action) => action.category)).toEqual([
+      'github',
+      'projects',
+      'linkedin',
+      'mock_interview',
+      'resume',
+    ]);
     expect(actions[0]).toMatchObject({ score: 0, href: '/dashboard/profile' });
     expect(actions[0]?.description).toContain('Pin 2 representative repositories');
     expect(actions[1]?.description).toContain('40/100');

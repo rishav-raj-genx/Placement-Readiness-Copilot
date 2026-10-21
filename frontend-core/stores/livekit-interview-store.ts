@@ -32,6 +32,8 @@ export interface LiveKitInterviewRecord {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  mode?: 'voice' | 'text';
+  provider?: 'cloud_api' | 'ollama_local';
 }
 
 interface LiveKitInterviewState {
@@ -47,7 +49,9 @@ interface LiveKitInterviewState {
     serverUrl: string,
     token: string,
     durationMinutes: number,
-    topics?: string[]
+    topics?: string[],
+    mode?: 'voice' | 'text',
+    provider?: 'cloud_api' | 'ollama_local'
   ) => void;
   setCreating: (creating: boolean) => void;
   setCreateError: (error: string | null) => void;
@@ -111,7 +115,9 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
     serverUrl: string,
     token: string,
     durationMinutes: number,
-    topics?: string[]
+    topics?: string[],
+    mode?: 'voice' | 'text',
+    provider?: 'cloud_api' | 'ollama_local'
   ) => {
     const record: LiveKitInterviewRecord = {
       interviewId,
@@ -121,6 +127,8 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
       durationMinutes,
       serverUrl,
       token,
+      mode: mode || 'voice',
+      provider: provider || 'cloud_api',
       status: 'connecting',
       currentQuestion: null,
       transcripts: [],

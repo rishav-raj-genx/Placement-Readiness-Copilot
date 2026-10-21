@@ -26,6 +26,8 @@ interface SessionRequest {
   targetCompany?: string;
   customInstructions?: string;
   focusAreas?: string[];
+  mode?: 'voice' | 'text';
+  provider?: 'cloud_api' | 'ollama_local';
 }
 
 interface StudentInfo {
@@ -66,6 +68,10 @@ interface RoomMetadata {
   job: JobInfo | null;
   focusAreas: string[];
   config: SessionRequest;
+  durationMinutes?: number;
+  target_duration_minutes?: number;
+  mode?: string;
+  provider?: string;
 }
 
 function hasWrappingQuotes(value: string): boolean {
@@ -300,6 +306,10 @@ Deno.serve(async (req: Request) => {
     // --- Build focus areas ---
     const focusAreas = body.focusAreas || body.topics || [];
 
+    const resolvedDuration = typeof body.durationMinutes === 'number' && body.durationMinutes > 0
+      ? body.durationMinutes
+      : 15;
+
     // --- Build room metadata ---
     const roomMetadata: RoomMetadata = {
       interviewId,
@@ -315,6 +325,10 @@ Deno.serve(async (req: Request) => {
       job: jobInfo,
       focusAreas,
       config: body,
+      durationMinutes: resolvedDuration,
+      target_duration_minutes: resolvedDuration,
+      mode: body.mode || 'voice',
+      provider: body.provider || 'cloud_api',
     };
 
     const metadataJson = JSON.stringify(roomMetadata);

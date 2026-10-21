@@ -1,12 +1,17 @@
 export type UserRole = 'student' | 'admin';
 
 export interface CandidateProject {
-  id: string;
-  name: string;
-  repositoryUrl: string;
+  id?: string;
+  name?: string;
+  title?: string;
+  repositoryUrl?: string;
+  repoUrl?: string;
+  githubUrl?: string;
   liveUrl?: string;
   description: string;
 }
+
+export type ProjectItem = CandidateProject;
 
 export interface CoCurricularProfile {
   hackathonsCount: number;
@@ -28,6 +33,9 @@ export interface UserProfile {
   githubUsername?: string;
   resumePdfPath?: string;
   linkedinPdfPath?: string;
+  linkedinText?: string;
+  leetcodeUrl?: string;
+  codingProfileUrl?: string;
   projects: CandidateProject[];
   coCurricular?: CoCurricularProfile;
   interviewCredits?: number;
@@ -120,9 +128,19 @@ export type ApplicationStatus =
   | 'saved'
   | 'applied'
   | 'shortlisted'
+  | 'interview'
   | 'interviewing'
   | 'offer'
   | 'rejected';
+
+export const KANBAN_COLUMNS: Array<{ id: ApplicationStatus; label: string }> = [
+  { id: 'saved', label: 'Saved' },
+  { id: 'applied', label: 'Applied' },
+  { id: 'shortlisted', label: 'Shortlisted' },
+  { id: 'interview', label: 'Interview' },
+  { id: 'offer', label: 'Offer' },
+  { id: 'rejected', label: 'Rejected' },
+];
 
 export interface JobApplication {
   id: string;
@@ -134,6 +152,7 @@ export interface JobApplication {
   applicationDate: string;
   notes?: string;
   jobPostingUrl?: string;
+  followUpDate?: string;
   createdAt: string;
 }
 
@@ -313,6 +332,8 @@ export interface LiveKitSessionRequest {
   targetCompany?: string;
   customInstructions?: string;
   focusAreas?: string[];
+  mode?: 'voice' | 'text';
+  provider?: 'cloud_api' | 'ollama_local';
 }
 
 export interface LiveKitGreetingPayload {
@@ -359,6 +380,7 @@ export interface LiveKitResultsPayload {
   evaluationMode?: string;
   rubricVersion?: string;
   isProvisional?: boolean;
+  transcript?: LiveKitTranscriptEntry[];
 }
 
 export interface LiveKitErrorPayload {

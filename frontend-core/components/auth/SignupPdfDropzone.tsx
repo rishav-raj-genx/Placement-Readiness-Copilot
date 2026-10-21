@@ -11,6 +11,8 @@ interface SignupPdfDropzoneProps {
   existingDocument?: boolean;
   error: string | null;
   progress: number;
+  accept?: string;
+  fileTypeLabel?: string;
   onChange: (file: File) => void;
 }
 
@@ -21,6 +23,8 @@ export function SignupPdfDropzone({
   existingDocument = false,
   error,
   progress,
+  accept = 'application/pdf,.pdf',
+  fileTypeLabel = 'PDF ≤ 10 MB',
   onChange,
 }: SignupPdfDropzoneProps) {
   const inputId = useId();
@@ -35,9 +39,9 @@ export function SignupPdfDropzone({
     <div>
       <div className="mb-1.5 flex items-center justify-between">
         <label htmlFor={inputId} className="text-xs font-medium text-stone-300">
-          {label} <span className="text-[#D93829]">*</span>
+          {label}
         </label>
-        <span className="font-mono text-xs text-stone-500">PDF ≤ 10 MB</span>
+        <span className="font-mono text-xs text-stone-500">{fileTypeLabel}</span>
       </div>
       <button
         type="button"

@@ -14,17 +14,34 @@ import os
 from collections.abc import Mapping
 from contextlib import suppress
 
-from livekit import rtc
-from livekit.agents import (
-    Agent,
-    AgentServer,
-    AgentSession,
-    ConversationItemAddedEvent,
-    JobContext,
-    cli,
-    inference,
-)
-from livekit.agents.llm import ChatMessage
+try:
+    from livekit import rtc
+    from livekit.agents import (
+        Agent,
+        AgentServer,
+        AgentSession,
+        ConversationItemAddedEvent,
+        JobContext,
+        cli,
+        inference,
+    )
+    from livekit.agents.llm import ChatMessage
+except ImportError:
+    class DummyAgentServer:
+        def rtc_session(self, *args: object, **kwargs: object):
+            def decorator(f: object) -> object:
+                return f
+            return decorator
+
+    rtc = None  # type: ignore[assignment]
+    Agent = object  # type: ignore[misc,assignment]
+    AgentServer = DummyAgentServer  # type: ignore[misc,assignment]
+    AgentSession = object  # type: ignore[misc,assignment]
+    ConversationItemAddedEvent = object  # type: ignore[misc,assignment]
+    JobContext = object  # type: ignore[misc,assignment]
+    cli = None  # type: ignore[assignment]
+    inference = None  # type: ignore[assignment]
+    ChatMessage = object  # type: ignore[misc,assignment]
 
 from agent.context_adapter import adapt_resume
 from agent.finalizer import InterviewFinalizer
@@ -80,19 +97,24 @@ async def entrypoint(ctx: JobContext) -> None:
     instructions = _interview_instructions(context, session_config)
 
     # Selectable hosted vs local Ollama mode with strict privacy policy
-    mode = str(metadata.get("mode") or os.getenv("INTERVIEW_MODE", "hosted_api"))
-    if mode == "ollama_local":
+    provider_val = str(metadata.get("provider") or metadata.get("mode") or os.getenv("INTERVIEW_MODE", "hosted_api")).lower()
+    cfg = metadata.get("config")
+    if isinstance(cfg, Mapping):
+        provider_val = str(cfg.get("provider") or cfg.get("mode") or provider_val).lower()
+
+    is_local = provider_val in ("ollama_local", "ollama", "local")
+
+    if is_local:
         interview_model = os.getenv("LIVEKIT_INTERVIEW_MODEL", "ollama/llama-3.1")
-        # Issue 7: Enforce strict local mode with zero cloud token leak when in ollama_local
+        # Enforce strict local mode with zero cloud token leak when in ollama_local
         scoring_llm = ResilientLLM(
             primary=OllamaLLM(),
             fallback=None,
         )
-        logger.info(
-            "Strict local mode configured: no cloud LLM fallback. "
-            "Pipeline notice: voice STT/TTS relies on LiveKit plugins (%s / %s).",
-            os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-3"),
-            os.getenv("LIVEKIT_TTS_MODEL", "deepgram/aura-2-thalia-en"),
+        logger.info("Strict local mode configured: Deepgram dependencies disabled.")
+        # When local mode is selected, disable Deepgram dependencies
+        session = AgentSession(
+            llm=inference.LLM(interview_model),
         )
     else:
         interview_model = os.getenv("LIVEKIT_INTERVIEW_MODEL", "groq/llama-3.1-8b-instant")
@@ -100,15 +122,14 @@ async def entrypoint(ctx: JobContext) -> None:
             primary=GroqLLM(),
             fallback=OllamaLLM(),
         )
-
-    session = AgentSession(
-        stt=inference.STT(
-            os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-3"),
-            language="en",
-        ),
-        llm=inference.LLM(interview_model),
-        tts=inference.TTS(os.getenv("LIVEKIT_TTS_MODEL", "deepgram/aura-2-thalia-en")),
-    )
+        session = AgentSession(
+            stt=inference.STT(
+                os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-3"),
+                language="en",
+            ),
+            llm=inference.LLM(interview_model),
+            tts=inference.TTS(os.getenv("LIVEKIT_TTS_MODEL", "deepgram/aura-2-thalia-en")),
+        )
     finalizer = InterviewFinalizer(
         context=context,
         llm=scoring_llm,
@@ -261,12 +282,21 @@ async def entrypoint(ctx: JobContext) -> None:
 
 
 def _duration_from_metadata(metadata: Mapping[str, object]) -> int:
-    val = metadata.get("durationMinutes") or metadata.get("duration_minutes") or metadata.get("target_duration_minutes")
+    cfg = metadata.get("config")
+    cfg_map = cfg if isinstance(cfg, Mapping) else {}
+    val = (
+        metadata.get("durationMinutes")
+        or metadata.get("duration_minutes")
+        or metadata.get("target_duration_minutes")
+        or cfg_map.get("durationMinutes")
+        or cfg_map.get("duration_minutes")
+        or cfg_map.get("target_duration_minutes")
+    )
     if isinstance(val, (int, float)) and 5 <= int(val) <= 60:
         return int(val)
     if isinstance(val, str) and val.isdigit() and 5 <= int(val) <= 60:
         return int(val)
-    return 15 if os.getenv("E2E_MODE") else 20
+    return 15
 
 
 def _resume_from_room_metadata(metadata: str) -> dict[str, object]:

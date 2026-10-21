@@ -5,7 +5,8 @@ export type RoadmapCategory =
   | 'github'
   | 'projects'
   | 'linkedin'
-  | 'mock_interview';
+  | 'mock_interview'
+  | 'coding_practice';
 
 export type RoadmapStatus = 'Evidence needed' | 'Action required' | 'In progress' | 'Ready';
 
@@ -38,6 +39,15 @@ export const READINESS_CATEGORY_LABELS: readonly { key: RoadmapCategory; label: 
   { key: 'projects', label: 'Projects' },
   { key: 'linkedin', label: 'LinkedIn' },
   { key: 'mock_interview', label: 'Mock Interview' },
+];
+
+export const ALL_READINESS_PILLARS: readonly { key: RoadmapCategory; label: string }[] = [
+  { key: 'resume', label: 'Resume' },
+  { key: 'github', label: 'GitHub' },
+  { key: 'projects', label: 'Projects' },
+  { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'mock_interview', label: 'Mock Interview' },
+  { key: 'coding_practice', label: 'Coding Practice' },
 ];
 
 interface RoadmapDefinition {
@@ -142,6 +152,11 @@ const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefiniti
     description: (score) => `Your mock interview score is ${score}/100. Complete a focused AI viva and act on its weakest-topic feedback.`,
     href: '/dashboard/interview',
   },
+  coding_practice: {
+    title: 'Sharpen your coding & DSA skills',
+    description: (score) => `Your coding practice score is ${score}/100. Connect your LeetCode profile and solve interactive problems in the Round 2 IDE.`,
+    href: '/dashboard/interview/coding',
+  },
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -193,7 +208,7 @@ export function buildNextBestActions(readiness: ReadinessScore | null): Dashboar
   return ROADMAP_DEFINITIONS
     .map(({ categoryKey }) => ({ category: categoryKey, score: scoreFor(readiness.breakdown?.[categoryKey]) }))
     .sort((left, right) => left.score - right.score)
-    .slice(0, 2)
+    .slice(0, 5)
     .map(({ category, score }) => {
       const recommendation = RECOMMENDATION_DEFINITIONS[category];
       return {

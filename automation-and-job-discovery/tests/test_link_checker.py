@@ -121,3 +121,51 @@ def test_real_browser_captures_mobile_screenshot_and_page_errors(tmp_path, monke
     assert screenshot_path.stat().st_size > 0
     assert "fixture console error" in result["console_errors"]
     assert any(error["error"] == "HTTP 404" for error in result["network_errors"])
+
+
+def test_unmatched_claims_produce_failed_check(tmp_path, monkeypatch):
+    html = b"""<!doctype html>
+    <html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Simple Blog</title></head>
+    <body><main>This is a simple plain blog without any blockchain or webgl.</main></body></html>"""
+
+    class FixtureHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.end_headers()
+            self.wfile.write(html)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), FixtureHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    checker = LiveLinkChecker(headless=True, timeout_ms=5000)
+    checker.screenshot_dir = tmp_path
+    monkeypatch.setattr(
+        LiveLinkChecker,
+        "is_safe_public_url",
+        staticmethod(lambda url: (True, "Allowed only by local integration fixture")),
+    )
+
+    try:
+        # Candidate claimed "Solidity" and "Kubernetes", which do NOT exist on the site
+        result = checker.check_project_url(
+            f"http://127.0.0.1:{server.server_port}",
+            claimed_keywords=["Solidity", "Kubernetes", "WebAssembly"],
+            save_to_db=False,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=2)
+
+    assert result["is_live"] is True
+    assert result["content_evaluation"]["claims_matched"] is False
+    assert len(result["content_evaluation"]["matched_keywords"]) == 0
+    assert result["passed"] is False
+    assert any("claims mismatch" in rec.lower() for rec in result["recommendations"])
+

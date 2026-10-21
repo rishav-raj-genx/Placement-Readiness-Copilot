@@ -1,4 +1,9 @@
-import type { LiveKitCategoryScore, LiveKitResultsPayload, LiveKitSuggestedFix } from '@/types';
+import type {
+  LiveKitCategoryScore,
+  LiveKitResultsPayload,
+  LiveKitSuggestedFix,
+  LiveKitTranscriptEntry,
+} from '@/types';
 
 type ResultRecord = Record<string, unknown>;
 
@@ -37,6 +42,28 @@ function normalizeSuggestedFix(value: unknown): LiveKitSuggestedFix | null {
     title: readString(value.title),
     location: readString(value.location, 'answers'),
     recommendedChange: readString(value.recommendedChange),
+  };
+}
+
+function normalizeTranscriptEntry(entry: unknown, index: number): LiveKitTranscriptEntry | null {
+  if (!isRecord(entry)) return null;
+  const rawSpeaker = readString(entry.speaker || entry.role);
+  const speaker: 'student' | 'interviewer' =
+    rawSpeaker === 'student' || rawSpeaker === 'user' || rawSpeaker === 'candidate'
+      ? 'student'
+      : 'interviewer';
+  const text = readString(entry.text || entry.message || entry.content);
+  if (!text) return null;
+  const timestamp = typeof entry.timestamp === 'number'
+    ? entry.timestamp
+    : (typeof entry.time === 'number' ? entry.time : Date.now());
+  const id = readString(entry.id) || `transcript_${index}_${timestamp}`;
+  return {
+    id,
+    speaker,
+    text,
+    timestamp,
+    final: Boolean(entry.final ?? true),
   };
 }
 
@@ -96,6 +123,23 @@ export function normalizeInterviewResult(value: unknown): LiveKitResultsPayload 
   const rubricVersion = readString(value.rubric_version ?? value.rubricVersion);
   const isProvisional = Boolean(value.is_provisional ?? value.isProvisional ?? isFallback);
 
+  let rawTranscriptList: unknown[] = [];
+  if (Array.isArray(value.transcript)) {
+    rawTranscriptList = value.transcript;
+  } else if (Array.isArray(value.transcripts)) {
+    rawTranscriptList = value.transcripts;
+  } else if (isRecord(value.result)) {
+    if (Array.isArray(value.result.transcript)) {
+      rawTranscriptList = value.result.transcript;
+    } else if (Array.isArray(value.result.transcripts)) {
+      rawTranscriptList = value.result.transcripts;
+    }
+  }
+
+  const transcript = rawTranscriptList
+    .map((entry, index) => normalizeTranscriptEntry(entry, index))
+    .filter((entry): entry is LiveKitTranscriptEntry => entry !== null);
+
   return {
     overallReadinessDelta: readNumber(value.overallReadinessDelta),
     finalScore,
@@ -107,5 +151,6 @@ export function normalizeInterviewResult(value: unknown): LiveKitResultsPayload 
     evaluationMode,
     rubricVersion,
     isProvisional,
+    transcript: transcript.length > 0 ? transcript : undefined,
   };
 }

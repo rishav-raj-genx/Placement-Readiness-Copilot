@@ -42,8 +42,9 @@ import {
   Tooltip,
 } from 'recharts';
 import { format } from 'date-fns';
-import type { LiveKitResultsPayload } from '@/types';
+import type { LiveKitResultsPayload, LiveKitTranscriptEntry } from '@/types';
 import { normalizeInterviewResult } from '@/lib/interview-result-adapter';
+import { InterviewAuditPlayer } from '@/components/interview/interview-audit-player';
 
 export default function ResultsPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -54,6 +55,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const [showAnswers, setShowAnswers] = useState(false);
   const [liveKitResults, setLiveKitResults] = useState<LiveKitResultsPayload | null>(null);
   const [liveKitLoading, setLiveKitLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   const isLiveKitId = id.startsWith('intv_');
   const session = getSession(id);
@@ -104,14 +106,23 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       try {
         const { data } = await supabase
           .from('interview_sessions')
-          .select('result, target_role, completed_at')
+          .select('result, target_role, completed_at, audio_url, transcript')
           .eq('id', id)
           .maybeSingle();
 
-        if (data?.result) {
-          setLiveKitResults(normalizeInterviewResult(data.result));
-          setLiveKitLoading(false);
-          return true;
+        if (data) {
+          if (data.audio_url) {
+            setAudioUrl(data.audio_url);
+          }
+          if (data.result) {
+            const normalized = normalizeInterviewResult(data.result);
+            if ((!normalized.transcript || normalized.transcript.length === 0) && Array.isArray(data.transcript)) {
+              normalized.transcript = data.transcript as LiveKitTranscriptEntry[];
+            }
+            setLiveKitResults(normalized);
+            setLiveKitLoading(false);
+            return true;
+          }
         }
       } catch {
         // Safe ignore
@@ -154,7 +165,14 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   }, [isLiveKitId, isHydrated, session, router, id]);
 
   if (isLiveKitId) {
-    return <LiveKitResultsView id={id} results={liveKitResults} loading={liveKitLoading} />;
+    return (
+      <LiveKitResultsView
+        id={id}
+        results={liveKitResults}
+        loading={liveKitLoading}
+        audioUrl={audioUrl}
+      />
+    );
   }
 
   if (!isHydrated) {
@@ -429,10 +447,12 @@ function LiveKitResultsView({
   id,
   results,
   loading,
+  audioUrl,
 }: {
   id: string;
   results: LiveKitResultsPayload | null;
   loading: boolean;
+  audioUrl?: string | null;
 }) {
   const router = useRouter();
 
@@ -669,6 +689,12 @@ function LiveKitResultsView({
           </CardContent>
         </Card>
       )}
+
+      {/* Replayable Timestamped Transcript & Audio Player for Auditing */}
+      <InterviewAuditPlayer
+        audioUrl={audioUrl}
+        transcript={results.transcript || []}
+      />
 
       {/* Actions */}
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">

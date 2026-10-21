@@ -9,6 +9,15 @@ export interface PendingSignupDraft {
   email: string;
   targetRole: string;
   githubUsername: string;
+  leetcodeUrl?: string;
+  linkedinText?: string;
+  projects?: Array<{
+    title?: string;
+    name?: string;
+    repoUrl?: string;
+    liveUrl?: string;
+    description: string;
+  }>;
 }
 
 export interface PendingSignupDocuments {

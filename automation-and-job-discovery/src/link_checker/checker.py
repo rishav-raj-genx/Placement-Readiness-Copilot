@@ -313,11 +313,20 @@ class LiveLinkChecker:
                     """)
                     mobile_friendly = has_viewport_meta and not horizontal_overflow
 
-                    # Keyword verification (if student claimed specific tech/features in README)
-                    if claimed_keywords and body_text:
-                        lower_body = body_text.lower() + " " + page_title.lower()
+                    # Keyword verification for specific project claims
+                    if claimed_keywords:
+                        page_html = ""
+                        try:
+                            page_html = page.content() or ""
+                        except Exception:
+                            pass
+                        searchable_corpus = (
+                            (body_text or "") + " " + (page_title or "") + " " + page_html
+                        ).lower()
                         matched_keywords = [
-                            kw for kw in claimed_keywords if kw.lower() in lower_body
+                            kw.strip()
+                            for kw in claimed_keywords
+                            if kw.strip() and kw.strip().lower() in searchable_corpus
                         ]
 
                     # Capture mobile screenshot
@@ -375,6 +384,16 @@ class LiveLinkChecker:
             horizontal_overflow=horizontal_overflow,
         )
 
+        claims_matched = True
+        if claimed_keywords and len(claimed_keywords) > 0:
+            claims_matched = len(matched_keywords) > 0
+            if not claims_matched:
+                recommendations.insert(
+                    0,
+                    f"Project claims mismatch: The live deployment did not match any of the stated project claims ({', '.join(claimed_keywords)})."
+                )
+                quality_score = min(quality_score, 45.0)
+
         result_payload = {
             "id": f"chk_{int(time.time())}_{self._sanitize_filename(url)[:15]}",
             "student_id": student_id,
@@ -400,10 +419,11 @@ class LiveLinkChecker:
                 "viewport_height": config.DEFAULT_VIEWPORT_HEIGHT,
                 "claimed_keywords_checked": claimed_keywords or [],
                 "matched_keywords": matched_keywords,
+                "claims_matched": claims_matched,
             },
             "quality_score": quality_score,
             "recommendations": recommendations,
-            "passed": is_live and not is_blank_page and quality_score >= 60.0,
+            "passed": is_live and not is_blank_page and quality_score >= 60.0 and claims_matched,
         }
 
         # Sync to Supabase / Local DB
