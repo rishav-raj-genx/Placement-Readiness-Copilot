@@ -38,7 +38,19 @@ const DEFAULT_QUESTIONS: Record<string, VoicePlanItem[]> = {
     },
     {
       id: 'fe-q5',
-      category: 'System Design & Collaboration',
+      category: 'Frontend Security',
+      text: 'How do you safeguard a Single Page Application against XSS and CSRF? Where should auth tokens be stored and why?',
+      expectedConcepts: ['HttpOnly cookies', 'CSP headers', 'DOM sanitization', 'SameSite cookies', 'XSS prevention'],
+    },
+    {
+      id: 'fe-q6',
+      category: 'CSS & Modern Layouts',
+      text: 'Compare CSS Grid and Flexbox for complex responsive layouts. How do CSS repaint and reflow cycles impact runtime rendering performance?',
+      expectedConcepts: ['Grid vs Flexbox', 'reflow', 'repaint', 'composite layers', 'GPU acceleration'],
+    },
+    {
+      id: 'fe-q7',
+      category: 'System Design & Debugging',
       text: 'Describe a challenging bug you encountered in a recent frontend project. How did you diagnose, debug, and prevent recurrence?',
       expectedConcepts: ['debugging tools', 'network tab', 'root cause analysis', 'testing'],
     },
@@ -70,58 +82,433 @@ const DEFAULT_QUESTIONS: Record<string, VoicePlanItem[]> = {
     },
     {
       id: 'be-q5',
+      category: 'Microservices & Resilience',
+      text: 'How do you implement fault tolerance in microservices? Discuss the circuit breaker pattern, idempotency keys, and message queue backpressure.',
+      expectedConcepts: ['circuit breaker', 'idempotency key', 'message broker', 'dead-letter queue', 'retry backoff'],
+    },
+    {
+      id: 'be-q6',
+      category: 'Database Scaling & Sharding',
+      text: 'When should a system scale read replicas versus implementing database sharding? What challenges arise with cross-shard transactions?',
+      expectedConcepts: ['read replicas', 'horizontal sharding', 'two-phase commit', 'routing key', 'consistency trade-offs'],
+    },
+    {
+      id: 'be-q7',
       category: 'Engineering Best Practices',
       text: 'Tell me about a time an API or service degraded in production. How did you respond, troubleshoot, and resolve the incident?',
       expectedConcepts: ['telemetry', 'logs', 'circuit breakers', 'graceful degradation', 'post-mortem'],
     },
   ],
-  general: [
+  fullstack: [
     {
-      id: 'gen-q1',
-      category: 'Introduction & Foundations',
-      text: 'Welcome! To start off, please introduce yourself and outline your core technical stack and most impactful project.',
-      expectedConcepts: ['introduction', 'technical stack', 'project impact'],
+      id: 'fs-q1',
+      category: 'End-to-End Architecture',
+      text: 'Walk me through the complete end-to-end journey of a user request from typing a URL in the browser, through DNS, CDN, API Gateway, DB, to UI rendering.',
+      expectedConcepts: ['DNS resolution', 'TLS handshake', 'reverse proxy', 'API gateway', 'database query', 'client hydration'],
     },
     {
-      id: 'gen-q2',
-      category: 'Data Structures & Algorithms',
-      text: 'Explain the difference between an array-based list and a linked list in terms of memory layout and runtime complexity for insertions and lookups.',
-      expectedConcepts: ['contiguous memory', 'cache locality', 'O(1) vs O(N)', 'pointers'],
+      id: 'fs-q2',
+      category: 'Authentication & Session Flow',
+      text: 'How do you design a robust authentication system across a full-stack app? Compare JWTs stored in HttpOnly cookies versus session-based auth with Redis.',
+      expectedConcepts: ['JWT', 'HttpOnly cookie', 'refresh token rotation', 'CSRF protection', 'session revocation'],
     },
     {
-      id: 'gen-q3',
-      category: 'System Design Fundamentals',
-      text: 'How would you design a rate limiter to protect a public API against abuse? What algorithms and storage systems would you consider?',
-      expectedConcepts: ['token bucket', 'leaky bucket', 'sliding window', 'Redis'],
+      id: 'fs-q3',
+      category: 'Rendering Paradigms',
+      text: 'Compare Server-Side Rendering (SSR), Static Site Generation (SSG), and Client-Side Rendering (CSR). When would you choose each, and how do you prevent hydration mismatches?',
+      expectedConcepts: ['SSR vs SSG vs CSR', 'hydration error', 'SEO', 'Time to First Byte (TTFB)', 'incremental static regeneration'],
     },
     {
-      id: 'gen-q4',
-      category: 'Code Quality & Testing',
-      text: 'What is your philosophy on automated testing? How do you balance unit tests, integration tests, and end-to-end tests?',
-      expectedConcepts: ['testing pyramid', 'mocking', 'integration testing', 'CI/CD pipeline'],
+      id: 'fs-q4',
+      category: 'Data Synchronization & State',
+      text: 'How do you handle optimistic UI updates and data synchronization when a backend network request fails or returns a validation error?',
+      expectedConcepts: ['optimistic update', 'rollback', 'cache invalidation', 're-validation', 'user notification'],
     },
     {
-      id: 'gen-q5',
-      category: 'Behavioral & Leadership',
-      text: 'Tell me about a situation where you had a technical disagreement with a teammate or lead. How did you resolve it constructively?',
-      expectedConcepts: ['communication', 'trade-off analysis', 'alignment', 'egoless engineering'],
+      id: 'fs-q5',
+      category: 'Database & Schema Evolution',
+      text: 'When building a full-stack feature that requires a schema change, how do you perform database migrations with zero downtime in production?',
+      expectedConcepts: ['expand and contract pattern', 'zero-downtime migration', 'backward compatibility', 'feature flags'],
+    },
+    {
+      id: 'fs-q6',
+      category: 'Full-Stack Performance',
+      text: 'What are the most common performance bottlenecks across the stack (e.g., N+1 query problem, bundle bloat, blocking I/O) and how do you resolve them?',
+      expectedConcepts: ['N+1 queries', 'dataloader / batching', 'code splitting', 'connection pooling', 'caching'],
+    },
+  ],
+  devops: [
+    {
+      id: 'do-q1',
+      category: 'Infrastructure as Code',
+      text: 'How do you manage Infrastructure as Code with Terraform? Explain state file locking, drift detection, and modular infrastructure design.',
+      expectedConcepts: ['Terraform state', 'remote backend', 'state locking', 'drift detection', 'reusable modules'],
+    },
+    {
+      id: 'do-q2',
+      category: 'Container Orchestration',
+      text: 'How does Kubernetes schedule and manage pods? Compare rolling updates, blue-green deployments, and canary releases in production.',
+      expectedConcepts: ['kube-scheduler', 'replica sets', 'canary release', 'blue-green deployment', 'health checks (readiness / liveness)'],
+    },
+    {
+      id: 'do-q3',
+      category: 'CI/CD Pipeline Design',
+      text: 'Describe an ideal CI/CD pipeline from git push to production release. What security, testing, and deployment gates would you enforce?',
+      expectedConcepts: ['static analysis', 'container vulnerability scan', 'unit/integration test stages', 'artifact registry', 'automated rollback'],
+    },
+    {
+      id: 'do-q4',
+      category: 'Observability & SRE',
+      text: 'Explain the three pillars of observability (metrics, logs, traces). How do you define SLIs, SLOs, and error budgets for high-availability systems?',
+      expectedConcepts: ['Prometheus', 'distributed tracing (OpenTelemetry)', 'structured logging', 'SLI vs SLO', 'error budget'],
+    },
+    {
+      id: 'do-q5',
+      category: 'Cloud Networking & Security',
+      text: 'How do you architect a secure VPC with public and private subnets, NAT gateways, security groups, and bastion or zero-trust access?',
+      expectedConcepts: ['VPC', 'private subnet', 'NAT gateway', 'security groups vs NACLs', 'least privilege access'],
+    },
+    {
+      id: 'do-q6',
+      category: 'Incident Response & Post-Mortem',
+      text: 'Tell me about a major infrastructure or deployment outage you dealt with. How did you diagnose the root cause, mitigate impact, and conduct a post-mortem?',
+      expectedConcepts: ['triage', 'rollback', 'observability dashboards', 'blameless post-mortem', 'preventative actions'],
+    },
+  ],
+  data_science: [
+    {
+      id: 'ds-q1',
+      category: 'ML Fundamentals & Regularization',
+      text: 'Explain the bias-variance trade-off. What practical techniques do you use to detect and mitigate overfitting in complex models?',
+      expectedConcepts: ['bias vs variance', 'L1 vs L2 regularization', 'dropout', 'cross-validation', 'early stopping'],
+    },
+    {
+      id: 'ds-q2',
+      category: 'Feature Engineering & Imbalanced Data',
+      text: 'How do you handle severe class imbalance in real-world datasets? Compare sampling techniques like SMOTE with class-weighted loss functions.',
+      expectedConcepts: ['class imbalance', 'SMOTE', 'focal loss / weighted cross-entropy', 'Precision-Recall curve', 'ROC-AUC'],
+    },
+    {
+      id: 'ds-q3',
+      category: 'Deep Learning & Transformers',
+      text: 'How does the self-attention mechanism work in Transformers? Why do transformers scale better than recurrent neural networks (RNNs) for sequential data?',
+      expectedConcepts: ['query key value', 'self-attention', 'parallelization', 'multi-head attention', 'positional encoding'],
+    },
+    {
+      id: 'ds-q4',
+      category: 'Evaluation & Metrics',
+      text: 'Why is classification accuracy often misleading? When would you optimize for Precision over Recall or evaluate with F1-score and AUC-ROC?',
+      expectedConcepts: ['confusion matrix', 'Precision vs Recall', 'false positives vs false negatives', 'AUC-ROC', 'domain trade-offs'],
+    },
+    {
+      id: 'ds-q5',
+      category: 'MLOps & Model Deployment',
+      text: 'What is the difference between data drift and concept drift? How do you monitor and retrain machine learning models in production?',
+      expectedConcepts: ['data drift', 'concept drift', 'feature distribution monitoring', 'model retraining pipeline', 'A/B testing'],
+    },
+    {
+      id: 'ds-q6',
+      category: 'Embeddings & Vector Search',
+      text: 'How do vector embeddings work and how are they indexed for approximate nearest neighbor (ANN) search in semantic retrieval or RAG systems?',
+      expectedConcepts: ['vector embeddings', 'cosine similarity', 'HNSW / FAISS', 'ANN search', 'RAG pipeline'],
+    },
+  ],
+  data_engineering: [
+    {
+      id: 'de-q1',
+      category: 'Batch vs Stream Processing',
+      text: 'Compare batch processing with Apache Spark against stream processing with Apache Flink or Kafka Streams. When would you choose each?',
+      expectedConcepts: ['micro-batch vs streaming', 'latency vs throughput', 'event time vs processing time', 'watermarks'],
+    },
+    {
+      id: 'de-q2',
+      category: 'Data Warehousing & Modeling',
+      text: 'Explain the difference between a Star Schema and a Snowflake Schema. Why do analytical databases use columnar storage like Parquet or ORC?',
+      expectedConcepts: ['fact and dimension tables', 'denormalization', 'columnar format (Parquet)', 'compression ratio', 'scan efficiency'],
+    },
+    {
+      id: 'de-q3',
+      category: 'Pipeline Idempotency & Backfilling',
+      text: 'How do you design data ingestion pipelines to guarantee idempotency and handle late-arriving data without duplicate records?',
+      expectedConcepts: ['idempotency', 'upsert / merge', 'deduplication', 'partitioning', 'backfill strategies'],
+    },
+    {
+      id: 'de-q4',
+      category: 'Distributed Query Optimization',
+      text: 'What causes data skew in distributed processing frameworks like Spark? How do you diagnose and mitigate severe partition skew?',
+      expectedConcepts: ['data skew', 'salting', 'broadcast join', 'shuffle partition tuning', 'repartitioning'],
+    },
+    {
+      id: 'de-q5',
+      category: 'Schema Evolution & Data Governance',
+      text: 'How do you handle schema evolution across distributed messaging systems using Schema Registry with Avro or Protocol Buffers?',
+      expectedConcepts: ['backward compatibility', 'forward compatibility', 'schema registry', 'Avro / Protobuf', 'data quality gates'],
+    },
+  ],
+  mobile: [
+    {
+      id: 'mob-q1',
+      category: 'Lifecycle & State Management',
+      text: 'Explain the mobile application lifecycle. How do you preserve user state and restore views when the operating system kills background processes?',
+      expectedConcepts: ['lifecycle states', 'saved state / bundle', 'background execution', 'process death restoration'],
+    },
+    {
+      id: 'mob-q2',
+      category: 'Offline-First & Local Storage',
+      text: 'How would you architect an offline-first mobile app? Discuss local caching (Room, CoreData, SQLite) and synchronization conflict resolution.',
+      expectedConcepts: ['local database', 'sync queue', 'optimistic updates', 'conflict resolution (last write wins / CRDT)'],
+    },
+    {
+      id: 'mob-q3',
+      category: 'UI Performance & 60 FPS',
+      text: 'What causes UI jank and dropped frames on mobile devices? How do you ensure smooth 60 or 120 FPS rendering on resource-constrained devices?',
+      expectedConcepts: ['UI thread vs background thread', 'view recycling', 'image resizing / caching', 'layout hierarchy flattening', 'memory allocation'],
+    },
+    {
+      id: 'mob-q4',
+      category: 'Cross-Platform vs Native',
+      text: 'Compare React Native / Flutter architecture against purely native development (Swift/Kotlin). What are the performance and bridge trade-offs?',
+      expectedConcepts: ['native bridge / JSI', 'Flutter Skia / Impeller', 'startup time', 'native SDK access', 'memory footprint'],
+    },
+    {
+      id: 'mob-q5',
+      category: 'Mobile Security & Permissions',
+      text: 'How do you secure sensitive user credentials on mobile devices? Compare iOS Keychain and Android Keystore with biometric authentication.',
+      expectedConcepts: ['Keychain / Keystore', 'hardware-backed encryption', 'biometric authentication', 'SSL pinning', 'root/jailbreak detection'],
+    },
+  ],
+  cybersecurity: [
+    {
+      id: 'sec-q1',
+      category: 'Web Security & OWASP Top 10',
+      text: 'Discuss three critical vulnerabilities from the OWASP Top 10: SQL Injection, Server-Side Request Forgery (SSRF), and Broken Object Level Authorization (BOLA). How do you remediate each?',
+      expectedConcepts: ['parameterized queries', 'input validation / allowlisting', 'metadata service protection', 'authorization checks', 'principle of least privilege'],
+    },
+    {
+      id: 'sec-q2',
+      category: 'Modern Authentication & OAuth',
+      text: 'Explain the OAuth 2.0 Authorization Code flow with PKCE. Why is PKCE critical for public clients and Single Page Applications?',
+      expectedConcepts: ['OAuth 2.0', 'PKCE (code verifier & challenge)', 'authorization code', 'token exchange', 'intercept protection'],
+    },
+    {
+      id: 'sec-q3',
+      category: 'Cryptography Fundamentals',
+      text: 'Explain the difference between symmetric and asymmetric encryption. What is the difference between hashing, salting, and digital signatures?',
+      expectedConcepts: ['AES vs RSA/ECC', 'public/private key pair', 'hashing (SHA-256 / bcrypt)', 'salt & pepper', 'digital signature verification'],
+    },
+    {
+      id: 'sec-q4',
+      category: 'Zero Trust & Network Architecture',
+      text: 'What are the core tenets of a Zero Trust security model? How do you implement micro-segmentation and continuous verification across a company network?',
+      expectedConcepts: ['never trust always verify', 'least privilege', 'micro-segmentation', 'mutual TLS (mTLS)', 'identity-aware proxy'],
+    },
+    {
+      id: 'sec-q5',
+      category: 'Incident Response & Threat Modeling',
+      text: 'Walk me through your incident response plan if an production API token or database credential was accidentally leaked on a public GitHub repo.',
+      expectedConcepts: ['revocation', 'credential rotation', 'audit log inspection', 'containment', 'blast radius assessment', 'post-mortem'],
+    },
+  ],
+  qa: [
+    {
+      id: 'qa-q1',
+      category: 'Testing Pyramid & Strategy',
+      text: 'Explain the Testing Pyramid. How do you balance unit tests, integration tests, contract tests, and end-to-end (E2E) tests in an enterprise project?',
+      expectedConcepts: ['testing pyramid', 'unit vs integration vs E2E', 'cost and speed of execution', 'test reliability', 'contract testing'],
+    },
+    {
+      id: 'qa-q2',
+      category: 'Test Automation & Flakiness',
+      text: 'What causes flaky automated tests in frameworks like Playwright or Cypress? What design patterns do you apply to eliminate race conditions?',
+      expectedConcepts: ['flaky tests', 'explicit waits vs arbitrary sleep', 'test isolation', 'page object model', 'network stubbing vs live backend'],
+    },
+    {
+      id: 'qa-q3',
+      category: 'Performance & Load Testing',
+      text: 'How do you design a performance and stress test using tools like k6 or JMeter? What key metrics indicate a system saturation point?',
+      expectedConcepts: ['load test vs stress test', 'p95 and p99 latency', 'throughput (RPS)', 'error rate', 'bottleneck identification'],
+    },
+    {
+      id: 'qa-q4',
+      category: 'CI/CD Test Automation',
+      text: 'How do you integrate automated test suites into CI/CD pipelines to ensure rapid developer feedback without slowing down deployment velocity?',
+      expectedConcepts: ['parallel test runners', 'test sharding', 'smoke tests on PR', 'nightly regression suites', 'test reporting'],
+    },
+    {
+      id: 'qa-q5',
+      category: 'Root Cause & Defect Analysis',
+      text: 'Tell me about a subtle, non-deterministic bug that escaped to staging or production. How did you reproduce, isolate, and create automated regression tests for it?',
+      expectedConcepts: ['reproduction steps', 'root cause analysis', 'boundary conditions', 'regression suite addition'],
+    },
+  ],
+  system_design: [
+    {
+      id: 'sd-q1',
+      category: 'Distributed Rate Limiting',
+      text: 'How would you design a distributed rate limiter for a public API that receives 100,000 requests per second? What algorithms and storage would you use?',
+      expectedConcepts: ['token bucket', 'sliding window counter', 'Redis cluster', 'Lua scripts for atomicity', 'race conditions'],
+    },
+    {
+      id: 'sd-q2',
+      category: 'High-Throughput URL Shortener',
+      text: 'Walk through the high-level system design of a URL shortener like bit.ly. How do you generate short keys, ensure high availability, and prevent collisions?',
+      expectedConcepts: ['Base62 encoding', 'distributed key generator (Snowflake)', 'caching read layer', 'database sharding', 'collision avoidance'],
+    },
+    {
+      id: 'sd-q3',
+      category: 'Consistency & CAP Theorem',
+      text: 'Explain the CAP Theorem and PACELC Theorem with real database examples. When would you sacrifice strong consistency for high availability?',
+      expectedConcepts: ['CAP theorem', 'PACELC', 'eventual consistency vs strong consistency', 'quorum reads/writes', 'split-brain mitigation'],
+    },
+    {
+      id: 'sd-q4',
+      category: 'Message Queues & Event Streaming',
+      text: 'Compare an asynchronous message queue (e.g. RabbitMQ) with an event streaming platform (e.g. Apache Kafka). When would you choose each?',
+      expectedConcepts: ['publish-subscribe', 'message persistence', 'consumer groups', 'partition ordering', 'backpressure'],
+    },
+    {
+      id: 'sd-q5',
+      category: 'High-Scale Caching & Stampedes',
+      text: 'How do you design a multi-tiered caching architecture? How do you prevent cache penetration, cache breakdown, and cache avalanches under sudden traffic spikes?',
+      expectedConcepts: ['cache penetration (Bloom filters)', 'cache avalanche (jittered TTL)', 'mutex locking', 'CDN edge caching'],
+    },
+    {
+      id: 'sd-q6',
+      category: 'Resilience & Load Shedding',
+      text: 'When a distributed system experiences massive traffic spikes, how do you implement graceful degradation, load shedding, and bulkhead isolation to protect core services?',
+      expectedConcepts: ['load shedding', 'graceful degradation', 'bulkhead pattern', 'health check probing', 'rate limiting'],
     },
   ],
 };
 
-export function buildInterviewQuestionPlan(targetRole: string, topics: string[] = []): VoicePlanItem[] {
-  const normalizedRole = targetRole.toLowerCase();
-  let baseQuestions: VoicePlanItem[] = [];
-
-  if (normalizedRole.includes('front') || normalizedRole.includes('react') || normalizedRole.includes('ui') || normalizedRole.includes('web')) {
-    baseQuestions = [...DEFAULT_QUESTIONS.frontend];
-  } else if (normalizedRole.includes('back') || normalizedRole.includes('node') || normalizedRole.includes('python') || normalizedRole.includes('api') || normalizedRole.includes('cloud')) {
-    baseQuestions = [...DEFAULT_QUESTIONS.backend];
-  } else {
-    baseQuestions = [...DEFAULT_QUESTIONS.general];
+export function getRoleDomain(targetRole: string): string {
+  const r = (targetRole || '').toLowerCase();
+  if (
+    r.includes('devops') ||
+    r.includes('cloud') ||
+    r.includes('sre') ||
+    r.includes('platform') ||
+    r.includes('infra') ||
+    r.includes('kubernetes') ||
+    r.includes('terraform') ||
+    r.includes('aws') ||
+    r.includes('azure') ||
+    r.includes('gcp')
+  ) {
+    return 'devops';
   }
+  if (
+    r.includes('data sci') ||
+    r.includes('machine learn') ||
+    r.includes('ai ') ||
+    r.includes('ml ') ||
+    r.includes('ai engineer') ||
+    r.includes('deep learn') ||
+    r.includes('nlp')
+  ) {
+    return 'data_science';
+  }
+  if (
+    r.includes('data eng') ||
+    r.includes('big data') ||
+    r.includes('etl') ||
+    r.includes('spark') ||
+    r.includes('kafka') ||
+    r.includes('warehouse') ||
+    r.includes('analytics eng')
+  ) {
+    return 'data_engineering';
+  }
+  if (
+    r.includes('full stack') ||
+    r.includes('fullstack') ||
+    r.includes('full-stack') ||
+    r.includes('mern') ||
+    r.includes('mean')
+  ) {
+    return 'fullstack';
+  }
+  if (
+    r.includes('mobile') ||
+    r.includes('android') ||
+    r.includes('ios') ||
+    r.includes('swift') ||
+    r.includes('kotlin') ||
+    r.includes('flutter') ||
+    r.includes('react native')
+  ) {
+    return 'mobile';
+  }
+  if (
+    r.includes('security') ||
+    r.includes('cyber') ||
+    r.includes('infosec') ||
+    r.includes('penetration') ||
+    r.includes('soc') ||
+    r.includes('appsec') ||
+    r.includes('vulnerability')
+  ) {
+    return 'cybersecurity';
+  }
+  if (
+    r.includes('qa') ||
+    r.includes('test') ||
+    r.includes('sdet') ||
+    r.includes('quality assurance') ||
+    r.includes('automation engineer')
+  ) {
+    return 'qa';
+  }
+  if (
+    r.includes('front') ||
+    r.includes('react') ||
+    r.includes('vue') ||
+    r.includes('angular') ||
+    r.includes('ui') ||
+    r.includes('ux') ||
+    r.includes('web')
+  ) {
+    return 'frontend';
+  }
+  if (
+    r.includes('back') ||
+    r.includes('node') ||
+    r.includes('python') ||
+    r.includes('django') ||
+    r.includes('fastapi') ||
+    r.includes('flask') ||
+    r.includes('golang') ||
+    r.includes('go developer') ||
+    r.includes('java') ||
+    r.includes('spring') ||
+    r.includes('c#') ||
+    r.includes('.net') ||
+    r.includes('api') ||
+    r.includes('server')
+  ) {
+    return 'backend';
+  }
+  return 'system_design';
+}
 
-  // Look for any matched topic questions in questionBank
+function sampleBalancedQuestions(pool: VoicePlanItem[], count = 5): VoicePlanItem[] {
+  if (pool.length <= count) return [...pool];
+  // Shuffle array using Fisher-Yates with deterministic or randomized seed
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+  return shuffled.slice(0, count);
+}
+
+export function buildInterviewQuestionPlan(targetRole: string, topics: string[] = []): VoicePlanItem[] {
+  const domain = getRoleDomain(targetRole);
+  const domainQuestions = DEFAULT_QUESTIONS[domain] || DEFAULT_QUESTIONS.system_design;
+
+  // Look for matched topic questions in questionBank
   const bankQuestions: VoicePlanItem[] = [];
   topics.forEach((topic) => {
     const technicalGroup = questionBank.technical[topic];
@@ -138,12 +525,13 @@ export function buildInterviewQuestionPlan(targetRole: string, topics: string[] 
   });
 
   if (bankQuestions.length > 0) {
-    // Interleave topic-specific questions
-    const combined = [...bankQuestions.slice(0, 3), ...baseQuestions.slice(1, 4)];
-    return combined.slice(0, 5);
+    // Interleave topic-specific questions with role domain questions
+    const sampledTopic = sampleBalancedQuestions(bankQuestions, Math.min(2, bankQuestions.length));
+    const sampledDomain = sampleBalancedQuestions(domainQuestions, 5 - sampledTopic.length);
+    return [...sampledTopic, ...sampledDomain].slice(0, 5);
   }
 
-  return baseQuestions;
+  return sampleBalancedQuestions(domainQuestions, 5);
 }
 
 export function getConversationalGreeting(role: string): string {
@@ -333,81 +721,110 @@ interface SpeechRecognitionInstance {
 export class BrowserSpeechRecognizer {
   private recognition: SpeechRecognitionInstance | null = null;
   private isListening = false;
+  private isRecognitionActive = false;
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
-  private accumulatedFinalText = '';
+  private onErrorCallback: ((error: string) => void) | null = null;
+  private restartTimeout: number | null = null;
+  private sessionPrefix = '';
+  private currentFullTranscript = '';
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      const windowRef = window as unknown as Record<string, unknown>;
-      const SpeechRecognitionCtor = (windowRef.SpeechRecognition ||
-        windowRef.webkitSpeechRecognition) as { new (): SpeechRecognitionInstance } | undefined;
+    this.initRecognition();
+  }
 
-      if (SpeechRecognitionCtor) {
-        try {
-          this.recognition = new SpeechRecognitionCtor();
-          this.recognition.continuous = true;
-          this.recognition.interimResults = true;
-          this.recognition.lang = 'en-US';
+  private initRecognition(): void {
+    if (typeof window === 'undefined') return;
+    const windowRef = window as unknown as Record<string, unknown>;
+    const SpeechRecognitionCtor = (windowRef.SpeechRecognition ||
+      windowRef.webkitSpeechRecognition) as { new (): SpeechRecognitionInstance } | undefined;
 
-          this.recognition.onresult = (event: SpeechRecognitionResultEvent) => {
-            let interimTranscript = '';
+    if (!SpeechRecognitionCtor) return;
 
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              const piece = event.results[i][0].transcript;
-              if (event.results[i].isFinal) {
-                const trimmed = piece.trim();
-                if (trimmed) {
-                  this.accumulatedFinalText += (this.accumulatedFinalText ? ' ' : '') + trimmed;
-                }
-              } else {
-                interimTranscript += piece;
-              }
-            }
+    try {
+      this.recognition = new SpeechRecognitionCtor();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = true;
+      this.recognition.lang = 'en-US';
 
-            const activeText = (
-              this.accumulatedFinalText + (interimTranscript ? ' ' + interimTranscript.trim() : '')
-            ).trim();
+      this.recognition.onresult = (event: SpeechRecognitionResultEvent) => {
+        let finalChunk = '';
+        let interimChunk = '';
 
-            if (this.onTranscriptCallback && activeText) {
-              this.onTranscriptCallback(activeText, interimTranscript.length === 0);
-            }
-          };
-
-          this.recognition.onerror = (event: { error: string }) => {
-            if (event.error !== 'no-speech' && event.error !== 'aborted') {
-              console.warn('Speech recognition status:', event.error);
-            }
-          };
-
-          this.recognition.onend = () => {
-            if (this.isListening) {
-              // Automatically restart recognition when candidate is still in answering mode
-              try {
-                this.recognition?.start();
-              } catch {
-                // Ignore already-started edge cases
-              }
-            }
-          };
-        } catch (e) {
-          console.warn('SpeechRecognition initialization error:', e);
+        for (let i = 0; i < event.results.length; ++i) {
+          const item = event.results[i];
+          const text = item[0]?.transcript || '';
+          if (item.isFinal) {
+            finalChunk += (finalChunk ? ' ' : '') + text.trim();
+          } else {
+            interimChunk += (interimChunk ? ' ' : '') + text.trim();
+          }
         }
-      }
+
+        // Combine with any previously committed text before a silent restart
+        const fullFinal = (this.sessionPrefix ? this.sessionPrefix + ' ' : '') + finalChunk;
+        const completeText = (fullFinal + (interimChunk ? ' ' + interimChunk : '')).trim();
+
+        this.currentFullTranscript = completeText;
+
+        if (this.onTranscriptCallback && completeText) {
+          this.onTranscriptCallback(completeText, interimChunk.length === 0);
+        }
+      };
+
+      this.recognition.onerror = (event: { error: string }) => {
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          console.warn('Speech recognition notice:', event.error);
+          this.onErrorCallback?.(event.error);
+        }
+        if (event.error === 'network' || event.error === 'no-speech') {
+          this.scheduleRestart(600);
+        }
+      };
+
+      this.recognition.onend = () => {
+        this.isRecognitionActive = false;
+        // Commit what was finalized so when recognition restarts, it builds continuously
+        if (this.currentFullTranscript) {
+          this.sessionPrefix = this.currentFullTranscript;
+        }
+
+        if (this.isListening) {
+          this.scheduleRestart(250);
+        }
+      };
+    } catch (e) {
+      console.warn('SpeechRecognition initialization error:', e);
     }
   }
 
-  public async ensureMicrophonePermission(): Promise<boolean> {
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((t) => t.stop());
-        return true;
-      } catch (e) {
-        console.warn('Microphone permission not granted:', e);
-        return false;
-      }
+  private scheduleRestart(delayMs = 250): void {
+    if (this.restartTimeout !== null && typeof window !== 'undefined') {
+      window.clearTimeout(this.restartTimeout);
     }
-    return false;
+    if (typeof window !== 'undefined') {
+      this.restartTimeout = window.setTimeout(() => {
+        this.restartTimeout = null;
+        if (this.isListening && !this.isRecognitionActive) {
+          this.tryStartNative();
+        }
+      }, delayMs);
+    }
+  }
+
+  private tryStartNative(): boolean {
+    if (!this.recognition) return false;
+    try {
+      this.recognition.start();
+      this.isRecognitionActive = true;
+      return true;
+    } catch (e) {
+      const errStr = String(e);
+      if (errStr.includes('already started')) {
+        this.isRecognitionActive = true;
+        return true;
+      }
+      return false;
+    }
   }
 
   public isSupported(): boolean {
@@ -415,43 +832,50 @@ export class BrowserSpeechRecognizer {
   }
 
   public resetTranscript(seedText = ''): void {
-    this.accumulatedFinalText = seedText.trim();
+    this.sessionPrefix = seedText.trim();
+    this.currentFullTranscript = seedText.trim();
   }
 
   public getAccumulatedText(): string {
-    return this.accumulatedFinalText;
+    return this.currentFullTranscript;
   }
 
-  public async start(onTranscript: (text: string, isFinal: boolean) => void): Promise<boolean> {
+  public start(
+    onTranscript: (text: string, isFinal: boolean) => void,
+    onError?: (error: string) => void
+  ): boolean {
     this.onTranscriptCallback = onTranscript;
+    if (onError) this.onErrorCallback = onError;
     this.isListening = true;
-    if (!this.recognition) return false;
 
-    await this.ensureMicrophonePermission();
-
-    try {
-      this.recognition.start();
-      return true;
-    } catch (e) {
-      const errorMsg = String(e);
-      if (errorMsg.includes('already started')) {
-        return true;
-      }
-      console.warn('SpeechRecognition start notice:', errorMsg);
+    if (!this.recognition) {
+      this.initRecognition();
+    }
+    if (!this.recognition) {
+      onError?.('not-supported');
       return false;
     }
+
+    if (!this.isRecognitionActive) {
+      return this.tryStartNative();
+    }
+    return true;
   }
 
   public stop(): void {
     this.isListening = false;
-    this.onTranscriptCallback = null;
-    if (this.recognition) {
+    if (this.restartTimeout !== null && typeof window !== 'undefined') {
+      window.clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+    if (this.recognition && this.isRecognitionActive) {
       try {
         this.recognition.stop();
       } catch {
         // Safe ignore
       }
     }
+    this.isRecognitionActive = false;
   }
 }
 

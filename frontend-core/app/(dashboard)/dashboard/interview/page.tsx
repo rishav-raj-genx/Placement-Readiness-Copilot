@@ -138,7 +138,8 @@ export default function ConfigureInterviewPage() {
         normalizedTargetRole,
         session.serverUrl,
         session.token,
-        durationMinutes
+        durationMinutes,
+        focusTopics
       );
       router.push(`/dashboard/interview/session/${session.interviewId}`);
     } catch (error) {

@@ -75,6 +75,8 @@ export interface UseLiveKitInterviewReturn {
   compileResultsNow: () => LiveKitResultsPayload;
   startListeningToCandidate: () => void;
   stopListeningToCandidate: () => void;
+  isSpeechRecognitionSupported: boolean;
+  speechRecognitionError: string | null;
 }
 
 function parseEvent(raw: Uint8Array): { event: LiveKitEventName; payload: unknown } | null {
@@ -129,6 +131,8 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   const [results, setResults] = useState<LiveKitResultsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentCandidateAnswer, setCurrentCandidateAnswer] = useState<string>('');
+  const [speechRecognitionError, setSpeechRecognitionError] = useState<string | null>(null);
+  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState<boolean>(true);
 
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -166,18 +170,29 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
 
   const startListeningToCandidate = useCallback(() => {
     if (!sttRef.current) return;
-    sttRef.current.start((text: string, isFinal: boolean) => {
-      setCurrentCandidateAnswer(text);
-      const studentEntry: LiveKitTranscriptEntry = {
-        id: `student_voice_active`,
-        speaker: 'student',
-        text,
-        final: isFinal,
-        timestamp: Date.now(),
-      };
-      addTranscript(studentEntry);
-      optionsRef.current.onTranscript?.(studentEntry);
-    });
+    if (!sttRef.current.isSupported()) {
+      setIsSpeechRecognitionSupported(false);
+      return;
+    }
+    setIsSpeechRecognitionSupported(true);
+    sttRef.current.start(
+      (text: string, isFinal: boolean) => {
+        setCurrentCandidateAnswer(text);
+        setSpeechRecognitionError(null);
+        const studentEntry: LiveKitTranscriptEntry = {
+          id: `student_voice_active`,
+          speaker: 'student',
+          text,
+          final: isFinal,
+          timestamp: Date.now(),
+        };
+        addTranscript(studentEntry);
+        optionsRef.current.onTranscript?.(studentEntry);
+      },
+      (error: string) => {
+        setSpeechRecognitionError(error);
+      }
+    );
   }, [addTranscript]);
 
   const stopListeningToCandidate = useCallback(() => {
@@ -691,5 +706,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     compileResultsNow,
     startListeningToCandidate,
     stopListeningToCandidate,
+    isSpeechRecognitionSupported,
+    speechRecognitionError,
   };
 }
