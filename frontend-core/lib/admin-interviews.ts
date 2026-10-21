@@ -9,6 +9,7 @@ export const ADMIN_INTERVIEW_COLUMNS = [
   'target_role',
   'status',
   'result',
+  'transcript',
   'interview_score',
   'audio_url',
   'completed_at',
@@ -215,7 +216,7 @@ export function normalizeFacultyVivas(
       needsReview: aiConfidence !== null && aiConfidence < LOW_CONFIDENCE_THRESHOLD,
       completedAt: readString(item.completed_at) || readString(item.created_at),
       summary: readString(result.summary),
-      transcript: normalizeTranscript(result.transcript),
+      transcript: normalizeTranscript(result.transcript ?? item.transcript),
       audioUrl: readHttpUrl(item.audio_url) ?? readHttpUrl(result.audio_url),
       rubric: normalizeRubric(result),
       override: overriddenAt ? {

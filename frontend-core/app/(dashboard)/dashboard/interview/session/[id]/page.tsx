@@ -59,6 +59,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
   const [connectionAttempted, setConnectionAttempted] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const finishTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptsRef = useRef<LiveKitTranscriptPayload[]>([]);
 
   const isLiveKitId = id.startsWith('intv_');
 
@@ -67,6 +68,10 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     liveKitStore.updateCurrentQuestion(p);
   }, [liveKitStore]);
   const handleTranscript = useCallback((p: LiveKitTranscriptPayload) => {
+    transcriptsRef.current = [
+      ...transcriptsRef.current.filter((t) => t.id !== p.id),
+      p,
+    ];
     liveKitStore.addTranscript({
       id: p.id || `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       speaker: p.speaker,
@@ -111,10 +116,21 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       localStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
       localStorage.setItem('interview_round1_completed', 'true');
     }
+    const fullTranscript = transcriptsRef.current.length > 0
+      ? transcriptsRef.current
+      : (liveKitStore.currentInterview?.transcripts || []);
     try {
       await supabase
         .from('interview_sessions')
-        .update({ status: 'completed', result: p })
+        .update({
+          status: 'completed',
+          result: {
+            ...p,
+            transcript: fullTranscript,
+          },
+          transcript: fullTranscript,
+          completed_at: new Date().toISOString(),
+        })
         .eq('id', id);
     } catch {
       // Safe fallback
@@ -176,10 +192,19 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     markRound1Completed(user?.id);
     liveKitStore.setResults(resultsPayload);
 
+    const fullTranscript = livekit.transcripts.length > 0 ? livekit.transcripts : liveKitStore.currentInterview?.transcripts || [];
     try {
       await supabase
         .from('interview_sessions')
-        .update({ status: 'completed', result: resultsPayload })
+        .update({
+          status: 'completed',
+          result: {
+            ...resultsPayload,
+            transcript: fullTranscript,
+          },
+          transcript: fullTranscript,
+          completed_at: new Date().toISOString(),
+        })
         .eq('id', id);
     } catch {
       // Safe fallback
@@ -392,20 +417,23 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
               {currentQuestion.text}
             </h2>
 
-            {/* Candidate Response Section */}
+            {/* Candidate Response Section - Strict Voice Only Viva */}
             <div className="space-y-3 pt-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-300">
-                    Your Answer
-                  </label>
+                  <span className="flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-stone-300">
+                    <Mic className="h-3.5 w-3.5 text-[#D93829]" /> Verbal Response (Speech-To-Text Transcribed Live)
+                  </span>
                   {livekit.currentCandidateAnswer && (
                     <button
                       type="button"
-                      onClick={() => livekit.setCurrentCandidateAnswer('')}
-                      className="text-[11px] text-stone-500 hover:text-stone-300 underline"
+                      onClick={() => {
+                        livekit.setCurrentCandidateAnswer('');
+                        toast.info('Voice answer cleared. Speak into your microphone to record your response again.');
+                      }}
+                      className="text-[11px] text-stone-400 hover:text-stone-200 underline"
                     >
-                      Clear
+                      Clear &amp; Re-speak
                     </button>
                   )}
                 </div>
@@ -443,34 +471,66 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                     }`}
                   >
                     <Mic className="mr-1 h-3.5 w-3.5" />
-                    {livekit.isMicrophoneEnabled ? 'Voice Input Active' : 'Click to Speak'}
+                    {livekit.isMicrophoneEnabled ? 'Voice Input Active' : 'Enable Microphone'}
                   </Button>
                 </div>
               </div>
 
-              <textarea
-                value={livekit.currentCandidateAnswer}
-                onChange={(e) => livekit.setCurrentCandidateAnswer(e.target.value)}
-                placeholder="Speak your answer naturally into the microphone, or type here..."
-                rows={4}
-                className="flex w-full rounded-xl border border-stone-800 bg-stone-950/70 p-3.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829] resize-none leading-relaxed"
-              />
+              {/* Strict Voice-Only Transcription Canvas (No Typing) */}
+              <div
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') {
+                    toast.warning('Keyboard typing is disabled for Round 1 Viva. Please speak your answer verbally into the microphone.');
+                  }
+                }}
+                className="relative min-h-[120px] rounded-xl border border-stone-800 bg-stone-950/80 p-4 transition-colors focus:border-[#D93829]/60 focus:outline-none"
+              >
+                <div className="flex items-center justify-between border-b border-stone-800/60 pb-2 mb-2.5">
+                  <Badge variant="outline" className="border-stone-800 bg-stone-900/80 font-mono text-[10px] text-stone-400">
+                    Oral Viva Mode &middot; Voice Transcription Only
+                  </Badge>
+                  <span className="text-[10px] text-stone-500 font-mono">
+                    {livekit.currentCandidateAnswer
+                      ? `${livekit.currentCandidateAnswer.split(/\s+/).filter(Boolean).length} words transcribed`
+                      : 'Waiting for voice input'}
+                  </span>
+                </div>
+
+                {livekit.currentCandidateAnswer ? (
+                  <p className="text-sm font-medium leading-relaxed text-stone-100 font-sans">
+                    {livekit.currentCandidateAnswer}
+                    <span className="inline-block h-4 w-1.5 ml-1 animate-pulse bg-[#D93829] align-middle" />
+                  </p>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center text-stone-500 space-y-2">
+                    <Mic className="h-6 w-6 text-stone-600 animate-pulse" />
+                    <p className="text-xs font-semibold text-stone-300">
+                      Speak your response into the microphone
+                    </p>
+                    <p className="text-[11px] text-stone-500 max-w-sm">
+                      Your answer will be transcribed in real time. Oral viva responses and audio are recorded for faculty review and evaluation.
+                    </p>
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-xs text-stone-500">
-                  Round 1 Technical Viva &middot; Speaks questions aloud via AI voice
+                  Full conversation and audio stream recorded for faculty &amp; admin audit
                 </span>
                 <Button
                   onClick={() => void livekit.submitCandidateAnswer(livekit.currentCandidateAnswer)}
-                  className="bg-[#D93829] hover:bg-[#C22F21] text-white font-semibold text-xs px-5 py-2 rounded-xl shadow-lg"
+                  disabled={!livekit.currentCandidateAnswer.trim()}
+                  className="bg-[#D93829] hover:bg-[#C22F21] text-white font-semibold text-xs px-5 py-2 rounded-xl shadow-lg disabled:opacity-50"
                 >
                   {livekit.hasMoreQuestions ? (
                     <>
-                      Submit & Next Question <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                      Submit Verbal Answer <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                     </>
                   ) : (
                     <>
-                      Submit & Complete Viva <Sparkles className="ml-1.5 h-3.5 w-3.5" />
+                      Submit &amp; Complete Viva <Sparkles className="ml-1.5 h-3.5 w-3.5" />
                     </>
                   )}
                 </Button>
