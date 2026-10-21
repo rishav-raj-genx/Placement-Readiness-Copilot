@@ -18,6 +18,7 @@ import {
   User,
   ShieldCheck,
   ExternalLink,
+  Linkedin,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -30,6 +31,7 @@ import {
   signupAccountSchema,
   type SignupAccountValues,
   validateResumeFile,
+  validatePdf,
 } from '@/lib/onboarding';
 import {
   clearPendingSignup,
@@ -90,6 +92,9 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
   const [resumePath, setResumePath] = useState<string | null>(null);
   const [linkedinFile, setLinkedinFile] = useState<File | null>(null);
   const [linkedinPath, setLinkedinPath] = useState<string | null>(null);
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [linkedinUrlInput, setLinkedinUrlInput] = useState('');
+  const [isAddingLinkedinUrl, setIsAddingLinkedinUrl] = useState(false);
 
   // Chat UI state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -99,6 +104,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const linkedinFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const accountForm = useForm<SignupAccountValues>({
     resolver: zodResolver(signupAccountSchema),
@@ -144,7 +150,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
 
           const { data: profile } = await supabase
             .from('profiles')
-            .select('display_name, target_role, github_username, leetcode_url, linkedin_text, projects, resume_pdf_path, linkedin_pdf_path')
+            .select('display_name, target_role, github_username, leetcode_url, linkedin_text, linkedin_url, projects, resume_pdf_path, linkedin_pdf_path')
             .eq('id', authUser.id)
             .maybeSingle();
 
@@ -156,6 +162,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
             if (profile.github_username) setGithub(profile.github_username);
             if (profile.leetcode_url) setLeetcodeUrl(profile.leetcode_url);
             if (profile.linkedin_text) setLinkedinText(profile.linkedin_text);
+            if (profile.linkedin_url) setLinkedinUrl(profile.linkedin_url);
             if (profile.projects && Array.isArray(profile.projects)) setProjects(profile.projects);
             if (profile.resume_pdf_path) setResumePath(profile.resume_pdf_path);
             if (profile.linkedin_pdf_path) setLinkedinPath(profile.linkedin_pdf_path);
@@ -166,6 +173,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           if (draft.githubUsername) setGithub(draft.githubUsername);
           if (draft.leetcodeUrl) setLeetcodeUrl(draft.leetcodeUrl);
           if (draft.linkedinText) setLinkedinText(draft.linkedinText);
+          if (draft.linkedinUrl) setLinkedinUrl(draft.linkedinUrl);
           if (draft.projects && draft.projects.length > 0) setProjects(draft.projects);
           accountForm.reset({ fullName: draft.displayName, email: draft.email, password: '' });
         }
@@ -196,6 +204,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
     github?: string;
     leetcodeUrl?: string;
     linkedinText?: string;
+    linkedinUrl?: string;
     projects?: ProjectItem[];
     resumePath?: string;
     linkedinPath?: string;
@@ -205,6 +214,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
     const nextGithub = updates.github !== undefined ? updates.github : github;
     const nextLeetcode = updates.leetcodeUrl !== undefined ? updates.leetcodeUrl : leetcodeUrl;
     const nextLinkedinText = updates.linkedinText !== undefined ? updates.linkedinText : linkedinText;
+    const nextLinkedinUrl = updates.linkedinUrl !== undefined ? updates.linkedinUrl : linkedinUrl;
     const nextProjects = updates.projects !== undefined ? updates.projects : projects;
     const nextResumePath = updates.resumePath !== undefined ? updates.resumePath : resumePath;
     const nextLinkedinPath = updates.linkedinPath !== undefined ? updates.linkedinPath : linkedinPath;
@@ -218,6 +228,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       githubUsername: nextGithub,
       leetcodeUrl: nextLeetcode,
       linkedinText: nextLinkedinText,
+      linkedinUrl: nextLinkedinUrl,
       projects: nextProjects,
     };
     savePendingSignupDraft(draft);
@@ -232,6 +243,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           target_role: nextRole || 'Software Engineer',
           github_username: nextGithub ? normalizeGithubUsername(nextGithub) : null,
           leetcode_url: nextLeetcode.trim() || null,
+          linkedin_url: nextLinkedinUrl.trim() || null,
           linkedin_text: nextLinkedinText.trim() || null,
           projects: nextProjects.length > 0 ? nextProjects : null,
           resume_pdf_path: nextResumePath || null,
@@ -290,6 +302,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           target_role: targetRole || 'Software Engineer',
           github_username: github ? normalizeGithubUsername(github) : null,
           leetcode_url: leetcodeUrl.trim() || null,
+          linkedin_url: linkedinUrl.trim() || null,
           linkedin_text: linkedinText.trim() || null,
           projects: projects.length > 0 ? projects : null,
           resume_pdf_path: resumePath || null,
@@ -324,21 +337,6 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       return;
     }
 
-    const userMsgId = Date.now().toString();
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: userMsgId,
-        role: 'user',
-        content: `Uploaded resume: ${file.name} 📄`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        fileAttachment: { name: file.name, type: 'resume' },
-      },
-    ]);
-
-    setResumeFile(file);
-    await savePendingSignupDocuments({ resume: file, linkedin: linkedinFile });
-
     let uploadedPath = resumePath;
     if (isSupabaseConfigured && identity?.id) {
       try {
@@ -353,25 +351,125 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           .from('candidate-documents')
           .upload(path, file, { upsert: true, contentType });
 
-        if (!uploadError) {
-          uploadedPath = path;
-          setResumePath(path);
+        if (uploadError) {
+          toast.error(`Resume upload failed: ${uploadError.message || 'Storage rejected file'}`);
+          return;
         }
-      } catch {
-        // Storage upload fallback
+
+        uploadedPath = path;
+        setResumePath(path);
+      } catch (err: unknown) {
+        toast.error(`Resume upload failed: ${err instanceof Error ? err.message : 'Upload rejected'}`);
+        return;
       }
     }
 
+    setResumeFile(file);
+    await savePendingSignupDocuments({ resume: file, linkedin: linkedinFile });
     await updateProfileInDatabase({ resumePath: uploadedPath ?? undefined });
 
+    const userMsgId = Date.now().toString();
     setMessages((prev) => [
       ...prev,
+      {
+        id: userMsgId,
+        role: 'user',
+        content: `Uploaded resume: ${file.name} 📄`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        fileAttachment: { name: file.name, type: 'resume' },
+      },
       {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `Awesome! I've linked your resume **${file.name}** to your profile ✅.\n\nOur Review Engine will check for 1-page length, ATS friendliness, quantifiable metrics, and tech stack alignment. What role or GitHub profile would you like to link next?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         pillUpdate: 'Resume ✅',
+      },
+    ]);
+  };
+
+  const handleLinkedinFileUpload = async (file: File) => {
+    const error = validatePdf(file);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    let uploadedPath = linkedinPath;
+    if (isSupabaseConfigured && identity?.id) {
+      try {
+        const path = `${identity.id}/linkedin.pdf`;
+        const { error: uploadError } = await supabase.storage
+          .from('candidate-documents')
+          .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+
+        if (uploadError) {
+          toast.error(`LinkedIn upload failed: ${uploadError.message || 'Storage rejected file'}`);
+          return;
+        }
+
+        uploadedPath = path;
+        setLinkedinPath(path);
+      } catch (err: unknown) {
+        toast.error(`LinkedIn upload failed: ${err instanceof Error ? err.message : 'Upload rejected'}`);
+        return;
+      }
+    }
+
+    setLinkedinFile(file);
+    await savePendingSignupDocuments({ resume: resumeFile, linkedin: file });
+    await updateProfileInDatabase({ linkedinPath: uploadedPath ?? undefined });
+
+    toast.success('LinkedIn PDF uploaded successfully');
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `Uploaded LinkedIn profile PDF: ${file.name} 📄`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        fileAttachment: { name: file.name, type: 'linkedin' },
+      },
+      {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Great! Attached your LinkedIn profile PDF **${file.name}** ✅. We will cross-reference your experiences, endorsements, and headline with placement benchmarks.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        pillUpdate: 'LinkedIn ✅',
+      },
+    ]);
+  };
+
+  const handleLinkedinUrlSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanUrl = linkedinUrlInput.trim();
+    if (!cleanUrl) return;
+
+    if (!cleanUrl.includes('linkedin.com/')) {
+      toast.error('Please enter a valid LinkedIn URL (e.g. https://linkedin.com/in/username)');
+      return;
+    }
+
+    setLinkedinUrl(cleanUrl);
+    setLinkedinUrlInput('');
+    setIsAddingLinkedinUrl(false);
+    await updateProfileInDatabase({ linkedinUrl: cleanUrl });
+    toast.success('LinkedIn profile URL saved!');
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `Linked LinkedIn Profile: ${cleanUrl} 🔗`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+      {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Linked your LinkedIn profile URL **${cleanUrl}** ✅. Your career timeline is registered.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        pillUpdate: 'LinkedIn ✅',
       },
     ]);
   };
@@ -412,6 +510,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         github?: string;
         leetcodeUrl?: string;
         linkedinText?: string;
+        linkedinUrl?: string;
         displayName?: string;
         projects?: ProjectItem[];
       } = {};
@@ -436,6 +535,10 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         const textVal = extracted.linkedinText || `LinkedIn: ${extracted.linkedinUrl}`;
         setLinkedinText(textVal);
         updates.linkedinText = textVal;
+        if (extracted.linkedinUrl) {
+          setLinkedinUrl(extracted.linkedinUrl);
+          updates.linkedinUrl = extracted.linkedinUrl;
+        }
       }
       if (extracted.project) {
         const nextList = [...projects, extracted.project];
@@ -640,7 +743,8 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         />
         <StatusPill
           label="LinkedIn"
-          isComplete={Boolean(linkedinFile || linkedinPath || linkedinText)}
+          isComplete={Boolean(linkedinFile || linkedinPath || linkedinUrl || linkedinText)}
+          detail={linkedinUrl ? 'URL Linked' : linkedinFile ? linkedinFile.name : linkedinPath ? 'PDF' : undefined}
         />
         <StatusPill
           label="Coding Profile"
@@ -756,6 +860,72 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           </button>
         ))}
       </div>
+
+      {/* Dedicated LinkedIn PDF / URL Intake Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-800/80 bg-stone-900/50 px-4 py-2">
+        <div className="flex items-center gap-2 text-xs text-stone-300">
+          <Linkedin className="h-4 w-4 text-[#EA580C]" />
+          <span className="font-semibold text-stone-200">LinkedIn:</span>
+          {linkedinUrl ? (
+            <span className="font-mono text-[11px] text-[#EA580C] truncate max-w-[200px]">{linkedinUrl}</span>
+          ) : linkedinFile || linkedinPath ? (
+            <span className="font-mono text-[11px] text-[#EA580C]">PDF Attached</span>
+          ) : (
+            <span className="text-[11px] text-stone-500">Not linked</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {/* Hidden LinkedIn PDF Input */}
+          <input
+            ref={linkedinFileInputRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                void handleLinkedinFileUpload(file);
+                e.target.value = '';
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => linkedinFileInputRef.current?.click()}
+            className="inline-flex items-center gap-1 rounded-lg border border-stone-700 bg-stone-900 px-2.5 py-1 text-[11px] font-medium text-stone-300 hover:border-stone-600 hover:text-stone-100 transition-colors"
+          >
+            <Paperclip className="h-3 w-3 text-[#EA580C]" />
+            <span>Upload PDF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAddingLinkedinUrl((prev) => !prev)}
+            className="inline-flex items-center gap-1 rounded-lg border border-stone-700 bg-stone-900 px-2.5 py-1 text-[11px] font-medium text-stone-300 hover:border-stone-600 hover:text-stone-100 transition-colors"
+          >
+            <Linkedin className="h-3 w-3 text-[#EA580C]" />
+            <span>{isAddingLinkedinUrl ? 'Close URL' : 'Enter URL'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Expandable LinkedIn URL input */}
+      {isAddingLinkedinUrl && (
+        <form onSubmit={handleLinkedinUrlSubmit} className="flex items-center gap-2 border-t border-stone-800 bg-stone-950 px-4 py-2">
+          <input
+            type="url"
+            value={linkedinUrlInput}
+            onChange={(e) => setLinkedinUrlInput(e.target.value)}
+            placeholder="https://linkedin.com/in/your-profile"
+            className="h-8 flex-1 rounded-lg border border-stone-700 bg-stone-900 px-3 text-xs text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded-lg bg-[#D93829] px-3 py-1 text-xs font-semibold text-white hover:bg-[#c03023] transition-colors"
+          >
+            Save URL
+          </button>
+        </form>
+      )}
 
       {/* Chat Input & File Attachment Bar */}
       <div className="border-t border-stone-800 p-4">

@@ -458,5 +458,36 @@ DROP POLICY IF EXISTS "Service role full access application_tracker" ON applicat
 CREATE POLICY "Service role full access application_tracker"
     ON application_tracker FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+-- 3. Storage Bucket Configuration & Policies
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'candidate-documents',
+  'candidate-documents',
+  false,
+  10485760,
+  ARRAY[
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ]::text[]
+)
+ON CONFLICT (id) DO UPDATE
+SET public = false,
+    file_size_limit = 10485760,
+    allowed_mime_types = ARRAY[
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ]::text[];
+
+DROP POLICY IF EXISTS "candidate_documents_insert_own" ON storage.objects;
+CREATE POLICY "candidate_documents_insert_own"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'candidate-documents'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND lower(storage.extension(name)) IN ('pdf', 'docx')
+  );
+
 -- Force PostgREST schema cache reload
 NOTIFY pgrst, 'reload schema';
+

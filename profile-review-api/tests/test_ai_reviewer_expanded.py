@@ -77,6 +77,15 @@ def test_resume_evaluation_checks_coding_links_and_project_impact():
     assert result.has_project_stack_and_impact is True
     assert result.has_clean_visual_layout is True
 
+    # Geometry checks: narrow margins and multi-column flags
+    narrow_res = evaluate_text(resume_text, 1, layout_geometry={"has_narrow_margins": True})
+    assert narrow_res.has_clean_visual_layout is False
+    assert any("margins are too narrow" in fix.lower() for fix in narrow_res.specific_fixes)
+
+    multi_col_res = evaluate_text(resume_text, 1, layout_geometry={"is_multi_column": True})
+    assert multi_col_res.is_ats_friendly is False
+    assert any("multi-column structure detected" in fix.lower() for fix in multi_col_res.specific_fixes)
+
 
 def test_linkedin_evaluation_detects_photo_and_outputs_ready_to_paste_rewrites():
     linkedin_text = (
@@ -112,9 +121,9 @@ def test_resume_without_quantifiable_metrics_is_capped_at_60():
     vague_resume = (
         "ALEX MORGAN\ngithub.com/octocat | leetcode.com/u/octocat\n\n"
         "EXPERIENCE\n"
-        "Helped team build web applications. Made website faster and improved performance.\n\n"
+        "Was responsible of the the backend team. Made website faster and improved performance.\n\n"
         "PROJECTS\n"
-        "Web App - Built with React and Node. Worked on backend endpoints.\n\n"
+        "Web App - Built with Python,React and Node. Worked on backend endpoints.\n\n"
         "EDUCATION\n"
         "BS Computer Science.\n\n"
         "SKILLS\n"
@@ -124,6 +133,13 @@ def test_resume_without_quantifiable_metrics_is_capped_at_60():
     assert result.has_quantifiable_metrics is False
     assert result.score <= 60
     assert any("Score Capped at 60/100" in fix for fix in result.specific_fixes)
+
+    # Comprehensive grammar verification
+    assert result.has_spelling_or_grammar_issues is True
+    issues = " ".join(result.spelling_grammar_issues).lower()
+    assert "responsible of" in issues
+    assert "repeated word" in issues
+    assert "missing space after comma" in issues
 
 
 def test_github_without_tests_ci_or_diagrams_is_capped_at_50():
@@ -175,4 +191,6 @@ def test_linkedin_copy_paste_without_engagement_is_capped_at_70():
     assert review.has_engagement_markers is False
     assert review.score <= 70
     assert any("Score Capped at 70/100" in fix for fix in review.specific_fixes)
+
+
 

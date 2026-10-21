@@ -34,6 +34,7 @@ export interface UserProfile {
   resumePdfPath?: string;
   linkedinPdfPath?: string;
   linkedinText?: string;
+  linkedinUrl?: string;
   leetcodeUrl?: string;
   codingProfileUrl?: string;
   projects: CandidateProject[];

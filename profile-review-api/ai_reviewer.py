@@ -16,10 +16,51 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 
+def extract_docx_data(file_bytes: bytes) -> tuple[str, dict[str, object]]:
+    """Extract text and layout geometry metadata from a DOCX byte payload."""
+    doc = docx.Document(io.BytesIO(file_bytes))
+    paragraphs = [p.text for p in doc.paragraphs if p.text]
+    table_texts: list[str] = []
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [c.text.strip() for c in row.cells if c.text.strip()]
+            if cells:
+                table_texts.append(" | ".join(cells))
+
+    full_text = "\n".join(paragraphs + table_texts)
+    table_count = len(doc.tables)
+    margins: dict[str, float] = {}
+    has_narrow_margins = False
+    if doc.sections:
+        section = doc.sections[0]
+        left_pt = getattr(getattr(section, "left_margin", None), "pt", 72.0)
+        right_pt = getattr(getattr(section, "right_margin", None), "pt", 72.0)
+        top_pt = getattr(getattr(section, "top_margin", None), "pt", 72.0)
+        bottom_pt = getattr(getattr(section, "bottom_margin", None), "pt", 72.0)
+        margins = {
+            "left": round(float(left_pt), 2),
+            "right": round(float(right_pt), 2),
+            "top": round(float(top_pt), 2),
+            "bottom": round(float(bottom_pt), 2),
+        }
+        if float(left_pt) < 18.0 or float(right_pt) < 18.0:
+            has_narrow_margins = True
+
+    layout_geometry: dict[str, object] = {
+        "format": "docx",
+        "table_count": table_count,
+        "has_tables": table_count > 0,
+        "margins": margins,
+        "has_narrow_margins": has_narrow_margins,
+        "is_multi_column": table_count >= 2,
+    }
+    return full_text, layout_geometry
+
+
 def extract_docx_text(file_bytes: bytes) -> str:
     """Extract all text paragraphs from a DOCX byte payload."""
-    doc = docx.Document(io.BytesIO(file_bytes))
-    return "\n".join([para.text for para in doc.paragraphs])
+    text, _ = extract_docx_data(file_bytes)
+    return text
 
 ModelProvider = Literal["groq", "openai", "ollama", "static"]
 
@@ -209,13 +250,85 @@ ACTION_VERBS = {
 }
 
 COMMON_MISSPELLINGS = {
+    "algoritm": "algorithm",
+    "algoritms": "algorithms",
+    "architechture": "architecture",
+    "commited": "committed",
+    "compatability": "compatibility",
+    "databse": "database",
+    "databses": "databases",
+    "dependancy": "dependency",
+    "developement": "development",
+    "enviroment": "environment",
+    "excede": "exceed",
     "experiance": "experience",
+    "implimented": "implemented",
+    "independant": "independent",
+    "infrastucture": "infrastructure",
+    "maintainance": "maintenance",
     "managment": "management",
+    "occured": "occurred",
+    "occurrance": "occurrence",
+    "performence": "performance",
+    "persistant": "persistent",
+    "priviledge": "privilege",
+    "proccess": "process",
     "recieved": "received",
+    "refering": "referring",
+    "reponsible": "responsible",
     "responsibile": "responsible",
+    "seperate": "separate",
+    "succesful": "successful",
     "succesfully": "successfully",
     "teh": "the",
 }
+
+
+def _check_grammar_and_style(text: str) -> list[str]:
+    """Perform comprehensive grammatical, stylistic, and technical typo verification."""
+    issues: list[str] = []
+    normalized = text.lower()
+    words = re.findall(r"[a-zA-Z']+", normalized)
+
+    # 1. Spelling verification against technical and professional vocabulary
+    for misspelling, correction in COMMON_MISSPELLINGS.items():
+        if misspelling in words:
+            issues.append(f"Replace '{misspelling}' with '{correction}'.")
+
+    # 2. Repeated words / stuttering
+    repeated = re.findall(
+        r"\b(the|and|in|with|to|for|is|that|on|at|of|a|an)\s+\1\b", normalized
+    )
+    for rep in sorted(set(repeated)):
+        issues.append(f"Grammar: Repeated word '{rep} {rep}' detected.")
+
+    # 3. Preposition, collocation, and tense issues
+    if re.search(r"\bresponsible\s+of\b", normalized):
+        issues.append("Grammar: Replace 'responsible of' with 'responsible for'.")
+    if re.search(r"\bexperiences\s+in\b", normalized):
+        issues.append("Grammar: Use uncountable 'experience in' rather than 'experiences in'.")
+    if re.search(r"\b(?:did\s+not|to|will)\s+loose\b|\bloose\s+(?:data|users|performance|access|state)\b", normalized):
+        issues.append("Word choice: Replace 'loose' with 'lose'.")
+    if re.search(r"\beffected\s+(?:users|performance|latency|throughput|systems?)\b", normalized):
+        issues.append("Word choice: Use 'affected' (verb) instead of 'effected'.")
+    if re.search(r"\bthere\s+(?:work|code|systems?|projects?|team)\b", normalized):
+        issues.append("Grammar: Check 'there' vs possessive 'their'.")
+
+    # 4. Spacing after commas
+    punctuation_spacing = re.findall(r"\b[a-zA-Z]+,[a-zA-Z]+\b", text)
+    if punctuation_spacing:
+        issues.append(f"Punctuation: Missing space after comma (e.g., '{punctuation_spacing[0]}').")
+
+    # 5. Bullet point capitalization
+    for line in text.splitlines():
+        trimmed = line.strip()
+        if trimmed.startswith(("-", "*", "•")):
+            bullet_body = trimmed.lstrip("-*• ").strip()
+            if bullet_body and bullet_body[0].islower():
+                issues.append(f"Style: Capitalize first word of bullet point: '{bullet_body[:30]}...'")
+                break
+
+    return issues
 
 
 ATS_CORE_KEYWORDS = {
@@ -225,7 +338,9 @@ ATS_CORE_KEYWORDS = {
 }
 
 
-def _static_resume_review(text: str, page_count: int) -> ReviewResult:
+def _static_resume_review(
+    text: str, page_count: int, layout_geometry: Optional[dict[str, object]] = None
+) -> ReviewResult:
     normalized = text.lower()
     words = re.findall(r"[a-zA-Z']+", normalized)
     section_matches = sum(
@@ -263,16 +378,17 @@ def _static_resume_review(text: str, page_count: int) -> ReviewResult:
         normalized
     ))
 
-    # 6. Clean Visual Layout Check
-    has_clean_layout = unusual_character_count == 0 and section_matches >= 2
+    # 6. Clean Visual Layout & Geometry Check
+    has_narrow_margins = bool(layout_geometry.get("has_narrow_margins")) if layout_geometry else False
+    is_multi_column = bool(layout_geometry.get("is_multi_column")) if layout_geometry else False
 
-    # 7. Spelling and Grammar
-    spelling_issues = [
-        f"Replace '{misspelling}' with '{correction}'."
-        for misspelling, correction in COMMON_MISSPELLINGS.items()
-        if misspelling in words
-    ]
-    has_language_issues = bool(spelling_issues)
+    has_clean_layout = unusual_character_count == 0 and section_matches >= 2 and not has_narrow_margins
+    if is_multi_column:
+        is_ats_friendly = False
+
+    # 7. Comprehensive Grammar and Spelling
+    grammar_and_spelling_issues = _check_grammar_and_style(text)
+    has_language_issues = bool(grammar_and_spelling_issues)
 
     fixes: list[str] = [
         "[Heuristic Check] Rule-based evaluation used. Visual layout, columns, tables, and complex grammar verified structurally."
@@ -286,6 +402,10 @@ def _static_resume_review(text: str, page_count: int) -> ReviewResult:
         fixes.append(f"Resume is {page_count} pages instead of 1.")
     if not is_ats_friendly:
         fixes.append("Use standard section headings, selectable text, and a single-column ATS-friendly layout.")
+    if is_multi_column:
+        fixes.append("Layout Geometry: Multi-column structure detected. ATS parsers read horizontally across columns, corrupting experience timelines. Convert to a single-column layout.")
+    if has_narrow_margins:
+        fixes.append("Layout Geometry: Document margins are too narrow (<0.25in / 18pt), risking text clipping and parser rejection. Maintain standard 0.5in–1.0in margins.")
     if not uses_action_verbs:
         fixes.append("Start achievement bullets with strong action verbs and quantify outcomes.")
     if not has_links:
@@ -296,9 +416,9 @@ def _static_resume_review(text: str, page_count: int) -> ReviewResult:
         fixes.append("Deducted points for generic summary. Remove clichés like 'hardworking student' or 'seeking an entry-level role' and replace with a targeted technical skills profile.")
     if not has_ats_keywords:
         fixes.append("Missing core ATS keywords for software engineering. Ensure industry-standard skills (languages, databases, frameworks, CI/CD) are explicitly represented in a Skills section.")
-    if not has_clean_layout:
+    if not has_clean_layout and not has_narrow_margins:
         fixes.append("Improve visual hierarchy with clear section dividers, consistent font sizes, and uncluttered margins.")
-    fixes.extend(spelling_issues)
+    fixes.extend(grammar_and_spelling_issues)
 
     # Balanced score out of 100
     points = 0
@@ -337,13 +457,15 @@ def _static_resume_review(text: str, page_count: int) -> ReviewResult:
         has_clean_visual_layout=has_clean_layout,
         has_quantifiable_metrics=has_metrics,
         has_ats_keywords=has_ats_keywords,
-        spelling_grammar_issues=spelling_issues,
+        spelling_grammar_issues=grammar_and_spelling_issues,
         specific_fixes=fixes,
     )
 
 
-def evaluate_text(text: str, page_count: int) -> ReviewResult:
-    static_review = _static_resume_review(text, page_count)
+def evaluate_text(
+    text: str, page_count: int, layout_geometry: Optional[dict[str, object]] = None
+) -> ReviewResult:
+    static_review = _static_resume_review(text, page_count, layout_geometry=layout_geometry)
     if get_provider_sequence() == ["static"]:
         return static_review
 
@@ -367,7 +489,7 @@ Provide actionable, high-standard recommendations in specific_fixes. Return only
             ),
             (
                 "human",
-                "Verified PDF page_count: {page_count}\n\nExtracted resume text:\n{resume_text}",
+                "Verified PDF page_count: {page_count}\nLayout geometry: {layout_geometry}\n\nExtracted resume text:\n{resume_text}",
             ),
         ]
     )
@@ -376,7 +498,11 @@ Provide actionable, high-standard recommendations in specific_fixes. Return only
         review = _invoke_structured(
             prompt,
             ReviewResult,
-            {"page_count": page_count, "resume_text": text},
+            {
+                "page_count": page_count,
+                "resume_text": text,
+                "layout_geometry": str(layout_geometry or {}),
+            },
         )
     except ReviewBackendError:
         return static_review
@@ -388,6 +514,18 @@ Provide actionable, high-standard recommendations in specific_fixes. Return only
         review.specific_fixes.insert(0, page_fix)
     if not review.is_one_page:
         review.score = min(review.score, 75)
+
+    if layout_geometry:
+        if layout_geometry.get("has_narrow_margins"):
+            review.has_clean_visual_layout = False
+            margin_fix = "Layout Geometry: Document margins are too narrow (<0.25in / 18pt), risking text clipping and parser rejection. Maintain standard 0.5in–1.0in margins."
+            if margin_fix not in review.specific_fixes:
+                review.specific_fixes.append(margin_fix)
+        if layout_geometry.get("is_multi_column"):
+            review.is_ats_friendly = False
+            col_fix = "Layout Geometry: Multi-column structure detected. ATS parsers read horizontally across columns, corrupting experience timelines. Convert to a single-column layout."
+            if col_fix not in review.specific_fixes:
+                review.specific_fixes.append(col_fix)
 
     # Strictly enforce 60/100 cap if bullet points lack quantifiable metrics
     if not review.has_quantifiable_metrics:
@@ -489,6 +627,15 @@ Return only the GithubReview schema.""",
             if repo.get("has_committed_secrets"):
                 has_secrets = True
                 fixes.append(f"CRITICAL: Committed secrets detected in repo '{repo.get('name')}'. Rotate keys and purge from git history immediately.")
+            if repo.get("history_secrets"):
+                has_secrets = True
+                fixes.append(f"CRITICAL: Leaked credentials found in git commit history of '{repo.get('name')}'. Scrub history immediately using git-filter-repo.")
+            if repo.get("has_readme") and not repo.get("has_setup_instructions"):
+                fixes.append(f"README in '{repo.get('name')}' lacks explicit setup/installation instructions (e.g. 'pnpm install', 'docker compose up').")
+            if repo.get("code_readability_comments"):
+                for comment in repo.get("code_readability_comments", []):
+                    if "Clean" not in comment and "inferred" not in comment:
+                        fixes.append(f"Repository '{repo.get('name')}': {comment}")
             repo_scores.append(min(100.0, r_score))
 
         avg_score = round(sum(repo_scores) / len(repo_scores)) if repo_scores else 0

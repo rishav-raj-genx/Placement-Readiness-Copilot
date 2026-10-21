@@ -15,6 +15,7 @@ from ai_reviewer import (
     evaluate_github,
     evaluate_linkedin_text,
     evaluate_text,
+    extract_docx_data,
     extract_docx_text,
     get_backend_status,
 )
@@ -36,6 +37,7 @@ class ExtractedPdf(BaseModel):
     text: str
     page_count: int = Field(ge=1)
     is_truncated: bool = False
+    layout_geometry: dict[str, object] = Field(default_factory=dict)
 
 
 class LeetCodeReview(BaseModel):
@@ -136,8 +138,8 @@ CHUNK_SIZE_BYTES = 64 * 1024
 
 def _parse_pdf_bytes_sync(
     pdf_bytes: bytes, filename: str = "", filetype: str | None = None
-) -> tuple[str, int, bool]:
-    """CPU-bound PDF or DOCX text extraction run inside a thread pool."""
+) -> tuple[str, int, bool, dict[str, object]]:
+    """CPU-bound PDF or DOCX text extraction run inside a thread pool with layout inspection."""
     is_docx = (
         filetype == "docx"
         or filename.lower().endswith(".docx")
@@ -146,7 +148,7 @@ def _parse_pdf_bytes_sync(
 
     if is_docx:
         try:
-            extracted_text = extract_docx_text(pdf_bytes)
+            extracted_text, layout_geometry = extract_docx_data(pdf_bytes)
         except Exception as exc:
             raise HTTPException(status_code=400, detail="The uploaded file is not a valid DOCX document.") from exc
 
@@ -156,7 +158,7 @@ def _parse_pdf_bytes_sync(
             extracted_text = extracted_text[:100_000]
             is_truncated = True
 
-        return extracted_text, page_count, is_truncated
+        return extracted_text, page_count, is_truncated, layout_geometry
 
     try:
         document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
@@ -174,13 +176,76 @@ def _parse_pdf_bytes_sync(
                 status_code=400,
                 detail=f"The uploaded PDF has {document.page_count} pages; maximum allowed is 15 pages.",
             )
-        extracted_text = "\n".join(page.get_text("text") for page in document)
+
+        extracted_text_pages: list[str] = []
+        page_geometries: list[dict[str, object]] = []
+        has_narrow_margins = False
+        is_multi_column = False
+
+        for page in document:
+            page_text = page.get_text("text")
+            extracted_text_pages.append(page_text)
+
+            rect = page.rect
+            blocks = page.get_text("blocks")
+            text_blocks = [b for b in blocks if len(b) >= 5 and str(b[4]).strip()]
+
+            if text_blocks:
+                min_left = min(b[0] for b in text_blocks)
+                min_top = min(b[1] for b in text_blocks)
+                min_right = min(rect.width - b[2] for b in text_blocks)
+                min_bottom = min(rect.height - b[3] for b in text_blocks)
+
+                if min_left < 18 or min_right < 18:
+                    has_narrow_margins = True
+
+                mid_x = rect.width / 2.0
+                left_col_blocks = [b for b in text_blocks if b[2] <= mid_x + 20 and len(str(b[4]).strip()) > 10]
+                right_col_blocks = [b for b in text_blocks if b[0] >= mid_x - 20 and len(str(b[4]).strip()) > 10]
+
+                col_overlap_count = 0
+                for lb in left_col_blocks:
+                    for rb in right_col_blocks:
+                        if max(lb[1], rb[1]) < min(lb[3], rb[3]):
+                            col_overlap_count += 1
+                if col_overlap_count >= 2:
+                    is_multi_column = True
+
+                page_geometries.append({
+                    "width": round(rect.width, 2),
+                    "height": round(rect.height, 2),
+                    "margin_left": round(min_left, 2),
+                    "margin_right": round(min_right, 2),
+                    "margin_top": round(min_top, 2),
+                    "margin_bottom": round(min_bottom, 2),
+                    "block_count": len(text_blocks),
+                })
+            else:
+                page_geometries.append({
+                    "width": round(rect.width, 2),
+                    "height": round(rect.height, 2),
+                    "margin_left": 72.0,
+                    "margin_right": 72.0,
+                    "margin_top": 72.0,
+                    "margin_bottom": 72.0,
+                    "block_count": 0,
+                })
+
+        extracted_text = "\n".join(extracted_text_pages)
         is_truncated = False
         if len(extracted_text) > 100_000:
             extracted_text = extracted_text[:100_000]
             is_truncated = True
 
-        return extracted_text, document.page_count, is_truncated
+        layout_geometry = {
+            "format": "pdf",
+            "page_count": document.page_count,
+            "has_narrow_margins": has_narrow_margins,
+            "is_multi_column": is_multi_column,
+            "pages": page_geometries,
+        }
+
+        return extracted_text, document.page_count, is_truncated, layout_geometry
     finally:
         document.close()
 
@@ -206,7 +271,7 @@ async def extract_pdf_text(file: UploadFile) -> ExtractedPdf:
     filename = (file.filename or "").lower()
     filetype = "docx" if filename.endswith(".docx") else "pdf"
 
-    extracted_text, page_count, is_truncated = await asyncio.to_thread(
+    extracted_text, page_count, is_truncated, layout_geometry = await asyncio.to_thread(
         _parse_pdf_bytes_sync, file_bytes, filename, filetype
     )
 
@@ -214,6 +279,7 @@ async def extract_pdf_text(file: UploadFile) -> ExtractedPdf:
         text=extracted_text,
         page_count=page_count,
         is_truncated=is_truncated,
+        layout_geometry=layout_geometry,
     )
 
 
@@ -232,7 +298,7 @@ async def review_resume(
     _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
 ) -> ReviewResult:
     extracted = await extract_pdf_text(file)
-    return evaluate_text(extracted.text, extracted.page_count)
+    return evaluate_text(extracted.text, extracted.page_count, layout_geometry=extracted.layout_geometry)
 
 
 @app.post("/review/github", response_model=GithubReview)
@@ -284,7 +350,11 @@ async def analyze_profile(
     _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
 ) -> AnalyzeProfileResponse:
     extracted_resume = await extract_pdf_text(resume)
-    resume_review = evaluate_text(extracted_resume.text, extracted_resume.page_count)
+    resume_review = evaluate_text(
+        extracted_resume.text,
+        extracted_resume.page_count,
+        layout_geometry=extracted_resume.layout_geometry,
+    )
 
     # Independent error isolation: GitHub failure does not abort the entire review
     github_review: GithubReview | None = None

@@ -142,6 +142,8 @@ class LiveLinkChecker:
         status_code = None
         screenshot_local_path: Optional[Path] = None
         mobile_friendly = False
+        has_viewport_meta = False
+        has_complex_state = False
         is_blank_page = True
         page_title = ""
         body_text_length = 0
@@ -355,6 +357,10 @@ class LiveLinkChecker:
                     if browser is not None:
                         browser.close()
 
+        except PlaywrightTimeoutError as te:
+            is_live = False
+            status_code = status_code or 504
+            page_errors.append(f"Playwright navigation timed out: {str(te)}")
         except PlaywrightError as pe:
             is_live = False
             page_errors.append(f"Playwright navigation failed: {str(pe)}")

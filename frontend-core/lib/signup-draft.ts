@@ -11,6 +11,7 @@ export interface PendingSignupDraft {
   githubUsername: string;
   leetcodeUrl?: string;
   linkedinText?: string;
+  linkedinUrl?: string;
   projects?: Array<{
     title?: string;
     name?: string;

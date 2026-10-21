@@ -11,8 +11,8 @@ type UnknownRecord = Record<string, unknown>;
 
 export const PROFILE_SELECT_COLUMNS = [
   'id', 'email', 'display_name', 'role', 'created_at', 'target_role', 'target_locations',
-  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path', 'projects',
-  'onboarding_completed_at', 'updated_at',
+  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path', 'linkedin_url',
+  'linkedin_text', 'projects', 'onboarding_completed_at', 'updated_at',
 ].join(',');
 
 export function isRecord(value: unknown): value is UnknownRecord {
@@ -73,6 +73,7 @@ export function normalizeUserProfile(value: unknown): UserProfile | null {
     githubUsername: readString(value.github_username) || undefined,
     resumePdfPath: readString(value.resume_pdf_path) || undefined,
     linkedinPdfPath: readString(value.linkedin_pdf_path) || undefined,
+    linkedinUrl: readString(value.linkedin_url) || undefined,
     linkedinText: readString(value.linkedin_text) || undefined,
     leetcodeUrl: readString(value.leetcode_url) || undefined,
     codingProfileUrl: readString(value.coding_profile_url) || undefined,

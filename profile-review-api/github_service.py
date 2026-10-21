@@ -148,7 +148,7 @@ def _inspect_repository(
 
     has_recent_activity = bool(days_since_push is not None and days_since_push <= 90)
 
-    # 3. Committed Secrets Scanner
+    # 3. Committed Secrets & History-Aware Secret Scanner
     detected_secrets: list[str] = []
     committed_env_files = [f for f in top_level_files if f.lower() in SENSITIVE_FILES or f.lower().startswith(".env.")]
     if committed_env_files:
@@ -158,6 +158,47 @@ def _inspect_repository(
         readme_secret_matches = _scan_text_for_secrets(readme_text)
         for s in readme_secret_matches:
             detected_secrets.append(f"Exposed {s} in README")
+
+    # History-aware secret inspection across recent commits
+    history_secrets: list[str] = []
+    if hasattr(repository, "get_commits"):
+        try:
+            commits = repository.get_commits()
+            commit_list = []
+            for i, c in enumerate(commits):
+                if i >= 10:
+                    break
+                commit_list.append(c)
+
+            for commit in commit_list:
+                msg = getattr(getattr(commit, "commit", None), "message", "") or getattr(commit, "message", "")
+                sha_short = getattr(commit, "sha", "commit")[:7]
+                if re.search(r"(?i)\b(secret|token|api[_-]?key|password|credentials?|\.env)\b", msg):
+                    if re.search(r"(?i)\b(revert|remove|fix|leaked|accidental|deleted?|rotate)\b", msg):
+                        history_secrets.append(
+                            f"Commit '{sha_short}: {msg.strip().splitlines()[0]}' in git history indicates previously committed secrets."
+                        )
+
+                files = getattr(commit, "files", None)
+                if files:
+                    for f in files:
+                        fname = getattr(f, "filename", "")
+                        fname_lower = fname.lower()
+                        if fname_lower in SENSITIVE_FILES or fname_lower.endswith((".env", ".pem", ".key")):
+                            history_secrets.append(f"Sensitive file '{fname}' in commit {sha_short} history.")
+                        patch = getattr(f, "patch", "")
+                        if patch:
+                            additions = "\n".join(
+                                l for l in patch.splitlines() if l.startswith("+") and not l.startswith("+++")
+                            )
+                            patch_secrets = _scan_text_for_secrets(additions)
+                            for ps in patch_secrets:
+                                history_secrets.append(f"Exposed {ps} in commit {sha_short} diff.")
+        except (GithubException, AssertionError, AttributeError, Exception):
+            pass
+
+    if history_secrets:
+        detected_secrets.extend(history_secrets)
 
     has_committed_secrets = len(detected_secrets) > 0
 
@@ -177,7 +218,28 @@ def _inspect_repository(
                 has_architecture_diagram = True
                 break
 
-    # 4. Source-level Code Quality Assessment
+    # Explicit README Setup & Run Instructions Check
+    has_setup_instructions = False
+    setup_commands_found: list[str] = []
+    if readme_text:
+        has_setup_heading = bool(
+            re.search(
+                r"(?im)^#{1,4}\s*(?:setup|installation|getting\s+started|quick\s*start|how\s+to\s+run|running\s+locally|development|prerequisites)",
+                readme_text,
+            )
+        )
+        cmd_matches = re.findall(
+            r"(?i)\b(pnpm\s+(?:install|dev|build|start)|npm\s+(?:install|run\s+dev|start)|yarn\s+(?:install|dev)|pip\s+install|uv\s+pip|poetry\s+install|cargo\s+(?:build|run)|go\s+(?:run|build)|docker-compose\s+up|docker\s+compose\s+up|python\s+main\.py)\b",
+            readme_text,
+        )
+        if cmd_matches:
+            setup_commands_found = list(dict.fromkeys(cmd_matches))
+        has_setup_instructions = has_setup_heading or len(setup_commands_found) > 0
+
+    if has_readme and not has_setup_instructions:
+        inspection_errors.append("README lacks explicit setup or installation instructions (e.g., 'pnpm install', 'docker compose up').")
+
+    # 4. Source-level Code Fetching & Readability Assessment
     has_source_dir = bool(normalized_directories & SOURCE_DIRECTORIES)
     has_manifest = bool(normalized_files & DEPENDENCY_MANIFESTS)
     has_linter = bool(normalized_files & LINTER_CONFIGS)
@@ -186,9 +248,103 @@ def _inspect_repository(
     )
     has_license = any("license" in f.lower() for f in top_level_files)
 
+    code_extensions = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".c", ".cpp"}
+    candidate_paths: list[str] = [
+        f for f in top_level_files if any(f.lower().endswith(ext) for ext in code_extensions)
+    ]
+
+    if len(candidate_paths) < 3 and (normalized_directories & SOURCE_DIRECTORIES):
+        for sdir in sorted(normalized_directories & SOURCE_DIRECTORIES):
+            try:
+                sub_contents = repository.get_contents(sdir)
+                sub_items = sub_contents if isinstance(sub_contents, list) else [sub_contents]
+                for sitem in sub_items:
+                    sname = getattr(sitem, "name", "")
+                    stype = getattr(sitem, "type", "file")
+                    if stype == "file" and any(sname.lower().endswith(ext) for ext in code_extensions):
+                        candidate_paths.append(f"{sdir}/{sname}")
+                    if len(candidate_paths) >= 4:
+                        break
+            except (GithubException, AssertionError, Exception):
+                pass
+            if len(candidate_paths) >= 4:
+                break
+
+    source_files_analyzed: list[dict[str, object]] = []
+    readability_scores: list[float] = []
+    code_readability_comments: list[str] = []
+
+    for cpath in candidate_paths[:4]:
+        try:
+            file_obj = repository.get_contents(cpath)
+            if isinstance(file_obj, list):
+                continue
+            raw_data = getattr(file_obj, "decoded_content", b"")
+            file_text = raw_data.decode("utf-8", errors="replace") if isinstance(raw_data, bytes) else str(raw_data)
+            if not file_text.strip():
+                continue
+
+            lines = file_text.splitlines()
+            loc = len(lines)
+            if loc == 0:
+                continue
+
+            long_lines = sum(1 for l in lines if len(l) > 120)
+            comment_lines = sum(
+                1 for l in lines if l.strip().startswith(("#", "//", "/*", "*", "'''", '"""'))
+            )
+            comment_ratio = comment_lines / loc
+            long_line_ratio = long_lines / loc
+
+            file_readability = 75.0
+            if comment_ratio >= 0.05:
+                file_readability += 15.0
+            elif comment_ratio < 0.02 and loc > 40:
+                file_readability -= 10.0
+
+            if long_line_ratio <= 0.05:
+                file_readability += 10.0
+            elif long_line_ratio > 0.20:
+                file_readability -= 20.0
+
+            if loc > 800:
+                file_readability -= 10.0
+
+            file_readability = max(10.0, min(100.0, file_readability))
+            readability_scores.append(file_readability)
+
+            source_files_analyzed.append({
+                "path": cpath,
+                "lines_of_code": loc,
+                "comment_ratio": round(comment_ratio, 2),
+                "long_lines_count": long_lines,
+                "readability_score": round(file_readability),
+            })
+        except (GithubException, AssertionError, Exception):
+            pass
+
+    avg_readability = (
+        round(sum(readability_scores) / len(readability_scores))
+        if readability_scores
+        else (75 if has_source_dir else 45)
+    )
+
+    if source_files_analyzed:
+        if avg_readability >= 80:
+            code_readability_comments.append("Clean source code readability: consistent formatting, descriptive structure, and adequate inline documentation.")
+        elif avg_readability >= 60:
+            code_readability_comments.append("Moderate code readability: keep line lengths under 120 chars and add function docstrings.")
+        else:
+            code_readability_comments.append("Low code readability: excessive line lengths and lack of code comments/docstrings.")
+    else:
+        if has_source_dir:
+            code_readability_comments.append("Source directory detected; automated readability score inferred from modular project structure.")
+        else:
+            code_readability_comments.append("No source directory detected to evaluate code readability.")
+
     code_quality_score = 0
     if has_source_dir:
-        code_quality_score += 25
+        code_quality_score += 20
     if has_manifest:
         code_quality_score += 20
     if has_tests:
@@ -198,7 +354,10 @@ def _inspect_repository(
     if has_ci:
         code_quality_score += 10
     if has_license:
+        code_quality_score += 5
+    if avg_readability >= 70:
         code_quality_score += 10
+    code_quality_score = min(100, code_quality_score)
 
     return {
         "name": repo_name,
@@ -212,9 +371,15 @@ def _inspect_repository(
         "days_since_push": days_since_push,
         "has_committed_secrets": has_committed_secrets,
         "detected_secrets": detected_secrets,
+        "history_secrets": history_secrets,
         "has_unit_tests": has_tests,
         "has_ci_cd": has_ci,
         "has_architecture_diagram": has_architecture_diagram,
+        "has_setup_instructions": has_setup_instructions,
+        "setup_commands_found": setup_commands_found,
+        "code_readability_score": avg_readability,
+        "code_readability_comments": code_readability_comments,
+        "source_files_analyzed": len(source_files_analyzed),
         "code_quality_score": code_quality_score,
         "has_readme": has_readme,
         "readme_length": readme_length,
@@ -228,6 +393,8 @@ def _inspect_repository(
             "has_ci_workflow": has_ci,
             "has_license": has_license,
             "has_architecture_diagram": has_architecture_diagram,
+            "has_setup_instructions": has_setup_instructions,
+            "code_readability_score": avg_readability,
         },
         "inspection_errors": inspection_errors,
     }
