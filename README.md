@@ -139,7 +139,7 @@ graph TD
     ProfileAPI -.->|Offline / Fallback| OllamaLocal
 
     Automation -->|Headless Mobile Probing| Browser
-    Automation -->|Compliant Fetch (No Scraping)| JobAPIs
+    Automation -->|Compliant Fetch - No Scraping| JobAPIs
 
     NextJS -->|Direct Database Read / RLS| SupabaseDB
     Automation -->|Persist Readiness & Jobs| SupabaseDB
