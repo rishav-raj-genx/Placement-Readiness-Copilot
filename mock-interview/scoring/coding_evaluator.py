@@ -348,48 +348,75 @@ def _analyze_code_statically(problem_id: str, language: str, code: str) -> dict[
     has_hash_struct = False
     has_error_handling = False
 
+    syntax_error_details = ""
     if language == "python":
         import ast
 
-        try:
-            tree = ast.parse(cleaned)
-            has_valid_syntax = True
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if problem_id == "two_sum" and "two_sum" in node.name.lower():
-                        has_target_function = True
-                elif isinstance(node, ast.ClassDef):
-                    if problem_id == "lru_cache" and "lru" in node.name.lower():
-                        has_target_function = True
-                elif isinstance(node, (ast.For, ast.While)):
-                    has_loops = True
-                elif isinstance(node, (ast.Dict, ast.Set)):
-                    has_hash_struct = True
-                elif isinstance(node, ast.Try):
-                    has_error_handling = True
-        except SyntaxError:
+        # Check for cross-language mismatch (e.g. JavaScript written when Python is selected)
+        js_indicators = ["async function", "function ", "const ", "let ", "var ", "console.log", "=== ", " !== "]
+        found_js = [ind for ind in js_indicators if ind in cleaned]
+        if found_js:
             has_valid_syntax = False
+            first_found = found_js[0].strip()
+            syntax_error_details = f"SyntaxError: invalid syntax near '{first_found}'. JavaScript syntax cannot be executed in Python mode. Please switch language to JavaScript or write Python code."
+        else:
+            try:
+                tree = ast.parse(cleaned)
+                has_valid_syntax = True
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        if problem_id == "two_sum" and "two_sum" in node.name.lower():
+                            has_target_function = True
+                        elif problem_id == "fetch_with_retry":
+                            has_target_function = True
+                        elif problem_id == "use_debounce":
+                            has_target_function = True
+                    elif isinstance(node, ast.ClassDef):
+                        if problem_id == "lru_cache" and "lru" in node.name.lower():
+                            has_target_function = True
+                    elif isinstance(node, (ast.For, ast.While)):
+                        has_loops = True
+                    elif isinstance(node, (ast.Dict, ast.Set)):
+                        has_hash_struct = True
+                    elif isinstance(node, ast.Try):
+                        has_error_handling = True
+            except SyntaxError as e:
+                has_valid_syntax = False
+                syntax_error_details = f"SyntaxError: invalid syntax on line {e.lineno}: {e.msg}"
 
     elif language in {"javascript", "typescript"}:
-        # Safe lexical structure analysis without subprocess
-        has_valid_syntax = "{" in cleaned and "}" in cleaned and len(cleaned.splitlines()) >= 2
-        if problem_id == "two_sum":
-            has_target_function = "twoSum" in cleaned or "function" in cleaned or "=>" in cleaned
-            has_hash_struct = "Map" in cleaned or "seen" in cleaned or "{}" in cleaned
-        elif problem_id == "lru_cache":
-            has_target_function = "LRUCache" in cleaned or "class" in cleaned
-            has_hash_struct = "Map" in cleaned or "cache" in cleaned
-        elif problem_id == "use_debounce":
-            has_target_function = "debounce" in cleaned
-            has_error_handling = "clearTimeout" in cleaned
-        elif problem_id == "fetch_with_retry":
-            has_target_function = "fetch" in cleaned
-            has_error_handling = "try" in cleaned or "catch" in cleaned or "status" in cleaned
+        py_indicators = ["def ", "elif ", "import sys", "print(", "__init__"]
+        found_py = [ind for ind in py_indicators if ind in cleaned]
+        if found_py:
+            has_valid_syntax = False
+            first_found = found_py[0].strip()
+            syntax_error_details = f"SyntaxError: invalid syntax near '{first_found}'. Python syntax cannot be executed in JavaScript mode. Please switch language to Python or write JavaScript code."
+        else:
+            open_braces = cleaned.count("{")
+            close_braces = cleaned.count("}")
+            if open_braces != close_braces:
+                has_valid_syntax = False
+                syntax_error_details = f"SyntaxError: Unmatched curly braces (opened {open_braces}, closed {close_braces})."
+            else:
+                has_valid_syntax = len(cleaned.splitlines()) >= 2
+                if problem_id == "two_sum":
+                    has_target_function = "twoSum" in cleaned or "function" in cleaned or "=>" in cleaned
+                    has_hash_struct = "Map" in cleaned or "seen" in cleaned or "{}" in cleaned
+                elif problem_id == "lru_cache":
+                    has_target_function = "LRUCache" in cleaned or "class" in cleaned
+                    has_hash_struct = "Map" in cleaned or "cache" in cleaned
+                elif problem_id == "use_debounce":
+                    has_target_function = "debounce" in cleaned
+                    has_error_handling = "clearTimeout" in cleaned
+                elif problem_id == "fetch_with_retry":
+                    has_target_function = "fetch" in cleaned
+                    has_error_handling = "try" in cleaned or "catch" in cleaned or "status" in cleaned
 
-        has_loops = any(kw in cleaned for kw in ["for ", "for(", "while ", "while(", ".forEach", ".map"])
+                has_loops = any(kw in cleaned for kw in ["for ", "for(", "while ", "while(", ".forEach", ".map"])
 
     return {
         "has_valid_syntax": has_valid_syntax,
+        "syntax_error_details": syntax_error_details,
         "has_target_function": has_target_function,
         "has_loops": has_loops,
         "has_hash_struct": has_hash_struct,
@@ -645,23 +672,31 @@ def evaluate_coding_submission(
         quality_score += 15
     if has_error_handling or total_lines >= 8:
         quality_score += 15
-    if not analysis["has_valid_syntax"] or total_lines < 3:
-        quality_score = min(quality_score, 40)
-        correctness_score = min(correctness_score, 35)
-
-    overall = round(0.60 * correctness_score + 0.40 * quality_score)
-    overall = max(10, min(100, overall))
-
+    if not analysis["has_valid_syntax"]:
+        test_execution_status = "compile_error"
+        passed_tests = 0
+        quality_score = 0
+        correctness_score = 0
+        overall = 0
+        err_msg = analysis.get("syntax_error_details") or "SyntaxError: Code failed compilation."
+        comp_diff = f"[Compile Error] {err_msg}"
+    else:
+        if total_lines < 3:
+            quality_score = min(quality_score, 40)
+            correctness_score = min(correctness_score, 35)
+        overall = round(0.60 * correctness_score + 0.40 * quality_score)
+        overall = max(10, min(100, overall))
 
     strengths = []
-    if correctness_score >= 80:
-        strengths.append(f"Algorithm structure matches {time_comp} time constraints.")
-    if has_hash_map or "Map" in cleaned_code:
-        strengths.append("Leveraged hash-based data structures for fast lookups.")
-    if has_edge_checks:
-        strengths.append("Included defensive guards for input edge cases.")
-    if not strengths:
-        strengths.append("Demonstrated clear algorithm decomposition.")
+    if overall > 0:
+        if correctness_score >= 80:
+            strengths.append(f"Algorithm structure matches {time_comp} time constraints.")
+        if has_hash_map or "Map" in cleaned_code:
+            strengths.append("Leveraged hash-based data structures for fast lookups.")
+        if has_edge_checks:
+            strengths.append("Included defensive guards for input edge cases.")
+        if not strengths:
+            strengths.append("Demonstrated clear algorithm decomposition.")
 
     improvements = []
     if time_comp != problem.optimal_time_complexity:

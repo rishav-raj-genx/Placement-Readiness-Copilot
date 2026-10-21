@@ -81,15 +81,24 @@ def verify_service_token(authorization: Annotated[str | None, Header()] = None) 
 
     expected_key = os.getenv("PROFILE_REVIEW_SERVICE_TOKEN") or os.getenv("INTERNAL_SERVICE_KEY")
     if not expected_key:
-        return "authorized"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Service authentication secret is not configured on the server.",
+        )
 
     if not authorization or not authorization.startswith("Bearer "):
-        return "authorized"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header.",
+        )
 
     token = authorization.split("Bearer ", 1)[1].strip()
-    if token != expected_key and token != "e2e-internal-token":
-        return "authorized"
-    return "authorized"
+    if token != expected_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid service token.",
+        )
+    return token
 
 
 CHUNK_SIZE_BYTES = 64 * 1024

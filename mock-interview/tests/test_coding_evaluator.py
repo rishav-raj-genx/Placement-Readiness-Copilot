@@ -123,6 +123,28 @@ def two_sum(nums, target):
     assert result.overall_score >= 85
 
 
+def test_evaluate_compile_error_on_syntax_mismatch():
+    # JavaScript code submitted under Python mode (as seen in user screenshot)
+    code = """
+async function fetchWithRetry(url, options = {}, maxRetries = 3, backoffMs = 200) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const res = await fetch(url, options);
+            return res;
+        } catch (err) {
+            throw err;
+        }
+    }
+}
+"""
+    result = evaluate_coding_submission("fetch_with_retry", "python", code)
+    assert result.test_execution_status == "compile_error"
+    assert result.overall_score == 0
+    assert result.passed_tests == 0
+    assert "compile error" in result.complexity_comparison.lower()
+
+
+
 def test_round1_gating_and_activation(monkeypatch):
     from scoring.result_store import record_round1_completed
 

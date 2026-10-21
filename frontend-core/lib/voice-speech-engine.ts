@@ -396,6 +396,20 @@ export class BrowserSpeechRecognizer {
     }
   }
 
+  public async ensureMicrophonePermission(): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+        return true;
+      } catch (e) {
+        console.warn('Microphone permission not granted:', e);
+        return false;
+      }
+    }
+    return false;
+  }
+
   public isSupported(): boolean {
     return Boolean(this.recognition);
   }
@@ -408,20 +422,22 @@ export class BrowserSpeechRecognizer {
     return this.accumulatedFinalText;
   }
 
-  public start(onTranscript: (text: string, isFinal: boolean) => void): boolean {
+  public async start(onTranscript: (text: string, isFinal: boolean) => void): Promise<boolean> {
     this.onTranscriptCallback = onTranscript;
     this.isListening = true;
     if (!this.recognition) return false;
+
+    await this.ensureMicrophonePermission();
 
     try {
       this.recognition.start();
       return true;
     } catch (e) {
-      // If already started, do not treat as failure
       const errorMsg = String(e);
       if (errorMsg.includes('already started')) {
         return true;
       }
+      console.warn('SpeechRecognition start notice:', errorMsg);
       return false;
     }
   }

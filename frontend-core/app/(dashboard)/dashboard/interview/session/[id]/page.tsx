@@ -410,28 +410,40 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-stone-400">
-                    {livekit.isInterviewerSpeaking
-                      ? 'AI Interviewer speaking... Please listen'
-                      : livekit.isMicrophoneEnabled
-                      ? 'Microphone active · Transcribing speech live'
-                      : 'Unmute mic or click Dictate'}
-                  </span>
+                  {livekit.isInterviewerSpeaking ? (
+                    <span className="flex items-center gap-1.5 text-xs text-amber-300">
+                      <Volume2 className="h-3.5 w-3.5 animate-pulse" /> AI Interviewer speaking...
+                    </span>
+                  ) : livekit.isMicrophoneEnabled ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-3 py-1 text-xs text-emerald-300">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span>Listening &middot; Speak aloud</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-stone-400">Microphone muted</span>
+                  )}
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={livekit.isMicrophoneEnabled ? 'outline' : 'default'}
                     size="sm"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!livekit.isMicrophoneEnabled) {
-                        void livekit.toggleMicrophone();
+                        await livekit.toggleMicrophone();
                       }
                       livekit.startListeningToCandidate();
-                      toast.info('Microphone listening! Speak your answer clearly.');
+                      toast.info('Microphone active! Speak naturally — your voice is transcribing live.');
                     }}
-                    className="h-7 rounded-lg border-stone-700 bg-stone-900 px-2.5 text-[11px] font-semibold text-stone-200 hover:bg-stone-800"
+                    className={`h-7 rounded-lg px-2.5 text-[11px] font-semibold transition-colors ${
+                      livekit.isMicrophoneEnabled
+                        ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
+                        : 'bg-[#D93829] hover:bg-[#C22F21] text-white'
+                    }`}
                   >
-                    <Mic className="mr-1 h-3.5 w-3.5 text-[#D93829]" />
-                    Live Dictation
+                    <Mic className="mr-1 h-3.5 w-3.5" />
+                    {livekit.isMicrophoneEnabled ? 'Voice Input Active' : 'Click to Speak'}
                   </Button>
                 </div>
               </div>
