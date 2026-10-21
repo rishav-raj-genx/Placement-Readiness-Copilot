@@ -78,13 +78,21 @@ export interface EvaluationResult {
 }
 
 interface TestCaseExecutionResult {
+  id?: string;
+  name?: string;
   passed: boolean;
-  message: string;
+  message?: string;
+  input?: unknown;
   actual?: unknown;
+  expected?: unknown;
+  runtime_ms?: number;
+  error?: string;
 }
 
 interface CompileErrorState {
+  type?: 'Compile Error' | 'Runtime Error' | 'SyntaxError';
   line?: number;
+  column?: number;
   message: string;
   details?: string;
 }
@@ -99,6 +107,7 @@ function validateCodeSyntax(
     return {
       valid: false,
       error: {
+        type: 'SyntaxError',
         message: 'Empty solution provided',
         details: 'Please write your code implementation before running tests or submitting.',
       },
@@ -127,12 +136,28 @@ function validateCodeSyntax(
           return {
             valid: false,
             error: {
+              type: 'SyntaxError',
               line: i + 1,
               message: `SyntaxError: invalid syntax on line ${i + 1}`,
-              details: `${msg}\nOffending code: ${lineText.trim()}`,
+              details: `Line ${i + 1}: ${lineText.trim()}\nSyntaxError: ${msg}`,
             },
           };
         }
+      }
+
+      // Check for missing colon on Python control flow headers
+      const stripped = lineText.trim();
+      const headerMatch = stripped.match(/^(def\s+\w+.*|class\s+\w+.*|if\s+.*|elif\s+.*|else|for\s+.*|while\s+.*|try|except.*|finally|with\s+.*)$/);
+      if (headerMatch && !stripped.endsWith(':') && !stripped.endsWith('\\') && !stripped.endsWith(',')) {
+        return {
+          valid: false,
+          error: {
+            type: 'SyntaxError',
+            line: i + 1,
+            message: `SyntaxError: expected ':' at end of line ${i + 1}`,
+            details: `Line ${i + 1}: ${stripped}\nSyntaxError: expected ':' at end of block header`,
+          },
+        };
       }
     }
   } else {
@@ -151,44 +176,76 @@ function validateCodeSyntax(
           return {
             valid: false,
             error: {
+              type: 'SyntaxError',
               line: i + 1,
               message: `SyntaxError: invalid syntax on line ${i + 1}`,
-              details: `${msg}\nOffending code: ${lineText.trim()}`,
+              details: `Line ${i + 1}: ${lineText.trim()}\nSyntaxError: ${msg}`,
             },
           };
         }
       }
     }
+  }
 
-    // Bracket & Brace balance check
-    let braceCount = 0;
-    let parenCount = 0;
-    for (let i = 0; i < trimmed.length; i++) {
-      const char = trimmed[i];
-      if (char === '{') braceCount++;
-      if (char === '}') braceCount--;
-      if (char === '(') parenCount++;
-      if (char === ')') parenCount--;
-    }
+  // Universal bracket balance check with line numbers across all languages
+  const stack: { char: string; line: number; col: number }[] = [];
+  const openPairs: Record<string, string> = { '(': ')', '{': '}', '[': ']' };
+  const closePairs: Record<string, string> = { ')': '(', '}': '{', ']': '[' };
 
-    if (braceCount !== 0) {
-      return {
-        valid: false,
-        error: {
-          message: 'SyntaxError: Unmatched curly braces',
-          details: `The code contains ${braceCount > 0 ? `${braceCount} unclosed '{'` : `${Math.abs(braceCount)} unexpected '}'`}.`,
-        },
-      };
+  for (let l = 0; l < lines.length; l++) {
+    const lineStr = lines[l];
+    // Strip comments
+    const commentIdx = lang === 'python' ? lineStr.indexOf('#') : lineStr.indexOf('//');
+    const cleanLine = commentIdx >= 0 ? lineStr.slice(0, commentIdx) : lineStr;
+
+    for (let c = 0; c < cleanLine.length; c++) {
+      const ch = cleanLine[c];
+      if (ch === '(' || ch === '{' || ch === '[') {
+        stack.push({ char: ch, line: l + 1, col: c + 1 });
+      } else if (ch === ')' || ch === '}' || ch === ']') {
+        const expectedOpen = closePairs[ch];
+        if (stack.length === 0) {
+          return {
+            valid: false,
+            error: {
+              type: 'SyntaxError',
+              line: l + 1,
+              column: c + 1,
+              message: `SyntaxError: unmatched '${ch}' on line ${l + 1}`,
+              details: `Line ${l + 1}: ${cleanLine.trim()}\nSyntaxError: closing '${ch}' has no matching opening bracket`,
+            },
+          };
+        }
+        const top = stack.pop()!;
+        if (top.char !== expectedOpen) {
+          return {
+            valid: false,
+            error: {
+              type: 'SyntaxError',
+              line: l + 1,
+              column: c + 1,
+              message: `SyntaxError: closing '${ch}' on line ${l + 1} does not match '${top.char}' opened on line ${top.line}`,
+              details: `Line ${l + 1}: ${cleanLine.trim()}\nSyntaxError: mismatched brackets '${top.char}' and '${ch}'`,
+            },
+          };
+        }
+      }
     }
-    if (parenCount !== 0) {
-      return {
-        valid: false,
-        error: {
-          message: 'SyntaxError: Unmatched parentheses',
-          details: `The code contains ${parenCount > 0 ? `${parenCount} unclosed '('` : `${Math.abs(parenCount)} unexpected ')'`}.`,
-        },
-      };
-    }
+  }
+
+  if (stack.length > 0) {
+    const unclosed = stack[stack.length - 1];
+    const offendingLine = lines[unclosed.line - 1] || '';
+    return {
+      valid: false,
+      error: {
+        type: 'SyntaxError',
+        line: unclosed.line,
+        column: unclosed.col,
+        message: `SyntaxError: unclosed '${unclosed.char}' on line ${unclosed.line}`,
+        details: `Line ${unclosed.line}: ${offendingLine.trim()}\nSyntaxError: unmatched opening bracket '${unclosed.char}' was never closed`,
+      },
+    };
   }
 
   return { valid: true };
@@ -319,7 +376,7 @@ export function CodingIDE() {
     }
   };
 
-  // Run Tests with LeetCode-grade compilation error checking
+  // Run Tests with LeetCode-grade real code execution and error diagnostics
   const handleRunTests = async () => {
     if (!activeProblem) return;
     setCompileError(null);
@@ -329,39 +386,56 @@ export function CodingIDE() {
     // Step 1: Pre-flight syntax validation
     const syntaxCheck = validateCodeSyntax(code, language);
     if (!syntaxCheck.valid && syntaxCheck.error) {
-      setTimeout(() => {
-        setCompileError(syntaxCheck.error || null);
-        setTestOutput(null);
-        setIsRunningTests(false);
-        toast.error('Compilation / Syntax Error detected in your code.');
-      }, 400);
+      setCompileError(syntaxCheck.error);
+      setTestOutput(null);
+      setIsRunningTests(false);
+      toast.error(syntaxCheck.error.message);
       return;
     }
 
-    // Step 2: Simulate execution against test cases
-    setTimeout(() => {
-      const testCases = activeProblem.test_cases || [];
-      const results: TestCaseExecutionResult[] = [];
-
-      testCases.forEach((tc, idx) => {
-        const hasSubstantialCode = code.length > 35 && !code.includes('pass') && !code.includes('return []');
-        const passed = hasSubstantialCode;
-        results.push({
-          passed,
-          message: passed ? `Case ${idx + 1} Passed` : `Case ${idx + 1} Failed`,
-          actual: passed ? tc.expected : 'Execution incomplete or unhandled edge case',
-        });
+    // Step 2: Execute real test cases via /api/interview/coding
+    try {
+      const res = await fetch('/api/interview/coding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'run',
+          problem_id: activeProblem.id,
+          language,
+          code,
+        }),
       });
 
-      setTestOutput(results);
-      setIsRunningTests(false);
-      const passedCount = results.filter((r) => r.passed).length;
-      if (passedCount === results.length) {
-        toast.success(`All ${results.length} test cases passed! Click Submit to evaluate.`);
-      } else {
-        toast.warning(`${passedCount}/${results.length} test cases passed.`);
+      const data = await res.json();
+      if (data.status === 'compile_error' || data.status === 'runtime_error') {
+        const errPayload: CompileErrorState = {
+          type: data.status === 'runtime_error' ? 'Runtime Error' : 'Compile Error',
+          line: data.error?.line,
+          column: data.error?.column,
+          message: data.error?.message || 'Code execution error',
+          details: data.error?.details || data.error?.message,
+        };
+        setCompileError(errPayload);
+        setTestOutput(null);
+        toast.error(`${errPayload.type}: ${errPayload.message}`);
+        return;
       }
-    }, 600);
+
+      if (data.status === 'success' && data.test_cases) {
+        setTestOutput(data.test_cases);
+        setCompileError(null);
+        const passedCount = data.test_cases.filter((tc: TestCaseExecutionResult) => tc.passed).length;
+        if (passedCount === data.test_cases.length) {
+          toast.success(`Accepted! All ${passedCount}/${data.test_cases.length} test cases passed.`);
+        } else {
+          toast.warning(`Wrong Answer: ${passedCount}/${data.test_cases.length} test cases passed.`);
+        }
+      }
+    } catch {
+      toast.error('Could not connect to code execution service.');
+    } finally {
+      setIsRunningTests(false);
+    }
   };
 
   // Submit Solution (formerly "Review and compare")
@@ -377,7 +451,7 @@ export function CodingIDE() {
       setCompileError(syntaxCheck.error);
       setIsEvaluating(false);
       setActiveTab('tests');
-      toast.error('Cannot submit code with compilation/syntax errors.');
+      toast.error(syntaxCheck.error.message);
       return;
     }
 
@@ -386,6 +460,7 @@ export function CodingIDE() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'submit',
           problem_id: activeProblem.id,
           language,
           code,
@@ -393,22 +468,26 @@ export function CodingIDE() {
       });
 
       const data = await res.json();
-      if (res.ok && data.result) {
-        if (data.status === 'compile_error') {
-          setCompileError({
-            message: data.result.complexity_comparison || 'Compilation Error',
-            details: data.result.code_quality_feedback,
-          });
-          setActiveTab('tests');
-          toast.error('Code failed compilation.');
-        } else {
-          setEvaluation(data.result);
-          setEvaluatedProblems((prev) => ({
-            ...prev,
-            [activeProblem.id]: data.result,
-          }));
-          toast.success('Code evaluated successfully!');
+      if (data.status === 'compile_error' || data.status === 'runtime_error') {
+        setCompileError({
+          type: data.status === 'runtime_error' ? 'Runtime Error' : 'Compile Error',
+          line: data.error?.line,
+          column: data.error?.column,
+          message: data.error?.message || 'Compilation Error',
+          details: data.error?.details || data.result?.code_quality_feedback,
+        });
+        setActiveTab('tests');
+        toast.error('Code failed execution: ' + (data.error?.message || 'Compile Error'));
+      } else if (data.result) {
+        setEvaluation(data.result);
+        setEvaluatedProblems((prev) => ({
+          ...prev,
+          [activeProblem.id]: data.result,
+        }));
+        if (data.test_cases) {
+          setTestOutput(data.test_cases);
         }
+        toast.success(`Evaluation complete! Score: ${data.result.overall_score}/100`);
       } else {
         toast.error(data.error || 'Code evaluation could not be processed.');
       }
@@ -730,21 +809,30 @@ export function CodingIDE() {
             {/* TAB 2: LeetCode-Grade Interactive Test Cases */}
             {activeTab === 'tests' && activeProblem && (
               <div className="space-y-5">
-                {/* Compile Error Banner (LeetCode Style) */}
+                {/* Compile / Runtime Error Banner (LeetCode Style) */}
                 {compileError && (
-                  <div className="rounded-xl border border-red-800/80 bg-red-950/50 p-4 space-y-2 font-mono text-xs text-red-200 shadow-lg">
-                    <div className="flex items-center gap-2 font-bold text-red-400">
-                      <AlertTriangle className="h-4 w-4 shrink-0" />
-                      <span>Compile Error</span>
+                  <div className="rounded-xl border border-red-800/80 bg-red-950/50 p-4 space-y-2.5 font-mono text-xs text-red-200 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-red-900/60 pb-2">
+                      <div className="flex items-center gap-2 font-bold text-red-400">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                        <span className="text-sm font-semibold tracking-wide">
+                          {compileError.type || 'Compile Error'}
+                        </span>
+                      </div>
+                      {typeof compileError.line === 'number' && (
+                        <Badge variant="outline" className="border-red-800 bg-red-900/50 text-red-300 font-mono text-[11px]">
+                          Line {compileError.line}{typeof compileError.column === 'number' ? `:${compileError.column}` : ''}
+                        </Badge>
+                      )}
                     </div>
                     <p className="font-semibold text-stone-200">{compileError.message}</p>
                     {compileError.details && (
-                      <pre className="whitespace-pre-wrap rounded-lg bg-stone-950/80 p-3 text-[11px] text-red-300 font-mono border border-red-900/40">
+                      <pre className="whitespace-pre-wrap rounded-lg bg-stone-950/90 p-3.5 text-[11px] text-red-300 font-mono border border-red-900/50 overflow-x-auto">
                         {compileError.details}
                       </pre>
                     )}
                     <p className="text-[11px] text-stone-400 font-sans">
-                      Please resolve the syntax mismatch or switch to the corresponding language in the top dropdown before re-running tests.
+                      Fix the syntax or runtime error above and click &quot;Run all tests&quot; to re-evaluate.
                     </p>
                   </div>
                 )}
@@ -806,16 +894,29 @@ export function CodingIDE() {
                         {(activeProblem.test_cases[selectedTestCaseIndex] as Record<string, unknown>).name as string || `Test Case ${selectedTestCaseIndex + 1}`}
                       </span>
                       {testOutput && testOutput[selectedTestCaseIndex] && (
-                        <Badge
-                          variant="outline"
-                          className={
-                            testOutput[selectedTestCaseIndex].passed
-                              ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
-                              : 'border-red-800 bg-red-950/40 text-red-300'
-                          }
-                        >
-                          {testOutput[selectedTestCaseIndex].passed ? 'Accepted' : 'Wrong Answer'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {typeof testOutput[selectedTestCaseIndex].runtime_ms === 'number' && (
+                            <span className="text-[10px] text-stone-400 font-mono">
+                              {testOutput[selectedTestCaseIndex].runtime_ms} ms
+                            </span>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={
+                              testOutput[selectedTestCaseIndex].passed
+                                ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
+                                : testOutput[selectedTestCaseIndex].error
+                                ? 'border-amber-800 bg-amber-950/40 text-amber-300'
+                                : 'border-red-800 bg-red-950/40 text-red-300'
+                            }
+                          >
+                            {testOutput[selectedTestCaseIndex].passed
+                              ? 'Accepted'
+                              : testOutput[selectedTestCaseIndex].error
+                              ? 'Runtime Error'
+                              : 'Wrong Answer'}
+                          </Badge>
+                        </div>
                       )}
                     </div>
 
@@ -854,7 +955,11 @@ export function CodingIDE() {
                             ? 'border-emerald-900/60 bg-emerald-950/30 text-emerald-200'
                             : 'border-red-900/60 bg-red-950/30 text-red-200'
                         }`}>
-                          {JSON.stringify(testOutput[selectedTestCaseIndex].actual, null, 2)}
+                          {testOutput[selectedTestCaseIndex].error ? (
+                            <span className="text-red-400 font-semibold">{testOutput[selectedTestCaseIndex].error}</span>
+                          ) : (
+                            JSON.stringify(testOutput[selectedTestCaseIndex].actual, null, 2)
+                          )}
                         </pre>
                       </div>
                     )}
