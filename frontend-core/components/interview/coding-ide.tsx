@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import {
+  ArrowRight,
   Brain,
   CheckCircle2,
   ChevronRight,
@@ -98,6 +99,16 @@ export function CodingIDE() {
     setFollowUpAnswer('');
     setFollowUpSubmitted(false);
     setActiveTab('problem');
+  };
+
+  const currentProblemIndex = problems.findIndex((p) => p.id === activeProblem?.id);
+  const hasNextProblem = currentProblemIndex >= 0 && currentProblemIndex < problems.length - 1;
+
+  const handleNextProblem = () => {
+    if (hasNextProblem) {
+      handleSelectProblem(problems[currentProblemIndex + 1]);
+      toast.info(`Switched to next problem: ${problems[currentProblemIndex + 1].title}`);
+    }
   };
 
   const handleLanguageChange = (newLang: 'javascript' | 'typescript' | 'python') => {
@@ -539,9 +550,19 @@ export function CodingIDE() {
                       <p className="mt-2 text-xs leading-relaxed text-stone-300">{evaluation.interviewer_follow_up}</p>
 
                       {followUpSubmitted ? (
-                        <div className="mt-3 rounded-lg border border-stone-800 bg-stone-900 p-2.5 text-xs text-stone-300">
-                          <p className="font-semibold text-stone-200">Response recorded:</p>
-                          <p className="mt-1 italic text-stone-400">&quot;{followUpAnswer}&quot;</p>
+                        <div className="mt-3 space-y-3">
+                          <div className="rounded-lg border border-stone-800 bg-stone-900 p-2.5 text-xs text-stone-300">
+                            <p className="font-semibold text-stone-200">Response recorded:</p>
+                            <p className="mt-1 italic text-stone-400">&quot;{followUpAnswer}&quot;</p>
+                          </div>
+                          {hasNextProblem && (
+                            <Button
+                              onClick={handleNextProblem}
+                              className="w-full bg-[#D93829] hover:bg-[#C22F21] text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5 shadow-md"
+                            >
+                              Advance to Next Coding Problem <ArrowRight className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       ) : (
                         <div className="mt-3 space-y-2">

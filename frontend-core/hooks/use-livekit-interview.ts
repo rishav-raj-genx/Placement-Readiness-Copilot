@@ -28,6 +28,9 @@ import {
   BrowserSpeechRecognizer,
   buildInterviewQuestionPlan,
   compileInterviewResults,
+  getConversationalGreeting,
+  getConversationalTransition,
+  getConversationalClosing,
   type VoicePlanItem,
 } from '@/lib/voice-speech-engine';
 import { markRound1Completed } from '@/lib/round-status';
@@ -69,6 +72,9 @@ export interface UseLiveKitInterviewReturn {
   submitCandidateAnswer: (answerText?: string) => Promise<void>;
   repeatCurrentQuestion: () => void;
   setCurrentCandidateAnswer: (text: string) => void;
+  compileResultsNow: () => LiveKitResultsPayload;
+  startListeningToCandidate: () => void;
+  stopListeningToCandidate: () => void;
 }
 
 function parseEvent(raw: Uint8Array): { event: LiveKitEventName; payload: unknown } | null {
@@ -141,37 +147,38 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     };
   }, []);
 
+  const transcriptsRef = useRef<LiveKitTranscriptEntry[]>([]);
+
   const addTranscript = useCallback((entry: LiveKitTranscriptEntry) => {
     setTranscripts((prev) => {
       const existingIndex = prev.findIndex((item) => item.id === entry.id);
-      if (existingIndex === -1) return [...prev, entry];
-
-      const updated = [...prev];
-      updated[existingIndex] = entry;
+      let updated: LiveKitTranscriptEntry[];
+      if (existingIndex === -1) {
+        updated = [...prev, entry];
+      } else {
+        updated = [...prev];
+        updated[existingIndex] = entry;
+      }
+      transcriptsRef.current = updated;
       return updated;
     });
   }, []);
 
   const startListeningToCandidate = useCallback(() => {
-    if (!sttRef.current || !isMicrophoneEnabled) return;
+    if (!sttRef.current) return;
     sttRef.current.start((text: string, isFinal: boolean) => {
       setCurrentCandidateAnswer(text);
-      addTranscript({
+      const studentEntry: LiveKitTranscriptEntry = {
         id: `student_voice_active`,
         speaker: 'student',
         text,
         final: isFinal,
         timestamp: Date.now(),
-      });
-      optionsRef.current.onTranscript?.({
-        id: `student_voice_active`,
-        speaker: 'student',
-        text,
-        final: isFinal,
-        timestamp: Date.now(),
-      });
+      };
+      addTranscript(studentEntry);
+      optionsRef.current.onTranscript?.(studentEntry);
     });
-  }, [addTranscript, isMicrophoneEnabled]);
+  }, [addTranscript]);
 
   const stopListeningToCandidate = useCallback(() => {
     sttRef.current?.stop();
@@ -221,6 +228,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
       const qItem = plan[index];
       currentPlanIndexRef.current = index;
       setCurrentCandidateAnswer('');
+      sttRef.current?.resetTranscript('');
 
       const questionPayload: LiveKitQuestionPayload = {
         questionId: qItem.id,
@@ -240,7 +248,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
         timestamp: Date.now(),
       });
 
-      // Voice prompt to candidate
+      // Warm, natural conversational voice prompt
       const spokenPrompt = `Question ${index + 1} of ${plan.length}. ${qItem.text}`;
       speakInterviewerAudio(spokenPrompt);
     },
@@ -258,7 +266,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     questionPlanRef.current = plan;
     currentPlanIndexRef.current = 0;
 
-    const greetingText = `Welcome to your mock interview for ${targetRole}. I will be your interviewer today. Let's begin with your theoretical and architectural viva.`;
+    const greetingText = getConversationalGreeting(targetRole);
     setCurrentGreeting(greetingText);
     optionsRef.current.onGreeting?.({ message: greetingText });
 
@@ -271,7 +279,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     });
 
     speakInterviewerAudio(greetingText, () => {
-      // After speaking the greeting, immediately ask Question 1
+      // After speaking the greeting, immediately and smoothly ask Question 1
       presentQuestionIndex(0);
     });
   }, [addTranscript, currentQuestion, presentQuestionIndex, speakInterviewerAudio]);
@@ -579,31 +587,39 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
       }
 
       setCurrentCandidateAnswer('');
+      sttRef.current?.resetTranscript('');
 
       const plan = questionPlanRef.current;
       const nextIndex = currentPlanIndexRef.current + 1;
 
       if (nextIndex < plan.length) {
-        // Acknowledge and transition to next question with voice
-        const transitionPhrase = 'Thank you for your explanation. Moving to the next question.';
+        // Acknowledge and transition to next question with warm conversational voice
+        const transitionPhrase = getConversationalTransition(nextIndex, plan.length);
         speakInterviewerAudio(transitionPhrase, () => {
           presentQuestionIndex(nextIndex);
         });
       } else {
-        // Viva completed! Speak final message and compile results
-        const closingPhrase =
-          'Thank you. That concludes the technical viva. I am now analyzing your responses and compiling your evaluation.';
+        // Viva completed! Speak final message and compile results immediately
+        const closingPhrase = getConversationalClosing();
         speakInterviewerAudio(closingPhrase, () => {
           const targetRole = optionsRef.current.targetRole || 'Software Engineer';
-          const compiled = compileInterviewResults(targetRole, transcripts);
+          const compiled = compileInterviewResults(targetRole, transcriptsRef.current);
           setResults(compiled);
           markRound1Completed(optionsRef.current.userId);
           optionsRef.current.onResults?.(compiled);
         });
       }
     },
-    [addTranscript, currentCandidateAnswer, presentQuestionIndex, speakInterviewerAudio, stopListeningToCandidate, transcripts]
+    [addTranscript, currentCandidateAnswer, presentQuestionIndex, speakInterviewerAudio, stopListeningToCandidate]
   );
+
+  const compileResultsNow = useCallback(() => {
+    const targetRole = optionsRef.current.targetRole || 'Software Engineer';
+    const compiled = compileInterviewResults(targetRole, transcriptsRef.current);
+    setResults(compiled);
+    markRound1Completed(optionsRef.current.userId);
+    return compiled;
+  }, []);
 
   const repeatCurrentQuestion = useCallback(() => {
     if (!currentQuestion) return;
@@ -672,5 +688,8 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     submitCandidateAnswer,
     repeatCurrentQuestion,
     setCurrentCandidateAnswer,
+    compileResultsNow,
+    startListeningToCandidate,
+    stopListeningToCandidate,
   };
 }

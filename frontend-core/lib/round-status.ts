@@ -6,6 +6,7 @@ const ROUND1_GLOBAL_KEY = 'round1_completed_global';
 export function isLocalRound1Completed(userId?: string): boolean {
   if (typeof window === 'undefined') return false;
   if (window.localStorage.getItem(ROUND1_GLOBAL_KEY) === 'true') return true;
+  if (window.localStorage.getItem('interview_round1_completed') === 'true') return true;
   if (userId && window.localStorage.getItem(`${ROUND1_KEY_PREFIX}${userId}`) === 'true') return true;
   return false;
 }
@@ -14,6 +15,7 @@ export function markRound1Completed(userId?: string): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(ROUND1_GLOBAL_KEY, 'true');
+    window.localStorage.setItem('interview_round1_completed', 'true');
     if (userId) {
       window.localStorage.setItem(`${ROUND1_KEY_PREFIX}${userId}`, 'true');
     }

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  ArrowRight,
+  Code2,
   CheckCircle2,
   TrendingUp,
   Target,
@@ -24,6 +26,7 @@ import { useInterviewStore } from '@/stores/interview-store';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { supabase } from '@/lib/supabase-client';
+import { compileInterviewResults } from '@/lib/voice-speech-engine';
 import {
   RadarChart,
   Radar,
@@ -55,51 +58,87 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const isLiveKitId = id.startsWith('intv_');
   const session = getSession(id);
 
-  // Load LiveKit results from the store or from the database (with auto-polling)
+  // Load LiveKit results from the store, session/local storage, database, or instant synthesis
   useEffect(() => {
     if (!isLiveKitId) return;
 
-    // First check the store
+    // 1. Check current livekit store
     const stored = liveKitStore.currentInterview;
     if (stored && stored.results) {
       setLiveKitResults(stored.results);
       return;
     }
 
-    // Otherwise load from the database
-    if (!user) return;
+    // 2. Check session / local storage directly
+    if (typeof window !== 'undefined') {
+      const fromSession = sessionStorage.getItem(`interview_result_${id}`);
+      if (fromSession) {
+        try {
+          const parsed = JSON.parse(fromSession) as LiveKitResultsPayload;
+          setLiveKitResults(normalizeInterviewResult(parsed));
+          return;
+        } catch {
+          // ignore parse error
+        }
+      }
+      const fromLocal = localStorage.getItem(`interview_result_${id}`);
+      if (fromLocal) {
+        try {
+          const parsed = JSON.parse(fromLocal) as LiveKitResultsPayload;
+          setLiveKitResults(normalizeInterviewResult(parsed));
+          return;
+        } catch {
+          // ignore parse error
+        }
+      }
+    }
+
+    // 3. Query the database with short retry
     setLiveKitLoading(true);
 
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 3;
     let intervalId: NodeJS.Timeout | null = null;
 
     const fetchResult = async () => {
-      const { data } = await supabase
-        .from('interview_sessions')
-        .select('result, target_role, completed_at')
-        .eq('id', id)
-        .maybeSingle();
+      try {
+        const { data } = await supabase
+          .from('interview_sessions')
+          .select('result, target_role, completed_at')
+          .eq('id', id)
+          .maybeSingle();
 
-      if (data?.result) {
-        setLiveKitResults(normalizeInterviewResult(data.result));
-        setLiveKitLoading(false);
-        return true;
+        if (data?.result) {
+          setLiveKitResults(normalizeInterviewResult(data.result));
+          setLiveKitLoading(false);
+          return true;
+        }
+      } catch {
+        // Safe ignore
       }
       return false;
     };
 
     fetchResult().then((found) => {
       if (found) return;
-      // Poll every 2 seconds if result is still compiling
+
       intervalId = setInterval(async () => {
         attempts++;
         const gotIt = await fetchResult();
         if (gotIt || attempts >= maxAttempts) {
           if (intervalId) clearInterval(intervalId);
+          if (!gotIt) {
+            // Immediate guaranteed fallback synthesis so the user is never stuck
+            const role = stored?.targetRole || 'Software Engineer';
+            const synthesized = compileInterviewResults(role, stored?.transcripts || []);
+            setLiveKitResults(synthesized);
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(synthesized));
+            }
+          }
           setLiveKitLoading(false);
         }
-      }, 2000);
+      }, 1000);
     });
 
     return () => {
@@ -460,6 +499,35 @@ function LiveKitResultsView({
         </div>
       </div>
 
+      {/* Round 2 Coding Challenge Unlocked Banner */}
+      <Card className="rounded-2xl border-2 border-[#D93829]/60 bg-gradient-to-r from-[#28201E] via-[#331c19] to-[#28201E] shadow-xl shadow-red-950/20">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-[#D93829] text-white font-mono text-[10px] px-2.5 py-0.5">
+                  ROUND 1 COMPLETED
+                </Badge>
+                <span className="font-mono text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Round 2 IDE Unlocked
+                </span>
+              </div>
+              <h2 className="text-xl font-bold text-stone-100">
+                Proceed to Round 2: Live Coding Challenge &amp; IDE Evaluation
+              </h2>
+              <p className="text-xs text-stone-300 max-w-xl leading-relaxed">
+                Test your practical implementation skills in the interactive Monaco IDE. Write code, execute live test cases, and receive real-time AI code review with algorithmic complexity benchmarks.
+              </p>
+            </div>
+            <Link href="/dashboard/interview/coding">
+              <Button className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 shrink-0">
+                <Code2 className="h-4 w-4" /> Start Round 2 Coding IDE <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Overall Score */}
       <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
         <CardContent className="p-6 md:p-8">
@@ -617,10 +685,16 @@ function LiveKitResultsView({
               View history
             </Button>
           </Link>
-          <Link href="/dashboard/interview">
+          <Link href="/dashboard/interview/coding">
             <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]">
+              <Code2 className="mr-1.5 h-4 w-4" />
+              Proceed to Round 2 IDE
+            </Button>
+          </Link>
+          <Link href="/dashboard/interview">
+            <Button variant="outline" className="rounded-lg border-stone-800 bg-stone-900 text-xs text-stone-200 hover:bg-stone-800">
               <RotateCcw className="mr-1.5 h-4 w-4" />
-              Try another interview
+              New Viva
             </Button>
           </Link>
         </div>

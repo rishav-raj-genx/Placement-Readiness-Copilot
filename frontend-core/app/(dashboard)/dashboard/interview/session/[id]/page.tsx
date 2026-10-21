@@ -106,6 +106,11 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     }
     await finalizeRecording();
     markRound1Completed(user?.id);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
+      localStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
+      localStorage.setItem('interview_round1_completed', 'true');
+    }
     try {
       await supabase
         .from('interview_sessions')
@@ -155,41 +160,35 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     if (isFinishing) return;
     setIsFinishing(true);
 
-    // 1. Send interview:finish event to worker via data channel
     livekit.sendFinishMessage();
     void finalizeRecording();
-    toast.info('Finishing interview... Waiting for AI evaluation results.');
+    toast.info('Finishing interview and compiling results...');
 
-    // 2. Set bounded timeout (15s) to wait for interview:results
-    finishTimeoutRef.current = setTimeout(async () => {
-      finishTimeoutRef.current = null;
-      await finalizeRecording();
-      // If data event did not arrive in 15s, check database directly
-      try {
-        const { data, error: resultError } = await supabase
-          .from('interview_sessions')
-          .select('result, status')
-          .eq('id', id)
-          .maybeSingle();
-        if (resultError) throw resultError;
+    // Compile results immediately from whatever answers/transcripts exist
+    const resultsPayload = livekit.results || livekit.compileResultsNow();
 
-        if (data?.result) {
-          liveKitStore.setResults(normalizeInterviewResult(data.result));
-          await livekit.disconnect();
-          toast.success('Results loaded from database!');
-          router.push(`/dashboard/interview/results/${id}`);
-          return;
-        }
-      } catch {
-        toast.error('Could not verify the interview result yet. Retrying on the results screen.');
-      }
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
+      localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
+      localStorage.setItem('interview_round1_completed', 'true');
+    }
 
-      // If not yet in DB, disconnect safely and route to results page (where polling continues)
-      await livekit.disconnect();
-      toast.info('Scoring is being finalized. Redirecting to results screen...');
-      router.push(`/dashboard/interview/results/${id}`);
-    }, 15000);
-  }, [finalizeRecording, isFinishing, livekit, id, liveKitStore, router]);
+    markRound1Completed(user?.id);
+    liveKitStore.setResults(resultsPayload);
+
+    try {
+      await supabase
+        .from('interview_sessions')
+        .update({ status: 'completed', result: resultsPayload })
+        .eq('id', id);
+    } catch {
+      // Safe fallback
+    }
+
+    await livekit.disconnect().catch(() => undefined);
+    toast.success('Results generated! Redirecting to evaluation...');
+    router.push(`/dashboard/interview/results/${id}`);
+  }, [finalizeRecording, isFinishing, livekit, id, liveKitStore, router, user?.id]);
 
   // Connect to LiveKit room using the session data stored by the configure page
   useEffect(() => {
@@ -395,17 +394,46 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
 
             {/* Candidate Response Section */}
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                  Your Answer
-                </label>
-                <span className="text-xs text-stone-400">
-                  {livekit.isInterviewerSpeaking
-                    ? 'AI Interviewer speaking... Please listen'
-                    : livekit.isMicrophoneEnabled
-                    ? 'Microphone active · Transcribing speech live'
-                    : 'Unmute mic or type response below'}
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-stone-300">
+                    Your Answer
+                  </label>
+                  {livekit.currentCandidateAnswer && (
+                    <button
+                      type="button"
+                      onClick={() => livekit.setCurrentCandidateAnswer('')}
+                      className="text-[11px] text-stone-500 hover:text-stone-300 underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-stone-400">
+                    {livekit.isInterviewerSpeaking
+                      ? 'AI Interviewer speaking... Please listen'
+                      : livekit.isMicrophoneEnabled
+                      ? 'Microphone active · Transcribing speech live'
+                      : 'Unmute mic or click Dictate'}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!livekit.isMicrophoneEnabled) {
+                        void livekit.toggleMicrophone();
+                      }
+                      livekit.startListeningToCandidate();
+                      toast.info('Microphone listening! Speak your answer clearly.');
+                    }}
+                    className="h-7 rounded-lg border-stone-700 bg-stone-900 px-2.5 text-[11px] font-semibold text-stone-200 hover:bg-stone-800"
+                  >
+                    <Mic className="mr-1 h-3.5 w-3.5 text-[#D93829]" />
+                    Live Dictation
+                  </Button>
+                </div>
               </div>
 
               <textarea
@@ -413,7 +441,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                 onChange={(e) => livekit.setCurrentCandidateAnswer(e.target.value)}
                 placeholder="Speak your answer naturally into the microphone, or type here..."
                 rows={4}
-                className="flex w-full rounded-xl border border-stone-800 bg-stone-950/70 p-3.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829] resize-none"
+                className="flex w-full rounded-xl border border-stone-800 bg-stone-950/70 p-3.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829] resize-none leading-relaxed"
               />
 
               <div className="flex items-center justify-between pt-2">

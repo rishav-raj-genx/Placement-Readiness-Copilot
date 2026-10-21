@@ -60,11 +60,11 @@ interface LiveKitInterviewState {
 }
 
 function persistState(record: LiveKitInterviewRecord | null) {
-  if (!record || record.status === 'completed' || record.status === 'abandoned') {
+  if (!record || record.status === 'abandoned') {
     saveToStorage('livekit-current-interview', null);
     return;
   }
-  // Issue 6: Never persist LiveKit access tokens in localStorage; minimize transcript retention
+  // Never persist LiveKit access tokens in localStorage; minimize transcript retention
   const { token: _token, ...safeRecord } = record;
   saveToStorage('livekit-current-interview', {
     ...safeRecord,
@@ -157,15 +157,32 @@ export const useLiveKitInterviewStore = create<LiveKitInterviewState>((set, get)
 
   setResults: (results: LiveKitResultsPayload) => {
     const current = get().currentInterview;
-    if (!current) return;
-    const updated = {
-      ...current,
+    const fallbackRecord: LiveKitInterviewRecord = {
+      interviewId: '',
+      roomName: '',
+      targetRole: 'Software Engineer',
+      durationMinutes: 15,
+      serverUrl: '',
+      token: '',
+      status: 'completed',
+      currentQuestion: null,
+      transcripts: [],
+      results,
+      startedAt: null,
+      completedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    const updated: LiveKitInterviewRecord = {
+      ...(current || fallbackRecord),
       token: '', // clear token from memory
       results,
       status: 'completed' as const,
       completedAt: new Date().toISOString(),
     };
-    persistState(null); // Clear from browser storage upon completion
+    persistState(updated);
+    if (updated.interviewId) {
+      saveToStorage(`interview_result_${updated.interviewId}`, results);
+    }
     set({ currentInterview: updated });
   },
 

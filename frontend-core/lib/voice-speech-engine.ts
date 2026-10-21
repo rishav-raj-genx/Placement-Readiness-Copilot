@@ -146,10 +146,39 @@ export function buildInterviewQuestionPlan(targetRole: string, topics: string[] 
   return baseQuestions;
 }
 
+export function getConversationalGreeting(role: string): string {
+  return `Hello and welcome! I will be your technical interviewer for the ${role} position today. We are beginning Round 1: our technical and architectural viva. Feel free to speak naturally and explain your thought process as you would in a real senior engineering interview. Let's start with our first question.`;
+}
+
+export function getConversationalTransition(nextIndex: number, totalQuestions: number): string {
+  const transitions = [
+    'Thank you for that thoughtful explanation. Let us move to our next topic.',
+    'Great points. That gives me good context on your thought process. Here is the next scenario.',
+    'Very well explained. Building on those fundamentals, let us explore an architectural question.',
+    'Excellent breakdown. That brings us to our final viva question for Round 1.',
+  ];
+  const idx = Math.min(nextIndex - 1, transitions.length - 1);
+  return transitions[Math.max(0, idx)] || `Thank you. Moving to question ${nextIndex + 1} of ${totalQuestions}.`;
+}
+
+export function getConversationalClosing(): string {
+  return 'Fantastic job! That concludes all questions for our Round 1 technical viva. I am now synthesizing your answers across technical depth, architectural trade-offs, and communication clarity to generate your comprehensive evaluation and unlock Round 2.';
+}
+
 export class BrowserSpeechSynthesizer {
   private levelInterval: number | null = null;
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private isMuted = false;
+  private cachedVoices: SpeechSynthesisVoice[] = [];
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      this.cachedVoices = window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        this.cachedVoices = window.speechSynthesis.getVoices();
+      };
+    }
+  }
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
@@ -192,20 +221,27 @@ export class BrowserSpeechSynthesizer {
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
+      // Human, natural conversational rate and pitch
+      utterance.rate = 0.96;
+      utterance.pitch = 1.02;
 
-      // Select natural English voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(
-        (v) =>
-          v.lang.startsWith('en') &&
-          (v.name.includes('Samantha') ||
-            v.name.includes('Daniel') ||
-            v.name.includes('Google US English') ||
-            v.name.includes('Natural') ||
-            v.name.includes('Alex'))
-      ) || voices.find((v) => v.lang.startsWith('en'));
+      // Select most natural English voice available
+      const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
+      const preferredVoice =
+        voices.find(
+          (v) =>
+            v.lang.startsWith('en') &&
+            (v.name.includes('Google US English') ||
+              v.name.includes('Samantha') ||
+              v.name.includes('Karen') ||
+              v.name.includes('Victoria') ||
+              v.name.includes('Daniel') ||
+              v.name.includes('Serena') ||
+              v.name.includes('Natural') ||
+              v.name.includes('Alex'))
+        ) ||
+        voices.find((v) => v.lang.startsWith('en') && !v.name.includes('Compact')) ||
+        voices.find((v) => v.lang.startsWith('en'));
 
       if (preferredVoice) {
         utterance.voice = preferredVoice;
@@ -235,7 +271,7 @@ export class BrowserSpeechSynthesizer {
 
       this.currentUtterance = utterance;
 
-      // Handle Chrome resume bug
+      // Handle Chrome resume quirk
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
@@ -253,8 +289,8 @@ export class BrowserSpeechSynthesizer {
     if (!callback) return;
 
     this.levelInterval = window.setInterval(() => {
-      // Generate dynamic conversational audio waves
-      const randomWave = 0.35 + Math.random() * 0.45;
+      // Dynamic conversational audio rhythm wave
+      const randomWave = 0.35 + Math.random() * 0.55;
       callback(Number(randomWave.toFixed(2)));
     }, 100);
   }
@@ -291,12 +327,14 @@ interface SpeechRecognitionInstance {
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
+  abort: () => void;
 }
 
 export class BrowserSpeechRecognizer {
   private recognition: SpeechRecognitionInstance | null = null;
   private isListening = false;
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
+  private accumulatedFinalText = '';
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -313,36 +351,41 @@ export class BrowserSpeechRecognizer {
 
           this.recognition.onresult = (event: SpeechRecognitionResultEvent) => {
             let interimTranscript = '';
-            let finalTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-              const transcriptPiece = event.results[i][0].transcript;
+              const piece = event.results[i][0].transcript;
               if (event.results[i].isFinal) {
-                finalTranscript += transcriptPiece;
+                const trimmed = piece.trim();
+                if (trimmed) {
+                  this.accumulatedFinalText += (this.accumulatedFinalText ? ' ' : '') + trimmed;
+                }
               } else {
-                interimTranscript += transcriptPiece;
+                interimTranscript += piece;
               }
             }
 
-            const activeText = finalTranscript || interimTranscript;
-            if (activeText && this.onTranscriptCallback) {
-              this.onTranscriptCallback(activeText.trim(), Boolean(finalTranscript));
+            const activeText = (
+              this.accumulatedFinalText + (interimTranscript ? ' ' + interimTranscript.trim() : '')
+            ).trim();
+
+            if (this.onTranscriptCallback && activeText) {
+              this.onTranscriptCallback(activeText, interimTranscript.length === 0);
             }
           };
 
           this.recognition.onerror = (event: { error: string }) => {
-            if (event.error !== 'no-speech') {
-              console.warn('Speech recognition warning:', event.error);
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+              console.warn('Speech recognition status:', event.error);
             }
           };
 
           this.recognition.onend = () => {
             if (this.isListening) {
-              // Auto-restart if listening was not explicitly stopped
+              // Automatically restart recognition when candidate is still in answering mode
               try {
                 this.recognition?.start();
               } catch {
-                // Ignore restart race condition
+                // Ignore already-started edge cases
               }
             }
           };
@@ -353,14 +396,32 @@ export class BrowserSpeechRecognizer {
     }
   }
 
+  public isSupported(): boolean {
+    return Boolean(this.recognition);
+  }
+
+  public resetTranscript(seedText = ''): void {
+    this.accumulatedFinalText = seedText.trim();
+  }
+
+  public getAccumulatedText(): string {
+    return this.accumulatedFinalText;
+  }
+
   public start(onTranscript: (text: string, isFinal: boolean) => void): boolean {
-    if (!this.recognition) return false;
     this.onTranscriptCallback = onTranscript;
     this.isListening = true;
+    if (!this.recognition) return false;
+
     try {
       this.recognition.start();
       return true;
-    } catch {
+    } catch (e) {
+      // If already started, do not treat as failure
+      const errorMsg = String(e);
+      if (errorMsg.includes('already started')) {
+        return true;
+      }
       return false;
     }
   }
