@@ -18,7 +18,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
 PROFILE_URL = os.getenv("PROFILE_URL", "http://127.0.0.1:8001")
 INTERVIEW_WS_URL = os.getenv("INTERVIEW_WS_URL", "ws://127.0.0.1:8002/ws/interview")
 AUTOMATION_URL = os.getenv("AUTOMATION_URL", "http://127.0.0.1:8003")
-INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "e2e-internal-token")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "")
 
 
 async def request_json(

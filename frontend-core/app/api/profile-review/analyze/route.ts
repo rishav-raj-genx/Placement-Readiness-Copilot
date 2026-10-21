@@ -180,7 +180,6 @@ export async function POST(request?: Request): Promise<NextResponse> {
   try {
     const sessionClient = createServerSessionClient();
     const { data: { user } } = await sessionClient.auth.getUser();
-    studentId = user?.id ?? null;
 
     let bodyData: Record<string, unknown> | null = null;
     if (request) {
@@ -194,12 +193,25 @@ export async function POST(request?: Request): Promise<NextResponse> {
       }
     }
 
-    if (!studentId && typeof bodyData?.userId === 'string' && bodyData.userId.trim()) {
+    const requestedUserId = typeof bodyData?.userId === 'string' ? bodyData.userId.trim() : null;
+
+    if (user) {
+      // Standard Supabase session validation: forbid arbitrary userId spoofing
+      if (requestedUserId && requestedUserId !== user.id) {
+        return NextResponse.json(
+          { error: 'Forbidden: Cannot analyze another user profile.', code: 'FORBIDDEN' },
+          { status: 403 }
+        );
+      }
+      studentId = user.id;
+    } else {
+      // Secure service-to-service validation: strictly require configured INTERNAL_SERVICE_KEY
       const authHeader = request?.headers.get('authorization') ?? '';
       const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-      const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || 'e2e-internal-token';
-      if (token === internalKey || token === 'e2e-internal-token') {
-        studentId = bodyData.userId.trim();
+      const internalKey = process.env.INTERNAL_SERVICE_KEY?.trim();
+
+      if (internalKey && token && token === internalKey && requestedUserId) {
+        studentId = requestedUserId;
       }
     }
 

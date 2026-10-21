@@ -64,10 +64,7 @@ function getInternalServiceToken(): string {
   );
   if (token) return token;
 
-  const isE2e = (process.env.E2E_MODE ?? '').toLowerCase().trim() === 'true';
-  if (isE2e) return 'e2e-internal-token';
-
-  return 'e2e-internal-token';
+  return '';
 }
 
 export async function serviceRequest(url: string, options: ServiceRequestOptions = {}): Promise<unknown> {

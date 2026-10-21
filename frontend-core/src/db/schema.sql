@@ -34,6 +34,9 @@ CREATE POLICY "insert_own_profile" ON profiles FOR INSERT WITH CHECK (auth.uid()
 DROP POLICY IF EXISTS "update_own_profile" ON profiles;
 CREATE POLICY "update_own_profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "delete_own_profile" ON profiles;
+CREATE POLICY "delete_own_profile" ON profiles FOR DELETE USING (auth.uid() = id);
+
 DROP POLICY IF EXISTS "Service role full access profiles" ON profiles;
 CREATE POLICY "Service role full access profiles" ON profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
 
@@ -190,6 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_live_checks_url ON project_live_checks(project_ur
 -- --------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS discovered_jobs (
     id TEXT PRIMARY KEY,
+    student_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     company TEXT NOT NULL,
     location TEXT,
@@ -209,6 +213,9 @@ CREATE TABLE IF NOT EXISTS discovered_jobs (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS student_id UUID REFERENCES profiles(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_jobs_student ON discovered_jobs(student_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_relevance ON discovered_jobs(relevance_score DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_company ON discovered_jobs(company);
 
@@ -294,9 +301,27 @@ CREATE POLICY "Students can read own live checks"
     ON project_live_checks FOR SELECT
     USING (auth.uid()::text = student_id);
 
+DROP POLICY IF EXISTS "Students can delete own live checks" ON project_live_checks;
+CREATE POLICY "Students can delete own live checks"
+    ON project_live_checks FOR DELETE
+    TO authenticated
+    USING (auth.uid()::text = student_id);
+
 DROP POLICY IF EXISTS "Students can read own readiness scores" ON readiness_scores;
 CREATE POLICY "Students can read own readiness scores"
     ON readiness_scores FOR SELECT
+    USING (auth.uid()::text = student_id);
+
+DROP POLICY IF EXISTS "Students can delete own readiness scores" ON readiness_scores;
+CREATE POLICY "Students can delete own readiness scores"
+    ON readiness_scores FOR DELETE
+    TO authenticated
+    USING (auth.uid()::text = student_id);
+
+DROP POLICY IF EXISTS "Students can delete own mock results" ON mock_interview_results;
+CREATE POLICY "Students can delete own mock results"
+    ON mock_interview_results FOR DELETE
+    TO authenticated
     USING (auth.uid()::text = student_id);
 
 DROP POLICY IF EXISTS "Students can manage own applications" ON application_tracker;
@@ -305,11 +330,40 @@ CREATE POLICY "Students can manage own applications"
     USING (auth.uid()::text = student_id)
     WITH CHECK (auth.uid()::text = student_id);
 
-DROP POLICY IF EXISTS "Authenticated users can read discovered jobs" ON discovered_jobs;
-CREATE POLICY "Authenticated users can read discovered jobs"
-    ON discovered_jobs FOR SELECT
-    TO authenticated
-    USING (true);
+CREATE OR REPLACE FUNCTION public.delete_user_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, storage
+AS $$
+DECLARE
+    calling_user_id UUID;
+BEGIN
+    calling_user_id := auth.uid();
+    IF calling_user_id IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    DELETE FROM storage.objects
+    WHERE bucket_id IN ('interview_recordings', 'candidate-documents')
+      AND (
+        (storage.foldername(name))[1] = calling_user_id::text
+        OR owner = calling_user_id
+        OR name LIKE calling_user_id::text || '/%'
+      );
+
+    DELETE FROM public.readiness_scores WHERE student_id = calling_user_id::text;
+    DELETE FROM public.project_live_checks WHERE student_id = calling_user_id::text;
+    DELETE FROM public.application_tracker WHERE student_id = calling_user_id::text;
+    DELETE FROM public.mock_interview_results WHERE student_id = calling_user_id::text;
+    DELETE FROM public.interview_sessions WHERE user_id = calling_user_id OR student_id = calling_user_id::text;
+    DELETE FROM public.profiles WHERE id = calling_user_id;
+    DELETE FROM auth.users WHERE id = calling_user_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_user_account() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_user_account() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.is_msot_admin()
 RETURNS BOOLEAN

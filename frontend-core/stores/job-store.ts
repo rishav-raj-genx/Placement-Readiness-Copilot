@@ -65,7 +65,12 @@ export const useJobStore = create<JobState>((set, get) => ({
       let query = supabase
         .from('discovered_jobs')
         .select('*');
-      if (profile) query = query.eq('publication_status', 'published');
+      if (profile) {
+        query = query.eq('publication_status', 'published');
+        if (profile.id) {
+          query = query.or(`student_id.eq.${profile.id},student_id.is.null`);
+        }
+      }
       const { data, error } = await query
         .order('relevance_score', { ascending: false })
         .order('posted_at', { ascending: false });
@@ -82,6 +87,9 @@ export const useJobStore = create<JobState>((set, get) => ({
             .from('discovered_jobs')
             .select('*')
             .eq('publication_status', 'published');
+          if (profile.id) {
+            matchQuery = matchQuery.or(`student_id.eq.${profile.id},student_id.is.null`);
+          }
           if (skill) matchQuery = matchQuery.contains('required_skills', [skill]);
           if (employmentType) matchQuery = matchQuery.eq('employment_type', employmentType);
           return matchQuery.order('relevance_score', { ascending: false });

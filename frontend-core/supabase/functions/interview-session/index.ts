@@ -84,6 +84,7 @@ declare const Deno: {
   };
 };
 
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
@@ -157,7 +158,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile } = await serviceClient
       .from("profiles")
-      .select("id, email, display_name, role, target_role, skills, github_username, resume_pdf_path, linkedin_pdf_path, interview_credits, is_premium")
+      .select("id, email, display_name, role, target_role, skills, github_username, resume_pdf_path, linkedin_pdf_path, interview_credits, is_premium, projects")
       .eq("id", jwtUserId)
       .maybeSingle();
 
@@ -188,12 +189,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // --- Fetch candidate projects to provide grounded structured context ---
-    const { data: candidateProjects } = await serviceClient
-      .from("projects")
-      .select("title, description, tech_stack, live_url, github_url")
-      .eq("student_id", jwtUserId)
-      .limit(5);
+    // --- Fetch candidate projects from profile to provide grounded structured context ---
+    const profileProjects: unknown[] = profile && Array.isArray(profile.projects) ? profile.projects : [];
+    const candidateProjects: StructuredProject[] = profileProjects
+      .filter((proj): proj is Record<string, unknown> => typeof proj === "object" && proj !== null && !Array.isArray(proj))
+      .map((proj) => ({
+        title: typeof proj.name === "string" ? proj.name : typeof proj.title === "string" ? proj.title : undefined,
+        description: typeof proj.description === "string" ? proj.description : undefined,
+        tech_stack: Array.isArray(proj.tech_stack)
+          ? (proj.tech_stack as string[])
+          : Array.isArray(proj.skills)
+          ? (proj.skills as string[])
+          : undefined,
+        live_url: typeof proj.liveUrl === "string" ? proj.liveUrl : typeof proj.live_url === "string" ? proj.live_url : undefined,
+        github_url: typeof proj.repositoryUrl === "string" ? proj.repositoryUrl : typeof proj.github_url === "string" ? proj.github_url : undefined,
+      }))
+      .slice(0, 5);
 
     // --- Fetch resume from private storage ---
     let resumeInfo: ResumeInfo = {
@@ -246,17 +257,38 @@ Deno.serve(async (req: Request) => {
     }
 
     // --- Validate LiveKit configuration first before doing any database mutations ---
-    const livekitUrl = Deno.env.get("LIVEKIT_URL") || "";
-    const liveKitApiKey = Deno.env.get("LIVEKIT_API_KEY") || "";
-    const liveKitApiSecret = Deno.env.get("LIVEKIT_API_SECRET") || "";
+    const rawLivekitUrl = Deno.env.get("LIVEKIT_URL");
+    const rawLiveKitApiKey = Deno.env.get("LIVEKIT_API_KEY");
+    const rawLiveKitApiSecret = Deno.env.get("LIVEKIT_API_SECRET");
 
-    if (!livekitUrl || !liveKitApiKey || !liveKitApiSecret) {
+    if (!rawLivekitUrl?.trim() || !rawLiveKitApiKey?.trim() || !rawLiveKitApiSecret?.trim()) {
       console.error("LiveKit environment variables not configured");
       return new Response(
         JSON.stringify({
           error: "LiveKit is not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET as edge function secrets.",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const livekitUrl = rawLivekitUrl.trim();
+    const liveKitApiKey = rawLiveKitApiKey.trim();
+    const liveKitApiSecret = rawLiveKitApiSecret.trim();
+
+    if (hasWrappingQuotes(liveKitApiKey) || hasWrappingQuotes(liveKitApiSecret)) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: LiveKit credentials must not include wrapping quotes." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    try {
+      const protocol = new URL(livekitUrl).protocol;
+      if (protocol !== "wss:" && protocol !== "ws:") throw new Error("Invalid protocol");
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: LIVEKIT_URL must use ws:// or wss://." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -276,7 +308,7 @@ Deno.serve(async (req: Request) => {
         name: studentName,
         email: jwtEmail,
         targetRole: profile?.target_role || body.targetRole,
-        skills: Array.isArray(profile?.skills) ? profile.skills : [],
+        skills: profile && Array.isArray(profile.skills) ? profile.skills : [],
         githubUsername: profile?.github_username || "",
       },
       resume: resumeInfo,
@@ -286,51 +318,6 @@ Deno.serve(async (req: Request) => {
     };
 
     const metadataJson = JSON.stringify(roomMetadata);
-
-    // Validate the credentials used by the active room-creation path before
-    // inserting a session record, so configuration failures cannot orphan rows.
-    const rawLivekitUrl = Deno.env.get("LIVEKIT_URL");
-    const rawLiveKitApiKey = Deno.env.get("LIVEKIT_API_KEY");
-    const rawLiveKitApiSecret = Deno.env.get("LIVEKIT_API_SECRET");
-
-    if (!rawLivekitUrl?.trim() || !rawLiveKitApiKey?.trim() || !rawLiveKitApiSecret?.trim()) {
-      return new Response(
-        JSON.stringify({ error: "Server misconfiguration: LiveKit environment variables are missing." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const livekitUrl = rawLivekitUrl.trim();
-    const liveKitApiKey = rawLiveKitApiKey.trim();
-    const liveKitApiSecret = rawLiveKitApiSecret.trim();
-
-    console.log(`DEBUG: LIVEKIT_API_KEY loaded, length: ${liveKitApiKey.length}`);
-    console.log(`DEBUG: LIVEKIT_API_SECRET loaded, length: ${liveKitApiSecret.length}`);
-
-    if (
-      rawLivekitUrl !== livekitUrl ||
-      rawLiveKitApiKey !== liveKitApiKey ||
-      rawLiveKitApiSecret !== liveKitApiSecret
-    ) {
-      console.warn("Surrounding whitespace was removed from LiveKit configuration.");
-    }
-
-    if (hasWrappingQuotes(liveKitApiKey) || hasWrappingQuotes(liveKitApiSecret)) {
-      return new Response(
-        JSON.stringify({ error: "Server misconfiguration: LiveKit credentials must not include wrapping quotes." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    try {
-      const protocol = new URL(livekitUrl).protocol;
-      if (protocol !== "wss:" && protocol !== "ws:") throw new Error("Invalid protocol");
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Server misconfiguration: LIVEKIT_URL must use ws:// or wss://." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // --- Create the interview session record in the database ---
     const { error: insertError } = await serviceClient
@@ -392,7 +379,7 @@ Deno.serve(async (req: Request) => {
       console.warn("createRoom threw, verifying if room already exists for this interview:", roomErr);
       try {
         const existingRooms = await roomService.listRooms([roomName]);
-        const matchingRoom = existingRooms.find((room) => room.name === roomName);
+        const matchingRoom = existingRooms.find((room: { name: string; metadata?: string }) => room.name === roomName);
         if (matchingRoom) {
           let existingMetadata: Record<string, unknown> = {};
           try {

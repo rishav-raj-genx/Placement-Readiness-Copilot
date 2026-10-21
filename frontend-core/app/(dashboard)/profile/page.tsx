@@ -107,13 +107,16 @@ export default function ProfilePage() {
           resumePath,
           linkedinPath,
         };
-        const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || 'e2e-internal-token';
+        const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || '';
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (internalKey) {
+          headers['Authorization'] = `Bearer ${internalKey}`;
+        }
         const response = await fetch('/api/profile/review', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${internalKey}`
-          },
+          headers,
           body: JSON.stringify(profileData)
         });
 

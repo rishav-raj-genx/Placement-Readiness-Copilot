@@ -46,7 +46,7 @@ def authenticate_student(
     # 2. E2E simulation mode authorization
     is_e2e = os.getenv("MOCK_INTERVIEW_E2E_MODE", "false").lower() in {"1", "true", "yes"} or \
              os.getenv("E2E_MODE", "false").lower() in {"1", "true", "yes"}
-    if is_e2e and raw_token in {"e2e-internal-token", "test-token"}:
+    if is_e2e and raw_token in {"test-token"}:
         return str(requested_student_id) if requested_student_id else "e2e_candidate"
 
     # 3. Supabase user JWT verification

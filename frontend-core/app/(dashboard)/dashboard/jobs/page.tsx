@@ -90,10 +90,16 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
     // the service-role credential is never included in the client bundle.
     const jobsClient = authData.user ? supabase : createSupabaseServiceClient();
 
-    const { data: jobData, error: jobsError } = await jobsClient
+    let jobsQuery = jobsClient
       .from('discovered_jobs')
       .select(DISCOVERED_JOB_COLUMNS)
-      .eq('publication_status', 'published')
+      .eq('publication_status', 'published');
+
+    if (authData.user) {
+      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},student_id.is.null`);
+    }
+
+    const { data: jobData, error: jobsError } = await jobsQuery
       .order('is_msot_post', { ascending: false })
       .order('relevance_score', { ascending: false })
       .order('posted_at', { ascending: false });

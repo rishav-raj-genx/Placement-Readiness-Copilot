@@ -1,6 +1,7 @@
 import type { JobPosting } from '@/types';
 
 export interface JobMatchProfile {
+  id?: string;
   targetRole: string;
   skills: string[];
 }
