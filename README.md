@@ -90,6 +90,7 @@ Every feature listed below has been verified by direct code inspection and autom
 
 Hireable is structured as a modular, four-service microservices architecture to isolate compute-intensive browser automation and real-time audio streams from standard web traffic.
 
+
 ```mermaid
 graph TD
     subgraph ClientLayer["Candidate Interface (Port 3000)"]
