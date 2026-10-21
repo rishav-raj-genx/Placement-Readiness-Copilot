@@ -130,9 +130,17 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
   const [currentQuestion, setCurrentQuestion] = useState<LiveKitQuestionPayload | null>(null);
   const [results, setResults] = useState<LiveKitResultsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [currentCandidateAnswer, setCurrentCandidateAnswer] = useState<string>('');
+  const [currentCandidateAnswer, setCurrentCandidateAnswerState] = useState<string>('');
   const [speechRecognitionError, setSpeechRecognitionError] = useState<string | null>(null);
   const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState<boolean>(true);
+
+  const setCurrentCandidateAnswer = useCallback((valOrFn: string | ((prev: string) => string)) => {
+    setCurrentCandidateAnswerState((prev) => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      sttRef.current?.resetTranscript(next);
+      return next;
+    });
+  }, []);
 
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -177,7 +185,7 @@ export function useLiveKitInterview(options: UseLiveKitInterviewOptions = {}): U
     setIsSpeechRecognitionSupported(true);
     sttRef.current.start(
       (text: string, isFinal: boolean) => {
-        setCurrentCandidateAnswer(text);
+        setCurrentCandidateAnswerState(text);
         setSpeechRecognitionError(null);
         const studentEntry: LiveKitTranscriptEntry = {
           id: `student_voice_active`,

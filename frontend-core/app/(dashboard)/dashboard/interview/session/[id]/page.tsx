@@ -151,7 +151,6 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
     mode?: string;
     durationMinutes?: number;
   } | null>(null);
-  const [fallbackTyping, setFallbackTyping] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -547,7 +546,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
               {currentQuestion.text}
             </h2>
 
-            {/* Candidate Response Section - Strict Voice Only Viva */}
+            {/* Candidate Response Section - Live Voice & Verbal Viva Canvas */}
             <div className="space-y-3 pt-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -559,11 +558,11 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                       type="button"
                       onClick={() => {
                         livekit.setCurrentCandidateAnswer('');
-                        toast.info('Voice answer cleared. Speak into your microphone to record your response again.');
+                        toast.info('Response cleared. You can speak or edit your answer again.');
                       }}
-                      className="text-[11px] text-stone-400 hover:text-stone-200 underline"
+                      className="text-[11px] text-stone-400 hover:text-stone-200 underline ml-1"
                     >
-                      Clear &amp; Re-speak
+                      Clear Answer
                     </button>
                   )}
                 </div>
@@ -606,126 +605,66 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                 </div>
               </div>
 
-              {/* Speech Recognition Error or Warning Banner */}
+              {/* Status and Diagnostics Notice (Non-blocking) */}
               {(livekit.speechRecognitionError || !livekit.isSpeechRecognitionSupported) && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-900/60 bg-amber-950/40 p-3 text-xs text-amber-300">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-900/40 bg-amber-950/30 p-2.5 text-xs text-amber-300">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
                     <span>
                       {!livekit.isSpeechRecognitionSupported
-                        ? 'Your browser does not support Web Speech recognition. Please use the emergency typing option below.'
-                        : `Voice recognition status: ${livekit.speechRecognitionError}. If your browser paused, click Restart Voice.`}
+                        ? 'Browser Web Speech API not supported. Audio recording remains 100% active for faculty review — type or answer below.'
+                        : `Microphone is actively recording for faculty review. Browser cloud speech STT reported: ${livekit.speechRecognitionError}. You can speak or edit your answer directly below.`}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        livekit.startListeningToCandidate();
-                        toast.info('Re-starting voice speech recognition...');
-                      }}
-                      className="h-6 text-[10px] text-amber-200 border-amber-800 bg-amber-900/40 hover:bg-amber-800/50"
-                    >
-                      Restart Voice STT
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setFallbackTyping((v) => !v)}
-                      className="h-6 text-[10px] text-amber-200 border-amber-800 bg-amber-900/40 hover:bg-amber-800/50"
-                    >
-                      {fallbackTyping ? 'Back to Voice Canvas' : 'Emergency Typing'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Strict Voice-Only Transcription Canvas (with Emergency Fallback) */}
-              {fallbackTyping ? (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-amber-400 font-mono">
-                      Emergency Typing Mode Active &middot; Type your oral answer
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setFallbackTyping(false)}
-                      className="text-[11px] text-stone-400 hover:text-stone-200 underline"
-                    >
-                      Return to Voice Mode
-                    </button>
-                  </div>
-                  <textarea
-                    value={livekit.currentCandidateAnswer}
-                    onChange={(e) => livekit.setCurrentCandidateAnswer(e.target.value)}
-                    placeholder="Type your verbal viva response here..."
-                    rows={4}
-                    className="flex w-full rounded-xl border border-stone-800 bg-stone-950/70 p-3.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-[#D93829] focus:outline-none focus:ring-1 focus:ring-[#D93829] resize-none leading-relaxed"
-                  />
-                </div>
-              ) : (
-                <div
-                  tabIndex={0}
-                  onClick={() => {
-                    if (livekit.isMicrophoneEnabled && !livekit.isInterviewerSpeaking) {
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
                       livekit.startListeningToCandidate();
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter') {
-                      toast.warning('Keyboard typing is disabled for Round 1 Viva. Please speak your answer verbally into the microphone. (If your mic has issues, use Emergency Typing below).');
-                    }
-                  }}
-                  className="relative min-h-[120px] rounded-xl border border-stone-800 bg-stone-950/80 p-4 transition-colors focus:border-[#D93829]/60 focus:outline-none cursor-pointer"
-                >
-                  <div className="flex items-center justify-between border-b border-stone-800/60 pb-2 mb-2.5">
-                    <Badge variant="outline" className="border-stone-800 bg-stone-900/80 font-mono text-[10px] text-stone-400">
-                      Oral Viva Mode &middot; Voice Transcription Only
-                    </Badge>
-                    <span className="text-[10px] text-stone-500 font-mono">
-                      {livekit.currentCandidateAnswer
-                        ? `${livekit.currentCandidateAnswer.split(/\s+/).filter(Boolean).length} words transcribed`
-                        : 'Waiting for voice input'}
-                    </span>
-                  </div>
-
-                  {livekit.currentCandidateAnswer ? (
-                    <p className="text-sm font-medium leading-relaxed text-stone-100 font-sans">
-                      {livekit.currentCandidateAnswer}
-                      <span className="inline-block h-4 w-1.5 ml-1 animate-pulse bg-[#D93829] align-middle" />
-                    </p>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-6 text-center text-stone-500 space-y-2">
-                      <Mic className="h-6 w-6 text-stone-600 animate-pulse" />
-                      <p className="text-xs font-semibold text-stone-300">
-                        Speak your response into the microphone
-                      </p>
-                      <p className="text-[11px] text-stone-500 max-w-sm">
-                        Your answer will be transcribed in real time. Oral viva responses and audio are recorded for faculty review and evaluation.
-                      </p>
-                    </div>
-                  )}
+                      toast.info('Re-starting speech recognition...');
+                    }}
+                    className="h-6 text-[10px] text-amber-200 border-amber-800 bg-amber-900/40 hover:bg-amber-800/50"
+                  >
+                    Retry Voice STT
+                  </Button>
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-stone-500">
-                    Full conversation and audio stream recorded for faculty &amp; admin audit
+              {/* Real-time Voice & Text Viva Response Area */}
+              <div className="relative rounded-xl border border-stone-800 bg-stone-950/80 p-3.5 transition-colors focus-within:border-[#D93829]/70">
+                <div className="flex items-center justify-between border-b border-stone-800/60 pb-2 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="border-stone-800 bg-stone-900/80 font-mono text-[10px] text-stone-300">
+                      Oral Viva &middot; Live Voice Canvas
+                    </Badge>
+                    {livekit.isMicrophoneEnabled && !livekit.isInterviewerSpeaking && (
+                      <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Live Voice-to-Text Active
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-stone-400 font-mono">
+                    {livekit.currentCandidateAnswer
+                      ? `${livekit.currentCandidateAnswer.split(/\s+/).filter(Boolean).length} words`
+                      : 'Speak or type to answer'}
                   </span>
-                  {!fallbackTyping && (
-                    <button
-                      type="button"
-                      onClick={() => setFallbackTyping(true)}
-                      className="text-[10px] text-stone-500 hover:text-stone-300 underline"
-                    >
-                      Emergency Typing Option
-                    </button>
-                  )}
                 </div>
+
+                <textarea
+                  value={livekit.currentCandidateAnswer}
+                  onChange={(e) => livekit.setCurrentCandidateAnswer(e.target.value)}
+                  placeholder="Speak your response into the microphone... Your voice will transcribe here in real time. You can also edit or type directly at any time."
+                  rows={4}
+                  className="flex w-full bg-transparent p-1 text-sm font-medium text-stone-100 placeholder:text-stone-500 focus:outline-none resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-stone-500">
+                  Full conversation and audio stream recorded for faculty &amp; admin audit
+                </span>
                 <Button
                   onClick={() => void livekit.submitCandidateAnswer(livekit.currentCandidateAnswer)}
                   disabled={!livekit.currentCandidateAnswer.trim()}

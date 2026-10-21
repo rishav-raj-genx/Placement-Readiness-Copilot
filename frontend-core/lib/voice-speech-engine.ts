@@ -727,6 +727,7 @@ export class BrowserSpeechRecognizer {
   private restartTimeout: number | null = null;
   private sessionPrefix = '';
   private currentFullTranscript = '';
+  private consecutiveNetworkErrors = 0;
 
   constructor() {
     this.initRecognition();
@@ -742,11 +743,15 @@ export class BrowserSpeechRecognizer {
 
     try {
       this.recognition = new SpeechRecognitionCtor();
-      this.recognition.continuous = true;
+      // Single-utterance discrete mode with auto-restart is far more resilient in Chrome
+      // than persistent WebSocket streaming which frequently throws 'network' errors
+      this.recognition.continuous = false;
       this.recognition.interimResults = true;
+      // 'en-US' is the universal, most stable speech model on Google cloud STT endpoints
       this.recognition.lang = 'en-US';
 
       this.recognition.onresult = (event: SpeechRecognitionResultEvent) => {
+        this.consecutiveNetworkErrors = 0;
         let finalChunk = '';
         let interimChunk = '';
 
@@ -760,9 +765,9 @@ export class BrowserSpeechRecognizer {
           }
         }
 
-        // Combine with any previously committed text before a silent restart
-        const fullFinal = (this.sessionPrefix ? this.sessionPrefix + ' ' : '') + finalChunk;
-        const completeText = (fullFinal + (interimChunk ? ' ' + interimChunk : '')).trim();
+        // Combine with previously accumulated text
+        const base = this.sessionPrefix ? this.sessionPrefix + ' ' : '';
+        const completeText = (base + finalChunk + (interimChunk ? ' ' + interimChunk : '')).trim();
 
         this.currentFullTranscript = completeText;
 
@@ -776,20 +781,25 @@ export class BrowserSpeechRecognizer {
           console.warn('Speech recognition notice:', event.error);
           this.onErrorCallback?.(event.error);
         }
-        if (event.error === 'network' || event.error === 'no-speech') {
-          this.scheduleRestart(600);
+        if (event.error === 'network') {
+          this.consecutiveNetworkErrors++;
+          // Backoff and re-initialize to clear any stale socket
+          const delay = Math.min(1000 * Math.pow(1.5, this.consecutiveNetworkErrors), 5000);
+          this.scheduleRestart(delay);
+        } else if (event.error === 'no-speech') {
+          this.scheduleRestart(250);
         }
       };
 
       this.recognition.onend = () => {
         this.isRecognitionActive = false;
-        // Commit what was finalized so when recognition restarts, it builds continuously
+        // Commit what was finalized so the next utterance continues appending seamlessly
         if (this.currentFullTranscript) {
           this.sessionPrefix = this.currentFullTranscript;
         }
 
         if (this.isListening) {
-          this.scheduleRestart(250);
+          this.scheduleRestart(150);
         }
       };
     } catch (e) {
@@ -823,7 +833,15 @@ export class BrowserSpeechRecognizer {
         this.isRecognitionActive = true;
         return true;
       }
-      return false;
+      // Re-initialize recognition instance if previous instance crashed
+      try {
+        this.initRecognition();
+        this.recognition?.start();
+        this.isRecognitionActive = true;
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 
@@ -844,6 +862,7 @@ export class BrowserSpeechRecognizer {
     onTranscript: (text: string, isFinal: boolean) => void,
     onError?: (error: string) => void
   ): boolean {
+    this.consecutiveNetworkErrors = 0;
     this.onTranscriptCallback = onTranscript;
     if (onError) this.onErrorCallback = onError;
     this.isListening = true;
