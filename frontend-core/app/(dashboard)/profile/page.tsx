@@ -29,7 +29,7 @@ import { READINESS_CATEGORY_LABELS, readinessTier } from '@/lib/dashboard-readin
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { supabase } from '@/lib/supabase-client';
-import { validatePdf, validateResumeFile, normalizeUsername } from '@/lib/onboarding';
+import { validatePdf, validateResumeFile, normalizeUsername, sanitizeUsername } from '@/lib/onboarding';
 import type { ProjectItem } from '@/types';
 
 type DocumentKind = 'resume' | 'linkedin';
@@ -219,11 +219,11 @@ export default function ProfilePage() {
       let cleanVal: string | null = fieldValueDraft.trim();
       if (editingField === 'github') {
         dbColumn = 'github_username';
-        cleanVal = cleanVal ? normalizeUsername(cleanVal) : null;
+        cleanVal = cleanVal ? sanitizeUsername(cleanVal) : null;
         setGithub(cleanVal || '');
       } else if (editingField === 'leetcode') {
         dbColumn = 'leetcode_url';
-        cleanVal = cleanVal || null;
+        cleanVal = cleanVal ? sanitizeUsername(cleanVal) : null;
         setLeetcodeUrl(cleanVal || '');
       } else if (editingField === 'linkedinUrl') {
         dbColumn = 'linkedin_url';
@@ -512,8 +512,8 @@ export default function ProfilePage() {
             userId: currentUser.id,
             displayName: displayName.trim(),
             targetRole: targetRole.trim(),
-            githubUsername: normalizeUsername(github),
-            leetcodeUrl: leetcodeUrl.trim() || null,
+            githubUsername: github ? sanitizeUsername(github) : null,
+            leetcodeUrl: leetcodeUrl ? sanitizeUsername(leetcodeUrl) : null,
             linkedinUrl: linkedinUrl.trim() || null,
             linkedinText: linkedinText.trim() || null,
             projects: projects.length > 0 ? projects : null,
@@ -535,8 +535,8 @@ export default function ProfilePage() {
           role: currentUser.role || 'student',
           display_name: displayName.trim(),
           target_role: targetRole.trim(),
-          github_username: normalizeUsername(github),
-          leetcode_url: leetcodeUrl.trim() || null,
+          github_username: github ? sanitizeUsername(github) : null,
+          leetcode_url: leetcodeUrl ? sanitizeUsername(leetcodeUrl) : null,
           linkedin_url: linkedinUrl.trim() || null,
           linkedin_text: linkedinText.trim() || null,
           projects: projects.length > 0 ? projects : null,

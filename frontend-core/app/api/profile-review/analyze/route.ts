@@ -7,6 +7,7 @@ import {
   normalizeLeetCodeStats,
   type LeetCodeStats,
 } from '@/lib/leetcode';
+import { sanitizeUsername } from '@/lib/onboarding';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -548,13 +549,13 @@ export async function POST(request?: Request): Promise<NextResponse> {
         updatePayload.target_role = bodyData.targetRole.trim();
       }
       if (typeof bodyData.githubUsername === 'string') {
-        updatePayload.github_username = bodyData.githubUsername.trim();
+        updatePayload.github_username = sanitizeUsername(bodyData.githubUsername) || null;
       }
       if (typeof bodyData.leetcodeUrl === 'string') {
-        updatePayload.leetcode_url = bodyData.leetcodeUrl.trim() || null;
+        updatePayload.leetcode_url = sanitizeUsername(bodyData.leetcodeUrl) || null;
       }
       if (typeof bodyData.codingProfileUrl === 'string') {
-        updatePayload.coding_profile_url = bodyData.codingProfileUrl.trim() || null;
+        updatePayload.coding_profile_url = sanitizeUsername(bodyData.codingProfileUrl) || null;
       }
       if (typeof bodyData.resumePath === 'string') {
         updatePayload.resume_pdf_path = bodyData.resumePath;
@@ -578,15 +579,17 @@ export async function POST(request?: Request): Promise<NextResponse> {
       ? bodyData.linkedinPath
       : profile.linkedinPdfPath;
 
-    const effectiveGithubUsername = (typeof bodyData?.githubUsername === 'string' && bodyData.githubUsername)
-      ? bodyData.githubUsername.trim()
+    const rawGithub = (typeof bodyData?.githubUsername === 'string' && bodyData.githubUsername)
+      ? bodyData.githubUsername
       : (profile.githubUsername ?? '');
+    const effectiveGithubUsername = sanitizeUsername(rawGithub);
 
-    const effectiveLeetcodeUrl = typeof bodyData?.leetcodeUrl === 'string'
-      ? bodyData.leetcodeUrl.trim()
+    const rawLeetcode = typeof bodyData?.leetcodeUrl === 'string'
+      ? bodyData.leetcodeUrl
       : typeof bodyData?.codingProfileUrl === 'string'
-        ? bodyData.codingProfileUrl.trim()
+        ? bodyData.codingProfileUrl
         : profile.leetcodeUrl || profile.codingProfileUrl || '';
+    const effectiveLeetcodeUrl = sanitizeUsername(rawLeetcode);
 
     // ──────────────────────────────────────────────────────────────────────────
     // PHASE 1: PRESERVE EXISTING SCORES (DEEP MERGE)
@@ -594,58 +597,83 @@ export async function POST(request?: Request): Promise<NextResponse> {
     const currentScores = await fetchCurrentScores(admin, studentId);
 
     // Download documents for analysis if present
-    const validResumePath = effectiveResumePath ? requireOwnedPath(effectiveResumePath, studentId, 'Resume') : null;
+    let validResumePath: string | null = null;
     let resumeBlob: Blob | null = null;
     let resumeAnalysisError: string | null = null;
+    if (effectiveResumePath) {
+      try {
+        validResumePath = requireOwnedPath(effectiveResumePath, studentId, 'Resume');
+      } catch (pathErr) {
+        resumeAnalysisError = pathErr instanceof Error ? pathErr.message : 'Invalid resume path';
+      }
+    }
     if (validResumePath) {
-      const resumeDownload = await admin.storage.from('candidate-documents').download(validResumePath);
-      if (resumeDownload.error || !resumeDownload.data) {
-        resumeAnalysisError = `Resume could not be downloaded: ${resumeDownload.error?.message ?? 'Empty file'}`;
-      } else {
-        resumeBlob = resumeDownload.data;
+      for (const bucket of ['candidate-documents', 'resumes']) {
+        try {
+          const resumeDownload = await admin.storage.from(bucket).download(validResumePath);
+          if (!resumeDownload.error && resumeDownload.data) {
+            resumeBlob = resumeDownload.data;
+            resumeAnalysisError = null;
+            break;
+          }
+          if (resumeDownload.error) {
+            resumeAnalysisError = `Resume could not be downloaded: ${resumeDownload.error.message}`;
+          }
+        } catch (dlErr) {
+          resumeAnalysisError = dlErr instanceof Error ? dlErr.message : 'Resume download failed';
+        }
       }
     }
 
     let linkedinDownloadData: Blob | null = null;
     let linkedinAnalysisError: string | null = null;
     if (effectiveLinkedinPath) {
-      const validLinkedinPath = requireOwnedPath(effectiveLinkedinPath, studentId, 'LinkedIn profile');
-      const linkedinDownload = await admin.storage.from('candidate-documents').download(validLinkedinPath);
-      if (linkedinDownload.error || !linkedinDownload.data) {
-        linkedinAnalysisError = `LinkedIn PDF could not be downloaded: ${linkedinDownload.error?.message ?? 'Empty file'}`;
-      } else {
-        linkedinDownloadData = linkedinDownload.data;
+      try {
+        const validLinkedinPath = requireOwnedPath(effectiveLinkedinPath, studentId, 'LinkedIn profile');
+        for (const bucket of ['candidate-documents', 'resumes']) {
+          const linkedinDownload = await admin.storage.from(bucket).download(validLinkedinPath);
+          if (!linkedinDownload.error && linkedinDownload.data) {
+            linkedinDownloadData = linkedinDownload.data;
+            linkedinAnalysisError = null;
+            break;
+          }
+          if (linkedinDownload.error) {
+            linkedinAnalysisError = `LinkedIn PDF could not be downloaded: ${linkedinDownload.error.message}`;
+          }
+        }
+      } catch {
+        // Optional linkedin download error handled gracefully
       }
     }
 
-    // Attempt AI scoring service invocation
+    // Attempt AI scoring service invocation (with or without resumeBlob)
     let review: unknown = null;
-    if (resumeBlob) {
-      try {
-        const form = new FormData();
-        form.append('github_username', effectiveGithubUsername);
-        form.append('leetcode_url', effectiveLeetcodeUrl);
-        form.append('force_refresh', String(forceRefresh));
+    try {
+      const form = new FormData();
+      form.append('github_username', effectiveGithubUsername);
+      form.append('leetcode_url', effectiveLeetcodeUrl);
+      form.append('force_refresh', String(forceRefresh));
+      if (resumeBlob) {
         const isResumeDocx = validResumePath ? validResumePath.toLowerCase().endsWith('.docx') : false;
         form.append('resume', resumeBlob, isResumeDocx ? 'resume.docx' : 'resume.pdf');
-        if (linkedinDownloadData) {
-          form.append('linkedin_pdf', linkedinDownloadData, 'linkedin.pdf');
-        }
-        review = await serviceRequest(`${getProfileReviewBaseUrl()}/analyze-profile`, {
-          method: 'POST',
-          body: form,
-          timeoutMs: 50_000,
-          maxRetries: 0,
-        });
-      } catch (exc) {
-        const message = exc instanceof Error ? exc.message : 'AI analyzer service failure';
-        const isTimeout = message.toLowerCase().includes('timed out') || message.toLowerCase().includes('timeout');
-        throw new AnalysisError(
-          `AI analyzer failed or timed out: ${message}`,
-          isTimeout ? 504 : 502,
-          isTimeout ? 'AI_ANALYZER_TIMEOUT' : 'AI_ANALYZER_FAILED',
-        );
       }
+      if (linkedinDownloadData) {
+        form.append('linkedin_pdf', linkedinDownloadData, 'linkedin.pdf');
+      }
+      review = await serviceRequest(`${getProfileReviewBaseUrl()}/analyze-profile`, {
+        method: 'POST',
+        body: form,
+        timeoutMs: 50_000,
+        maxRetries: 0,
+      });
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message : 'AI analyzer service failure';
+      const isTimeout = message.toLowerCase().includes('timed out') || message.toLowerCase().includes('timeout');
+      throw new AnalysisError(
+        `AI analyzer failed or timed out: ${message}`,
+        isTimeout ? 504 : 502,
+        isTimeout ? 'AI_ANALYZER_TIMEOUT' : 'AI_ANALYZER_FAILED',
+      );
     }
 
     const safeReview = isRecord(review) ? review : {};
@@ -729,7 +757,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
     const updatedScores: ProfileScores = {
       resume: (typeof newResumeScore === 'number')
         ? newResumeScore
-        : (effectiveResumePath ? currentScores.resume : 0),
+        : (effectiveResumePath && resumeBlob ? currentScores.resume : 0),
 
       projects: currentScores.projects > 0 ? currentScores.projects : 0,
 

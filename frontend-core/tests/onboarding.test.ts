@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_PDF_BYTES,
   normalizeGithubUsername,
+  sanitizeUsername,
   signupAccountSchema,
   signupProfileSchema,
   validatePdf,
@@ -11,6 +12,19 @@ describe('three-step signup contracts', () => {
   it('requires a valid account identity and a strong password', () => {
     expect(signupAccountSchema.safeParse({ fullName: 'Asha Rao', email: 'asha@example.com', password: 'eight-chars' }).success).toBe(true);
     expect(signupAccountSchema.safeParse({ fullName: 'A', email: 'invalid', password: 'short' }).success).toBe(false);
+  });
+
+  it('sanitizes GitHub and LeetCode URLs to raw usernames', () => {
+    expect(sanitizeUsername('https://github.com/rishav-raj-genx')).toBe('rishav-raj-genx');
+    expect(sanitizeUsername('https://github.com/rishav-raj-genx/')).toBe('rishav-raj-genx');
+    expect(sanitizeUsername('@rishav-raj-genx')).toBe('rishav-raj-genx');
+    expect(sanitizeUsername('https://leetcode.com/u/rishav-raj-genx')).toBe('rishav-raj-genx');
+    expect(sanitizeUsername('https://leetcode.com/rishav-raj-genx/?tab=overview')).toBe('rishav-raj-genx');
+    expect(sanitizeUsername('leetcode.com/u/coder_123')).toBe('coder_123');
+    expect(sanitizeUsername('coder_123')).toBe('coder_123');
+    expect(sanitizeUsername('')).toBe('');
+    expect(sanitizeUsername(null)).toBe('');
+    expect(sanitizeUsername(undefined)).toBe('');
   });
 
   it('normalizes and strictly validates GitHub identities', () => {

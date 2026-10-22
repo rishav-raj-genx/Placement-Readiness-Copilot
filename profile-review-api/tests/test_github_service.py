@@ -104,3 +104,34 @@ def test_repository_inspection_checks_readme_and_code_structure() -> None:
     assert deep_review["code_readability_score"] >= 75
     assert len(deep_review["code_readability_comments"]) > 0
 
+
+def test_fetch_github_data_handles_404_resiliently(monkeypatch) -> None:
+    from github import Github, UnknownObjectException
+    from github_service import fetch_github_data
+
+    def mock_get_user(self, username: str):
+        raise UnknownObjectException(404, {"message": "Not Found"}, {})
+
+    monkeypatch.setattr(Github, "get_user", mock_get_user)
+
+    result = fetch_github_data("nonexistent_user_999", force_refresh=True)
+    assert result["score"] == 0
+    assert result["username"] == "nonexistent_user_999"
+    assert "not found" in str(result["reason"]).lower()
+
+
+def test_fetch_github_data_handles_connection_error_resiliently(monkeypatch) -> None:
+    from github import Github
+    from github_service import fetch_github_data
+
+    def mock_get_user(self, username: str):
+        raise ConnectionError("Connection refused by peer")
+
+    monkeypatch.setattr(Github, "get_user", mock_get_user)
+
+    result = fetch_github_data("network_error_user", force_refresh=True)
+    assert result["score"] == 0
+    assert result["username"] == "network_error_user"
+    assert "connection error" in str(result["reason"]).lower()
+
+

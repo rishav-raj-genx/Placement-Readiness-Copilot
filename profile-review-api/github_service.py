@@ -400,6 +400,30 @@ def _inspect_repository(
     }
 
 
+def _base_github_error_profile(username: str, reason: str = "GitHub profile not found or invalid username.") -> dict[str, object]:
+    return {
+        "username": username,
+        "name": None,
+        "bio": None,
+        "public_repos": 0,
+        "followers": 0,
+        "following": 0,
+        "repositories": [],
+        "repositories_inspected": 0,
+        "rate_limited": False,
+        "has_pinned_repos": False,
+        "has_recent_commit_activity": False,
+        "has_committed_secrets": False,
+        "has_unit_tests": False,
+        "has_ci_cd": False,
+        "has_architecture_diagrams": False,
+        "average_code_quality_score": 0,
+        "score": 0,
+        "reason": reason,
+        "error": reason,
+    }
+
+
 def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, object]:
     normalized_username = username.strip().lower()
     if not normalized_username:
@@ -415,10 +439,22 @@ def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, o
     try:
         try:
             user = github.get_user(normalized_username)
+        except UnknownObjectException:
+            return _base_github_error_profile(normalized_username, "GitHub profile not found or invalid username.")
         except (RateLimitExceededException, GithubException) as exc:
+            status_code = getattr(exc, "status", None)
+            if status_code == 404 or "not found" in str(exc).lower():
+                return _base_github_error_profile(normalized_username, "GitHub profile not found or invalid username.")
             if cached:
                 return cached[1]
-            raise
+            if status_code in (403, 429) or "rate limit" in str(exc).lower():
+                return _base_github_error_profile(normalized_username, "GitHub API rate limit exceeded.")
+            return _base_github_error_profile(normalized_username, f"GitHub API error: {str(exc)}")
+        except Exception as exc:
+            if cached:
+                return cached[1]
+            return _base_github_error_profile(normalized_username, f"GitHub connection error: {str(exc)}")
+
         repositories: list[dict[str, object]] = []
         rate_limited = False
         repo_limit = _repository_limit()
@@ -471,12 +507,16 @@ def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, o
                     if getattr(exc, "status", None) in (403, 429) or "rate limit" in str(exc).lower():
                         rate_limited = True
                         break
-                    raise
+                    pass
+                except Exception:
+                    pass
         except (RateLimitExceededException, GithubException) as exc:
             if getattr(exc, "status", None) in (403, 429) or "rate limit" in str(exc).lower():
                 rate_limited = True
-            else:
-                raise
+            elif getattr(exc, "status", None) == 404:
+                return _base_github_error_profile(normalized_username, "GitHub profile not found or invalid username.")
+        except Exception:
+            pass
 
         has_pinned = any(bool(r.get("is_pinned")) for r in repositories)
         has_recent = any(bool(r.get("has_recent_activity")) for r in repositories)

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
 import { createAdminClient } from '@/lib/supabase-server';
 import { normalizeUserProfile, PROFILE_SELECT_COLUMNS } from '@/lib/profile-adapters';
+import { sanitizeUsername } from '@/lib/onboarding';
 
 export const runtime = 'nodejs';
 
@@ -27,9 +28,9 @@ function sanitizeProfilePayload(body: Record<string, unknown>): Record<string, u
   }
 
   if (typeof body.githubUsername === 'string') {
-    payload.github_username = body.githubUsername.trim() || null;
+    payload.github_username = sanitizeUsername(body.githubUsername) || null;
   } else if (typeof body.github_username === 'string') {
-    payload.github_username = body.github_username.trim() || null;
+    payload.github_username = sanitizeUsername(body.github_username) || null;
   }
 
   if (typeof body.leetcodeUrl === 'string') {

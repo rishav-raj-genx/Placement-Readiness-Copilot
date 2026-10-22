@@ -27,6 +27,7 @@ import { toast } from '@/lib/toast';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 import {
   normalizeGithubUsername,
+  sanitizeUsername,
   validateResumeFile,
   validatePdf,
 } from '@/lib/onboarding';
@@ -158,8 +159,8 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
       displayName: fullName.trim(),
       email: email.trim(),
       targetRole: effectiveRole,
-      githubUsername: github.trim(),
-      leetcodeUrl: leetcodeUrl.trim(),
+      githubUsername: sanitizeUsername(github.trim()),
+      leetcodeUrl: sanitizeUsername(leetcodeUrl.trim()),
       linkedinUrl: linkedinUrl.trim(),
     });
 
@@ -199,12 +200,12 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
       return;
     }
 
-    if (github.trim()) {
-      const normalized = normalizeGithubUsername(github.trim());
-      if (!normalized) {
-        toast.error('Please enter a valid GitHub username or repository URL.');
-        return;
-      }
+    const sanitizedGithub = github.trim() ? sanitizeUsername(github.trim()) : null;
+    const sanitizedLeetcode = leetcodeUrl.trim() ? sanitizeUsername(leetcodeUrl.trim()) : null;
+
+    if (github.trim() && !sanitizedGithub) {
+      toast.error('Please enter a valid GitHub username or profile URL.');
+      return;
     }
 
     setIsSubmitting(true);
@@ -246,7 +247,7 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
       let uploadedResumePath: string | null = null;
       let uploadedLinkedinPath: string | null = null;
 
-      // 2. Upload resume file if selected
+      // 2. Upload resume file if selected (try resumes bucket first, then candidate-documents)
       if (resumeFile) {
         try {
           const isDocx = resumeFile.name.toLowerCase().endsWith('.docx');
@@ -256,12 +257,15 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
             : 'application/pdf';
           const path = `${userId}/resume.${ext}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('candidate-documents')
-            .upload(path, resumeFile, { upsert: true, contentType });
+          for (const bucket of ['resumes', 'candidate-documents']) {
+            const { error: uploadError } = await supabase.storage
+              .from(bucket)
+              .upload(path, resumeFile, { upsert: true, contentType });
 
-          if (!uploadError) {
-            uploadedResumePath = path;
+            if (!uploadError) {
+              uploadedResumePath = path;
+              break;
+            }
           }
         } catch {
           // Non-blocking: profile record will still succeed
@@ -272,12 +276,15 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
       if (linkedinFile) {
         try {
           const path = `${userId}/linkedin.pdf`;
-          const { error: uploadError } = await supabase.storage
-            .from('candidate-documents')
-            .upload(path, linkedinFile, { upsert: true, contentType: 'application/pdf' });
+          for (const bucket of ['candidate-documents', 'resumes']) {
+            const { error: uploadError } = await supabase.storage
+              .from(bucket)
+              .upload(path, linkedinFile, { upsert: true, contentType: 'application/pdf' });
 
-          if (!uploadError) {
-            uploadedLinkedinPath = path;
+            if (!uploadError) {
+              uploadedLinkedinPath = path;
+              break;
+            }
           }
         } catch {
           // Non-blocking
@@ -285,16 +292,16 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
       }
 
       // 4. Upsert complete profile record
-      const normalizedGithub = github.trim() ? normalizeGithubUsername(github.trim()) : null;
       const profileData: Record<string, unknown> = {
         id: userId,
         role: 'student',
         email: email.trim(),
         display_name: fullName.trim(),
         target_role: effectiveRole || 'Software Engineer',
-        github_username: normalizedGithub || null,
-        leetcode_url: leetcodeUrl.trim() || null,
+        github_username: sanitizedGithub,
+        leetcode_url: sanitizedLeetcode,
         linkedin_url: linkedinUrl.trim() || null,
+        resume_path: uploadedResumePath,
         resume_pdf_path: uploadedResumePath,
         linkedin_pdf_path: uploadedLinkedinPath,
         onboarding_completed_at: new Date().toISOString(),
@@ -310,12 +317,20 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
         const errStr = (profileError.message || '').toLowerCase();
         if (
           profileError.code === 'PGRST204' ||
+          errStr.includes('resume_path') ||
           errStr.includes('leetcode_url') ||
           errStr.includes('linkedin_url') ||
           errStr.includes('column')
         ) {
-          delete profileData.leetcode_url;
-          delete profileData.linkedin_url;
+          if (errStr.includes('resume_path') && !errStr.includes('resume_pdf_path')) {
+            delete profileData.resume_path;
+          }
+          if (errStr.includes('leetcode_url')) {
+            delete profileData.leetcode_url;
+          }
+          if (errStr.includes('linkedin_url')) {
+            delete profileData.linkedin_url;
+          }
           await supabase.from('profiles').upsert(profileData);
         }
       }

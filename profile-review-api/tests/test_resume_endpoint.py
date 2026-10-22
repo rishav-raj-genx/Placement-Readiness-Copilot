@@ -206,3 +206,23 @@ def test_forced_refresh_isolates_corrupted_resume_and_service_failures(monkeypat
     assert payload["resume_error"] is not None
     assert payload["total_readiness_score"] >= 0
 
+
+def test_analyze_profile_without_resume_file(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    response = client.post(
+        "/analyze-profile",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
+        data={
+            "github_username": "",
+            "leetcode_url": "",
+            "force_refresh": "true",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resume_review"]["score"] == 0
+    assert payload["resume_error"] == "No resume document provided."
+    assert payload["total_readiness_score"] >= 0
+
+

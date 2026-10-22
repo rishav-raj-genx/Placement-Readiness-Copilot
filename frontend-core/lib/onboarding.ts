@@ -38,13 +38,48 @@ export function validateResumeFile(file: File): string | null {
   return null;
 }
 
-export function normalizeGithubUsername(value: string): string {
-  const withoutPrefix = value
-    .trim()
-    .replace(/^@/, '')
-    .replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, '');
+export function sanitizeUsername(value: string | null | undefined): string {
+  if (!value) return '';
+  let str = value.trim();
+  if (!str) return '';
 
-  return withoutPrefix.split(/[/?#]/, 1)[0] ?? '';
+  // Remove leading @ if present
+  str = str.replace(/^@+/, '');
+
+  // Strip query params and hashes, remove trailing slashes
+  str = str.split(/[?#]/, 1)[0].replace(/\/+$/, '');
+
+  // Extract from common URL patterns:
+  // e.g. https://github.com/username or https://leetcode.com/username or https://leetcode.com/u/username
+  const urlMatch = str.match(/(?:github\.com|leetcode\.com(?:\/u)?)\/([a-zA-Z0-9_\-]+)/i);
+  if (urlMatch && urlMatch[1]) {
+    return urlMatch[1];
+  }
+
+  // Handle generic http(s) URL where username is the last segment
+  if (str.startsWith('http://') || str.startsWith('https://')) {
+    try {
+      const parsed = new URL(str);
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      const last = segments[segments.length - 1];
+      if (last && /^[a-zA-Z0-9_\-]+$/.test(last)) {
+        return last;
+      }
+    } catch {
+      // Fall through to regex
+    }
+  }
+
+  // If it's already a clean username or has prefix
+  const cleaned = str.replace(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com|leetcode\.com)\/?/i, '');
+  const segment = cleaned.replace(/^u\//i, '').split(/[/?#]/, 1)[0];
+  return segment.replace(/^@+/, '').trim();
 }
 
-export const normalizeUsername = normalizeGithubUsername;
+export function normalizeGithubUsername(value: string): string {
+  return sanitizeUsername(value);
+}
+
+export const normalizeUsername = sanitizeUsername;
+export const sanitizeGithubUsername = sanitizeUsername;
+export const sanitizeLeetcodeUsername = sanitizeUsername;
