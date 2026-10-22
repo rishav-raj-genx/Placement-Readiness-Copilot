@@ -21,6 +21,16 @@ import { getAuthenticatedDestination } from '@/lib/auth-routing';
 import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
 
+export const BLOCKED_DOMAINS = [
+  'gmail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'aol.com',
+  'icloud.com',
+  'protonmail.com',
+];
+
 interface LoginFormProps {
   isSignUp?: boolean;
   isStaff?: boolean;
@@ -110,6 +120,18 @@ export function LoginForm({
 
     if (password.length < 6) {
       toast.error('Password must be at least 6 characters long.');
+      return;
+    }
+
+    const emailDomain = trimmedEmail.toLowerCase().split('@')[1]?.trim();
+    if (
+      emailDomain &&
+      (BLOCKED_DOMAINS.includes(emailDomain) ||
+        BLOCKED_DOMAINS.some((b) => emailDomain.endsWith('.' + b)))
+    ) {
+      toast.error(
+        'Please use your official organizational email ID. Normal personal accounts are not permitted for staff.'
+      );
       return;
     }
 

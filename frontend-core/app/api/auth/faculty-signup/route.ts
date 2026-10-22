@@ -12,6 +12,16 @@ interface FacultySignUpBody {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export const BLOCKED_DOMAINS = [
+  'gmail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'aol.com',
+  'icloud.com',
+  'protonmail.com',
+];
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const rawBody: unknown = await request.json().catch(() => null);
@@ -35,6 +45,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
       return NextResponse.json(
         { error: 'Please enter a valid institutional email address.' },
+        { status: 400 }
+      );
+    }
+
+    const emailDomain = email.trim().toLowerCase().split('@')[1]?.trim();
+    if (
+      emailDomain &&
+      (BLOCKED_DOMAINS.includes(emailDomain) ||
+        BLOCKED_DOMAINS.some((b) => emailDomain.endsWith('.' + b)))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Please use your official organizational email ID. Normal personal accounts are not permitted for staff.',
+        },
         { status: 400 }
       );
     }

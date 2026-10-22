@@ -92,4 +92,29 @@ describe('Auth UI 2x2 Matrix & Persona Footer Toggles Contract', () => {
     // Footer link text: "Create Candidate Account →"
     expect(loginFormContent).toContain("isSignUp && isStaff && 'Create Candidate Account →'");
   });
+
+  it('Enforces organizational email validation exclusively during Staff Sign Up', () => {
+    // Defines BLOCKED_DOMAINS
+    const expectedBlocked = [
+      'gmail.com',
+      'yahoo.com',
+      'hotmail.com',
+      'outlook.com',
+      'aol.com',
+      'icloud.com',
+      'protonmail.com',
+    ];
+    for (const domain of expectedBlocked) {
+      expect(loginFormContent).toContain(domain);
+    }
+
+    // Displays the exact toast error popup
+    expect(loginFormContent).toContain(
+      'toast.error(\n        \'Please use your official organizational email ID. Normal personal accounts are not permitted for staff.\'\n      );'
+    );
+
+    // Guardrail: Candidate sign up does NOT block personal email domains
+    expect(signUpWizardContent).not.toContain('BLOCKED_DOMAINS');
+    expect(signUpWizardContent).not.toContain('Normal personal accounts are not permitted');
+  });
 });

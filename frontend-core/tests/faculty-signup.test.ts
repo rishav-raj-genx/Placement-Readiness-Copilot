@@ -102,6 +102,42 @@ describe('Faculty & Admin Sign-Up Security Guardrails', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
+  it('rejects signup with personal email domains (gmail, yahoo, outlook, etc.)', async () => {
+    const { POST } = await import('@/app/api/auth/faculty-signup/route');
+
+    const personalEmails = [
+      'prof.dumbledore@gmail.com',
+      'mcgonagall@yahoo.com',
+      'snape@hotmail.com',
+      'flitwick@outlook.com',
+      'sprout@aol.com',
+      'hagrid@icloud.com',
+      'lupin@protonmail.com',
+      'moody@subdomain.gmail.com',
+    ];
+
+    for (const personalEmail of personalEmails) {
+      const req = new NextRequest('http://localhost:3000/api/auth/faculty-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: 'Staff Member',
+          email: personalEmail,
+          password: 'securePassword123',
+          facultyCode: 'MSOT-SECRET-FACULTY-2026',
+        }),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBe(
+        'Please use your official organizational email ID. Normal personal accounts are not permitted for staff.'
+      );
+      expect(mockCreateUser).not.toHaveBeenCalled();
+    }
+  });
+
   it('authorizes and creates user with role="admin" when invite code is valid', async () => {
     const { POST } = await import('@/app/api/auth/faculty-signup/route');
 
