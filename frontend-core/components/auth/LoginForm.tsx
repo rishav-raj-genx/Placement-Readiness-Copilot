@@ -22,16 +22,20 @@ import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
 
 interface LoginFormProps {
-  onToggleSignUp: () => void;
+  isSignUp?: boolean;
+  isStaff?: boolean;
+  onToggleStaff?: () => void;
   redirectTo?: string | null;
 }
 
-export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
+export function LoginForm({
+  isSignUp = false,
+  isStaff = false,
+  onToggleStaff = () => {},
+  redirectTo,
+}: LoginFormProps) {
   const router = useRouter();
   const { signIn, isLoading, error, clearError } = useAuthStore();
-
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  const [adminTab, setAdminTab] = useState<'signin' | 'signup'>('signin');
 
   // Common credentials
   const [email, setEmail] = useState('');
@@ -65,10 +69,10 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
       if (state.user) {
         setIsRedirecting(true);
         toast.success(
-          isAdminMode ? 'Welcome to Faculty & Admin Portal' : 'Welcome back to Hireable'
+          isStaff ? 'Welcome to Faculty & Admin Portal' : 'Welcome back to Hireable'
         );
 
-        const destination = isAdminMode
+        const destination = isStaff
           ? redirectTo?.startsWith('/admin')
             ? redirectTo
             : '/admin-interviews'
@@ -154,7 +158,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   if (isRedirecting) {
     return (
       <SegmentedLoader
-        message={isAdminMode ? 'Loading administrative portal…' : 'Loading candidate workspace…'}
+        message={isStaff ? 'Loading administrative portal…' : 'Loading candidate workspace…'}
         subtitle="Verifying credentials…"
         fullScreen
       />
@@ -163,17 +167,17 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
 
   return (
     <motion.div
-      key={isAdminMode ? `admin-${adminTab}` : 'candidate-login'}
+      key={`${isSignUp ? 'signup' : 'signin'}-${isStaff ? 'staff' : 'candidate'}`}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -16 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
       className="w-full max-w-md rounded-2xl border border-stone-800 bg-[#28201E] p-7 text-stone-200 shadow-lg shadow-black/50 sm:p-9"
     >
       {/* Header */}
       <div className="mb-6">
         <div className="inline-flex items-center gap-1.5 rounded border border-stone-700 bg-stone-800 px-2.5 py-0.5 font-mono text-xs uppercase tracking-wider text-stone-300">
-          {isAdminMode ? (
+          {isStaff ? (
             <>
               <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
               <span>Faculty & Admin Portal</span>
@@ -187,52 +191,25 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
         </div>
 
         <h2 className="mt-3 font-[var(--font-display)] text-2xl font-bold tracking-tight text-stone-100 sm:text-3xl">
-          {isAdminMode
-            ? adminTab === 'signup'
-              ? 'Create Faculty Account'
+          {isStaff
+            ? isSignUp
+              ? 'Create Staff Account'
               : 'Faculty & Admin Portal'
-            : 'Welcome back'}
+            : 'Welcome back, Candidate'}
         </h2>
 
         <p className="mt-1.5 text-xs text-stone-400 sm:text-sm">
-          {isAdminMode
-            ? adminTab === 'signup'
+          {isStaff
+            ? isSignUp
               ? 'Register with your institutional credentials and verified MSOT authorization code.'
               : 'Sign in to manage technical vivas, review transcripts, and post MSOT job listings.'
             : 'Sign in to review your readiness scores and practice mock viva sessions.'}
         </p>
       </div>
 
-      {/* Admin Mode: Seamless Tab Toggle (Sign In / Create Account) */}
-      {isAdminMode && (
-        <div className="mb-6 flex rounded-xl border border-stone-800 bg-stone-900 p-1">
-          <button
-            type="button"
-            onClick={() => setAdminTab('signin')}
-            className={`flex-1 rounded-lg py-1.5 font-[var(--font-display)] text-xs font-semibold transition-all ${
-              adminTab === 'signin'
-                ? 'bg-[#D93829] text-white shadow-sm'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => setAdminTab('signup')}
-            className={`flex-1 rounded-lg py-1.5 font-[var(--font-display)] text-xs font-semibold transition-all ${
-              adminTab === 'signup'
-                ? 'bg-red-600 text-white shadow-sm'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
-      )}
-
-      {/* Admin Sign-Up View */}
-      {isAdminMode && adminTab === 'signup' ? (
+      {/* Form View: Staff Sign-Up vs Sign-In */}
+      {isStaff && isSignUp ? (
+        /* State 4: Staff Sign-Up View */
         <form onSubmit={handleFacultySignUp} className="space-y-4">
           {/* Full Name */}
           <div>
@@ -358,7 +335,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
           </button>
         </form>
       ) : (
-        /* Sign-In View (Candidate or Admin) */
+        /* State 1 & State 2: Sign-In View (Candidate or Staff) */
         <form onSubmit={handleSignIn} className="space-y-4">
           {/* Email Input */}
           <div>
@@ -377,7 +354,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
                 autoCapitalize="none"
                 spellCheck={false}
                 className="h-11 w-full rounded-lg border border-stone-800 bg-stone-900/90 px-3.5 text-sm text-stone-100 outline-none transition-colors placeholder:text-stone-500 focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
-                placeholder={isAdminMode ? 'faculty@institution.edu' : 'name@college.edu'}
+                placeholder={isStaff ? 'faculty@institution.edu' : 'name@college.edu'}
               />
               <Mail className="pointer-events-none absolute right-3.5 top-3.5 h-4 w-4 text-stone-500" />
             </div>
@@ -431,7 +408,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
             type="submit"
             disabled={isLoading}
             aria-busy={isLoading}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 font-[var(--font-display)] text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 font-[var(--font-display)] text-xs font-semibold text-white shadow-md shadow-red-950/40 transition-colors hover:bg-red-700 active:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -440,7 +417,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
               </>
             ) : (
               <>
-                <span>{isAdminMode ? 'Sign in to Portal' : 'Sign in'}</span>
+                <span>{isStaff ? 'Sign in to Portal' : 'Sign In'}</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
@@ -448,71 +425,17 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
         </form>
       )}
 
-      {/* Pathway Switcher */}
-      <div className="mt-7 border-t border-stone-800 pt-5 text-center space-y-2">
-        {isAdminMode ? (
-          <div className="space-y-1.5">
-            {adminTab === 'signin' ? (
-              <p className="text-xs text-stone-400">
-                Need a faculty account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setAdminTab('signup')}
-                  className="font-medium text-red-500 transition-colors hover:underline"
-                >
-                  Create Faculty Account &rarr;
-                </button>
-              </p>
-            ) : (
-              <p className="text-xs text-stone-400">
-                Already have a faculty account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setAdminTab('signin')}
-                  className="font-medium text-[#D93829] transition-colors hover:underline"
-                >
-                  Sign in to Portal &rarr;
-                </button>
-              </p>
-            )}
-
-            <p className="text-xs text-stone-400 pt-1">
-              Candidate looking for interviews?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAdminMode(false);
-                  setAdminTab('signin');
-                }}
-                className="font-medium text-stone-300 transition-colors hover:text-white hover:underline"
-              >
-                Candidate Sign in &rarr;
-              </button>
-            </p>
-          </div>
-        ) : (
-          <>
-            <p className="text-xs text-stone-400">
-              New candidate?{' '}
-              <button
-                type="button"
-                onClick={onToggleSignUp}
-                className="font-medium text-[#D93829] transition-colors hover:underline"
-              >
-                Create your account &rarr;
-              </button>
-            </p>
-            <div>
-              <button
-                type="button"
-                onClick={() => setIsAdminMode(true)}
-                className="text-[11px] text-stone-400 transition-colors hover:text-stone-200"
-              >
-                Staff &amp; Faculty Access &rarr;
-              </button>
-            </div>
-          </>
-        )}
+      {/* Persona Footer Toggle: Exactly ONE link that flips isStaff */}
+      <div className="mt-6 border-t border-stone-800/80 pt-4 text-center">
+        <button
+          type="button"
+          onClick={onToggleStaff}
+          className="text-xs font-medium text-stone-400 transition-colors hover:text-stone-200 focus-visible:outline-none"
+        >
+          {!isSignUp && !isStaff && 'Staff Sign In →'}
+          {!isSignUp && isStaff && 'Candidate Sign In →'}
+          {isSignUp && isStaff && 'Create Candidate Account →'}
+        </button>
       </div>
     </motion.div>
   );

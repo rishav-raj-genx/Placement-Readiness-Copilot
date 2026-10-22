@@ -11,16 +11,18 @@ import { SignUpWizard } from './SignUpWizard';
 
 interface AuthCanvasProps {
   initialMode?: 'login' | 'signup';
+  initialStaff?: boolean;
   redirectTo?: string | null;
 }
 
-export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProps) {
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
+export function AuthCanvas({ initialMode = 'login', initialStaff = false, redirectTo }: AuthCanvasProps) {
+  const [isSignUp, setIsSignUp] = useState<boolean>(initialMode === 'signup');
+  const [isStaff, setIsStaff] = useState<boolean>(initialStaff);
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
 
   useEffect(() => {
-    setMode(initialMode);
+    setIsSignUp(initialMode === 'signup');
   }, [initialMode]);
 
   return (
@@ -36,7 +38,7 @@ export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProp
 
         <Link
           href="/"
-          className="flex items-center gap-1.5 rounded-lg border border-stone-800 bg-stone-900/80 px-3 py-1.5 text-xs font-medium text-stone-400 transition-colors hover:border-stone-700 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
+          className="flex items-center gap-1.5 rounded-lg border border-stone-800 bg-stone-900/80 px-3.5 py-1.5 text-xs font-medium text-stone-400 transition-colors hover:border-stone-700 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>Home</span>
@@ -108,14 +110,14 @@ export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProp
             </div>
           )}
 
-          {/* Quick Segmented Mode Switcher */}
+          {/* Consolidated Top-Level Action Tabs: Controls exactly isSignUp */}
           <div className="mb-5 flex w-full max-w-xs rounded-xl border border-stone-800 bg-stone-900 p-1">
             <button
               type="button"
-              onClick={() => setMode('login')}
+              onClick={() => setIsSignUp(false)}
               className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                mode === 'login'
-                  ? 'bg-[#D93829] text-white shadow-sm'
+                !isSignUp
+                  ? 'bg-red-600 text-white shadow-sm'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
@@ -123,10 +125,10 @@ export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProp
             </button>
             <button
               type="button"
-              onClick={() => setMode('signup')}
+              onClick={() => setIsSignUp(true)}
               className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                mode === 'signup'
-                  ? 'bg-[#D93829] text-white shadow-sm'
+                isSignUp
+                  ? 'bg-red-600 text-white shadow-sm'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
@@ -136,16 +138,19 @@ export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProp
 
           <div className="w-full max-w-md sm:max-w-lg">
             <AnimatePresence mode="wait">
-              {mode === 'login' ? (
-                <LoginForm
-                  key="login"
-                  onToggleSignUp={() => setMode('signup')}
-                  redirectTo={redirectTo}
+              {isSignUp && !isStaff ? (
+                <SignUpWizard
+                  key="candidate-signup"
+                  onToggleLogin={() => setIsSignUp(false)}
+                  onToggleStaff={() => setIsStaff(true)}
                 />
               ) : (
-                <SignUpWizard
-                  key="signup"
-                  onToggleLogin={() => setMode('login')}
+                <LoginForm
+                  key={`${isSignUp ? 'signup' : 'signin'}-${isStaff ? 'staff' : 'candidate'}`}
+                  isSignUp={isSignUp}
+                  isStaff={isStaff}
+                  onToggleStaff={() => setIsStaff((prev) => !prev)}
+                  redirectTo={redirectTo}
                 />
               )}
             </AnimatePresence>

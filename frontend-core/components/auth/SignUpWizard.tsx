@@ -41,7 +41,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
 
 export interface SignUpWizardProps {
-  onToggleLogin: () => void;
+  onToggleLogin?: () => void;
+  onToggleStaff?: () => void;
 }
 
 const COMMON_ROLES = [
@@ -56,7 +57,7 @@ const COMMON_ROLES = [
   'Custom / Other Role',
 ];
 
-export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
+export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {} }: SignUpWizardProps) {
   const router = useRouter();
   const hydrate = useAuthStore((state) => state.hydrate);
 
@@ -374,7 +375,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           <span>Candidate Onboarding</span>
         </div>
         <h2 className="mt-3 font-[var(--font-display)] text-2xl font-bold tracking-tight text-stone-100 sm:text-3xl">
-          Create candidate account
+          Create Candidate Account
         </h2>
         <p className="mt-1 text-xs text-stone-400 sm:text-sm">
           Set up your credentials and evidence profile to benchmark your placement readiness.
@@ -775,7 +776,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
                   </>
                 ) : (
                   <>
-                    <span>Create Account & Start Scoring</span>
+                    <span>Create Account</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -785,18 +786,15 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         )}
       </form>
 
-      {/* Footer Switch to Login */}
+      {/* Persona Footer Toggle: Exactly ONE link that flips isStaff */}
       <div className="mt-6 border-t border-stone-800/80 pt-4 text-center">
-        <p className="text-xs text-stone-400">
-          Already have an account?{' '}
-          <button
-            type="button"
-            onClick={onToggleLogin}
-            className="font-semibold text-[#D93829] hover:underline"
-          >
-            Sign in here &rarr;
-          </button>
-        </p>
+        <button
+          type="button"
+          onClick={onToggleStaff}
+          className="text-xs font-medium text-stone-400 transition-colors hover:text-stone-200 focus-visible:outline-none"
+        >
+          Create Staff Account &rarr;
+        </button>
       </div>
     </motion.div>
   );
