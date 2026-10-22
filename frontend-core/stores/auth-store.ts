@@ -3,7 +3,11 @@
 import { create } from 'zustand';
 import type { UserProfile } from '@/types';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
-import { normalizeUserProfile, PROFILE_SELECT_COLUMNS } from '@/lib/profile-adapters';
+import {
+  normalizeUserProfile,
+  PROFILE_SELECT_COLUMNS,
+  PROFILE_SAFE_FALLBACK_COLUMNS,
+} from '@/lib/profile-adapters';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 
 export type SignUpResult = 'authenticated' | 'confirmation_required' | 'failed';
@@ -26,7 +30,29 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
     .select(PROFILE_SELECT_COLUMNS)
     .eq('id', userId)
     .maybeSingle();
-  if (error) throw error;
+
+  if (error) {
+    const errorMsg = error.message || '';
+    const isColumnMissing =
+      error.code === '42703' ||
+      error.code === 'PGRST204' ||
+      errorMsg.includes('does not exist') ||
+      errorMsg.includes('linkedin_text');
+
+    if (isColumnMissing) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('profiles')
+        .select(PROFILE_SAFE_FALLBACK_COLUMNS)
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!fallbackError && fallbackData) {
+        return normalizeUserProfile(fallbackData as unknown);
+      }
+    }
+    throw error;
+  }
+
   return normalizeUserProfile(data as unknown);
 }
 

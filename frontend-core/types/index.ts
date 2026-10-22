@@ -35,6 +35,8 @@ export interface UserProfile {
   linkedinPdfPath?: string;
   linkedinText?: string;
   linkedinUrl?: string;
+  linkedin_text?: string | null;
+  linkedin_url?: string | null;
   leetcodeUrl?: string;
   codingProfileUrl?: string;
   projects: CandidateProject[];

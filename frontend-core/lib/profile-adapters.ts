@@ -15,6 +15,12 @@ export const PROFILE_SELECT_COLUMNS = [
   'linkedin_text', 'projects', 'onboarding_completed_at', 'updated_at',
 ].join(',');
 
+export const PROFILE_SAFE_FALLBACK_COLUMNS = [
+  'id', 'email', 'display_name', 'role', 'created_at', 'target_role', 'target_locations',
+  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path', 'projects',
+  'onboarding_completed_at', 'updated_at',
+].join(',');
+
 export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -77,6 +83,8 @@ export function normalizeUserProfile(value: unknown): UserProfile | null {
     linkedinPdfPath: readString(value.linkedin_pdf_path) || undefined,
     linkedinUrl: readString(value.linkedin_url) || undefined,
     linkedinText: readString(value.linkedin_text) || undefined,
+    linkedin_url: readString(value.linkedin_url) || null,
+    linkedin_text: readString(value.linkedin_text) || null,
     leetcodeUrl: readString(value.leetcode_url) || undefined,
     codingProfileUrl: readString(value.coding_profile_url) || undefined,
     projects,
