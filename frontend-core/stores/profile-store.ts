@@ -82,14 +82,12 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
           // Ignore session fetch errors
         }
       }
-      const internalKey = process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || process.env.INTERNAL_SERVICE_KEY || '';
-      const authToken = sessionToken || internalKey;
       const response = await fetch('/api/profile-review/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
         },
         cache: 'no-store',
         body: JSON.stringify({

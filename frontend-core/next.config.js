@@ -3,8 +3,6 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_LIVEKIT_URL:
       process.env.NEXT_PUBLIC_LIVEKIT_URL || process.env.LIVEKIT_URL || '',
-    INTERNAL_SERVICE_KEY:
-      process.env.INTERNAL_SERVICE_KEY || '',
   },
   images: { unoptimized: true },
   experimental: {

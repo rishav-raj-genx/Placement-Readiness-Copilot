@@ -127,8 +127,12 @@ async function handleProfileUpdate(request: Request): Promise<NextResponse> {
     if (!studentId) {
       const authHeader = request.headers.get('authorization') ?? '';
       const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-      const internalKey = process.env.INTERNAL_SERVICE_KEY?.trim();
-      if (internalKey && token && token === internalKey) {
+      const internalSecret = (
+        process.env.INTERNAL_SERVICE_SECRET ||
+        process.env.INTERNAL_SERVICE_KEY ||
+        ''
+      ).trim();
+      if (internalSecret && token && token === internalSecret) {
         // Will be extracted from body
       } else {
         return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });

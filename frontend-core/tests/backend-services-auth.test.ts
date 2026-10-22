@@ -26,13 +26,13 @@ describe('serviceRequest authentication and secret validation', () => {
         method: 'GET',
       })
     ).rejects.toThrowError(
-      /Service authentication secret is not configured on the server\. Please define INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET/
+      'Server Misconfiguration: INTERNAL_SERVICE_SECRET is missing or evaluated to undefined on the Next.js server.'
     );
   });
 
-  it('attaches Authorization header when INTERNAL_SERVICE_SECRET is provided', async () => {
+  it('attaches trimmed Authorization header when INTERNAL_SERVICE_SECRET has whitespace', async () => {
     vi.stubEnv('INTERNAL_SERVICE_KEY', '');
-    vi.stubEnv('INTERNAL_SERVICE_SECRET', 'test-secret-token-xyz');
+    vi.stubEnv('INTERNAL_SERVICE_SECRET', '  test-secret-token-xyz \n');
 
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
@@ -49,6 +49,31 @@ describe('serviceRequest authentication and secret validation', () => {
     });
     expect(res).toEqual({ status: 'ok' });
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it('provides a descriptive error when microservice reports Invalid service token', async () => {
+    vi.stubEnv('INTERNAL_SERVICE_SECRET', 'valid-client-token');
+
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          detail: 'Invalid service token.',
+        }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      serviceRequest('https://profile-review-api.onrender.com/analyze-profile', {
+        method: 'POST',
+      })
+    ).rejects.toThrowError(
+      /Service request rejected: Upstream microservice \(https:\/\/profile-review-api\.onrender\.com\) reported "Invalid service token"\. Verify that INTERNAL_SERVICE_SECRET or INTERNAL_SERVICE_KEY in your microservice deployment matches Vercel\./
+    );
   });
 
   it('provides a descriptive error when microservice reports missing server secret', async () => {

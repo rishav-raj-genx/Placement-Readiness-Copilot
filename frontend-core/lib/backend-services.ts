@@ -59,16 +59,16 @@ export interface ServiceRequestOptions extends RequestInit {
   maxBackoffMs?: number;
 }
 
-function getInternalServiceToken(): string {
-  const token = firstConfigured(
-    process.env.INTERNAL_SERVICE_KEY,
-    process.env.INTERNAL_SERVICE_SECRET,
-    process.env.PROFILE_REVIEW_SERVICE_TOKEN,
-    process.env.AUTOMATION_SERVICE_TOKEN,
-  );
-  if (token) return token;
+export function getInternalServiceToken(): string {
+  const secret = (
+    process.env.INTERNAL_SERVICE_SECRET ||
+    process.env.INTERNAL_SERVICE_KEY ||
+    process.env.PROFILE_REVIEW_SERVICE_TOKEN ||
+    process.env.AUTOMATION_SERVICE_TOKEN ||
+    ''
+  ).trim();
 
-  return '';
+  return secret;
 }
 
 export async function serviceRequest(url: string, options: ServiceRequestOptions = {}): Promise<unknown> {
@@ -89,10 +89,13 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
       } else {
         clearTimeout(timeout);
         const errorMsg =
-          'Service authentication secret is not configured on the server. Please define INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET in your .env.local file or Vercel dashboard environment variables.';
+          'Server Misconfiguration: INTERNAL_SERVICE_SECRET is missing or evaluated to undefined on the Next.js server.';
         console.error(`[backend-services] Configuration Error: ${errorMsg}`);
         throw new Error(errorMsg);
       }
+    } else {
+      const currentAuth = headers.get('Authorization')?.trim() ?? '';
+      headers.set('Authorization', currentAuth);
     }
 
     try {
@@ -114,6 +117,14 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
         typeof payload === 'object' && payload !== null && 'detail' in payload
           ? String((payload as Record<string, unknown>).detail)
           : `${response.status} ${response.statusText}`;
+
+      if (detail.includes('Invalid service token')) {
+        let origin = url;
+        try { origin = new URL(url).origin; } catch {}
+        throw new Error(
+          `Service request rejected: Upstream microservice (${origin}) reported "Invalid service token". Verify that INTERNAL_SERVICE_SECRET or INTERNAL_SERVICE_KEY in your microservice deployment matches Vercel.`
+        );
+      }
 
       if (detail.includes('Service authentication secret is not configured')) {
         let origin = url;

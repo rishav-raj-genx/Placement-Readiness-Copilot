@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import logging
 import os
 from typing import Annotated
@@ -112,25 +113,25 @@ def verify_service_token(authorization: Annotated[str | None, Header()] = None) 
     if is_e2e_mode():
         return "authorized"
 
-    expected_key = (
-        os.getenv("PROFILE_REVIEW_SERVICE_TOKEN")
-        or os.getenv("INTERNAL_SERVICE_KEY")
-        or os.getenv("INTERNAL_SERVICE_SECRET")
-    )
-    if not expected_key:
+    service_secret = os.getenv("INTERNAL_SERVICE_SECRET", "").strip()
+    service_key = os.getenv("INTERNAL_SERVICE_KEY", "").strip()
+    service_token = os.getenv("PROFILE_REVIEW_SERVICE_TOKEN", "").strip()
+
+    valid_keys = [k for k in (service_secret, service_key, service_token) if k]
+    if not valid_keys:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Service authentication secret is not configured on the server. Please define INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET in your server environment variables.",
         )
 
-    if not authorization or not authorization.startswith("Bearer "):
+    if not authorization or not authorization.strip().startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing or invalid Authorization header.",
         )
 
-    token = authorization.split("Bearer ", 1)[1].strip()
-    if token != expected_key:
+    token = authorization.strip().split("Bearer ", 1)[1].strip()
+    if not token or not any(hmac.compare_digest(token, expected) for expected in valid_keys):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid service token.",

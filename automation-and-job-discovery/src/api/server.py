@@ -1,3 +1,4 @@
+import hmac
 import logging
 import os
 import uuid
@@ -51,17 +52,23 @@ def verify_service_token(
     if is_e2e_mode():
         return True
 
-    expected_token = (
-        os.environ.get("AUTOMATION_SERVICE_TOKEN")
-        or os.environ.get("INTERNAL_SERVICE_KEY")
-        or os.environ.get("INTERNAL_SERVICE_SECRET")
-    )
-    if not expected_token:
+    service_secret = os.environ.get("INTERNAL_SERVICE_SECRET", "").strip()
+    service_key = os.environ.get("INTERNAL_SERVICE_KEY", "").strip()
+    service_token = os.environ.get("AUTOMATION_SERVICE_TOKEN", "").strip()
+
+    valid_tokens = [k for k in (service_secret, service_key, service_token) if k]
+    if not valid_tokens:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"code": "MISCONFIGURED", "message": "Service authorization key not configured"},
         )
-    if not credentials or credentials.credentials != expected_token:
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "UNAUTHORIZED", "message": "Missing or invalid service authorization token"},
+        )
+    token = credentials.credentials.strip()
+    if not any(hmac.compare_digest(token, expected) for expected in valid_tokens):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "UNAUTHORIZED", "message": "Missing or invalid service authorization token"},

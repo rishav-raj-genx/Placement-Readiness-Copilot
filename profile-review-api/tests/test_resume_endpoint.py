@@ -99,6 +99,7 @@ def test_forced_profile_refresh_isolates_invalid_linkedin_pdf(monkeypatch: Monke
 
 def test_auth_fails_closed_when_secret_missing(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.delenv("INTERNAL_SERVICE_KEY", raising=False)
+    monkeypatch.delenv("INTERNAL_SERVICE_SECRET", raising=False)
     monkeypatch.delenv("PROFILE_REVIEW_SERVICE_TOKEN", raising=False)
     monkeypatch.setenv("E2E_MODE", "false")
     response = client.post(
@@ -109,7 +110,7 @@ def test_auth_fails_closed_when_secret_missing(monkeypatch: MonkeyPatch) -> None
 
 
 def test_auth_rejects_unauthorized_token(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    monkeypatch.setenv("INTERNAL_SERVICE_SECRET", "test-secret-key-1234")
     monkeypatch.setenv("E2E_MODE", "false")
     response = client.post(
         "/review/resume",
@@ -117,6 +118,18 @@ def test_auth_rejects_unauthorized_token(monkeypatch: MonkeyPatch) -> None:
         files={"file": ("resume.pdf", create_two_page_resume(), "application/pdf")},
     )
     assert response.status_code == 403
+
+
+def test_auth_accepts_internal_service_secret_with_whitespace(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("INTERNAL_SERVICE_SECRET", "  my-secret-key-xyz  \n")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "fallback-key")
+    monkeypatch.setenv("E2E_MODE", "false")
+    response = client.post(
+        "/review/resume",
+        headers={"Authorization": "Bearer  my-secret-key-xyz \n"},
+        files={"file": ("resume.pdf", create_two_page_resume(), "application/pdf")},
+    )
+    assert response.status_code == 200
 
 
 def test_provider_toggle_and_ollama_fallback(monkeypatch: MonkeyPatch) -> None:

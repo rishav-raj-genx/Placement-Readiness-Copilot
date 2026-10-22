@@ -500,11 +500,14 @@ export async function POST(request?: Request): Promise<NextResponse> {
         );
       }
       studentId = user.id;
-    } else {
-      // Secure service-to-service validation: strictly require configured INTERNAL_SERVICE_KEY
-      const internalKey = process.env.INTERNAL_SERVICE_KEY?.trim();
+      // Secure service-to-service validation: strictly require configured secret
+      const internalSecret = (
+        process.env.INTERNAL_SERVICE_SECRET ||
+        process.env.INTERNAL_SERVICE_KEY ||
+        ''
+      ).trim();
 
-      if (internalKey && token && token === internalKey && requestedUserId) {
+      if (internalSecret && token && token === internalSecret && requestedUserId) {
         studentId = requestedUserId;
       }
     }
