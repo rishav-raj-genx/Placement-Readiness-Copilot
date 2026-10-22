@@ -203,6 +203,65 @@ async function handleProfileUpdate(request: Request): Promise<NextResponse> {
       .eq('id', studentId)
       .maybeSingle();
 
+    if (!updatedProfile) {
+      const fallbackEmail =
+        user?.email ||
+        (typeof body.email === 'string' && body.email.trim() ? body.email.trim() : 'candidate@prepcopilot.local');
+      const fallbackDisplayName =
+        (typeof body.displayName === 'string' && body.displayName.trim()) ||
+        (typeof body.display_name === 'string' && body.display_name.trim()) ||
+        (user?.user_metadata?.display_name as string | undefined) ||
+        fallbackEmail.split('@')[0] ||
+        'Candidate';
+
+      const upsertPayload: Record<string, unknown> = {
+        id: studentId,
+        email: fallbackEmail,
+        display_name: fallbackDisplayName,
+        role: 'student',
+        ...sanitizedPayload,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const profilesTable = admin.from('profiles') as unknown as {
+        upsert?: (payload: Record<string, unknown>, opts?: { onConflict: string }) => Promise<{ error: { message?: string; code?: string } | null }>;
+      };
+
+      if (typeof profilesTable.upsert === 'function') {
+        const { error: upsertError } = await profilesTable.upsert(upsertPayload, { onConflict: 'id' });
+
+        if (upsertError) {
+          const errStr = (upsertError.message || '').toLowerCase();
+          if (
+            upsertError.code === 'PGRST204' ||
+            errStr.includes('leetcode_url') ||
+            errStr.includes('coding_profile_url') ||
+            errStr.includes('linkedin_text') ||
+            errStr.includes('column')
+          ) {
+            const coreUpsert = { ...upsertPayload };
+            delete coreUpsert.leetcode_url;
+            delete coreUpsert.coding_profile_url;
+            delete coreUpsert.linkedin_text;
+            await profilesTable.upsert(coreUpsert, { onConflict: 'id' });
+          }
+        }
+      }
+
+      const { data: createdProfile } = await admin
+        .from('profiles')
+        .select(PROFILE_SELECT_COLUMNS)
+        .eq('id', studentId)
+        .maybeSingle();
+
+      return NextResponse.json({
+        success: true,
+        message: 'Profile created successfully.',
+        profile: normalizeUserProfile(createdProfile ?? upsertPayload),
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Profile updated successfully.',

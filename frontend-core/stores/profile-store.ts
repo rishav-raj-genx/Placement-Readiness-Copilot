@@ -73,6 +73,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
           'Content-Type': 'application/json',
           ...(internalKey ? { Authorization: `Bearer ${internalKey}` } : {}),
         },
+        body: JSON.stringify({ userId }),
       });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {

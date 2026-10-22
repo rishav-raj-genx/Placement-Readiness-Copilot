@@ -249,7 +249,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                   {displayName}
                 </span>
                 <span className="block truncate text-xs text-stone-500">
-                  {user?.targetRole ?? 'Preview Mode'}
+                  {user ? (user.targetRole?.trim() || (user.role === 'admin' ? 'Administrator' : 'Candidate')) : 'Preview Mode'}
                 </span>
               </span>
             )}

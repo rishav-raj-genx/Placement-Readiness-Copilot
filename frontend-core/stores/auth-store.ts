@@ -14,6 +14,8 @@ export type SignUpResult = 'authenticated' | 'confirmation_required' | 'failed';
 
 interface AuthState {
   user: UserProfile | null;
+  isPreview: boolean;
+  isGuest: boolean;
   isHydrated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -116,6 +118,8 @@ let authListenerRegistered = false;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  isPreview: true,
+  isGuest: true,
   isHydrated: false,
   isLoading: false,
   error: null,
@@ -145,7 +149,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         profile = { ...profile, onboardingCompletedAt: now };
       }
 
-      set({ user: profile, isLoading: false });
+      set({ user: profile, isPreview: false, isGuest: false, isLoading: false });
     } catch (error: unknown) {
       const message = getAuthErrorMessage(error, 'sign_in');
       set({ isLoading: false, error: message });
@@ -176,7 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!data.user) throw new Error('Sign up failed — no user returned');
 
       if (!data.session) {
-        set({ user: null, isLoading: false });
+        set({ user: null, isPreview: true, isGuest: true, isLoading: false });
         return 'confirmation_required';
       }
 
@@ -205,7 +209,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         profile = { ...profile, onboardingCompletedAt: now };
       }
 
-      set({ user: profile, isLoading: false });
+      set({ user: profile, isPreview: false, isGuest: false, isLoading: false });
       return 'authenticated';
     } catch (error: unknown) {
       const message = getAuthErrorMessage(error, 'sign_up');
@@ -217,49 +221,59 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      set({ user: null, error: error ? getAuthErrorMessage(error, 'sign_out') : null });
+      set({ user: null, isPreview: true, isGuest: true, error: error ? getAuthErrorMessage(error, 'sign_out') : null });
     } catch (error: unknown) {
       const message = getAuthErrorMessage(error, 'sign_out');
-      set({ user: null, error: message });
+      set({ user: null, isPreview: true, isGuest: true, error: message });
     }
   },
 
   hydrate: () => {
     if (!isSupabaseConfigured) {
-      set({ isHydrated: true });
+      set({ isHydrated: true, isPreview: true, isGuest: true });
       return;
     }
 
-    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
-      if (!authUser) {
-        set({ user: null, isHydrated: true });
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) {
+        set({ user: null, isPreview: true, isGuest: true, isHydrated: true });
         return;
       }
-      const profile = await resolveOrCreateProfile(authUser);
-      set({ user: profile, isHydrated: true });
+      try {
+        const profile = await resolveOrCreateProfile(session.user);
+        set({ user: profile, isPreview: false, isGuest: false, isHydrated: true });
+      } catch (error: unknown) {
+        const message = getAuthErrorMessage(error, 'session_restore');
+        set({ user: null, isPreview: true, isGuest: true, isHydrated: true, error: message });
+      }
     }).catch((error: unknown) => {
       const message = getAuthErrorMessage(error, 'session_restore');
-      set({ isHydrated: true, error: message });
+      set({ isHydrated: true, isPreview: true, isGuest: true, error: message });
     });
 
     if (authListenerRegistered) return;
     authListenerRegistered = true;
 
     supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        set({ user: null });
+      if (event === 'SIGNED_OUT' || !session) {
+        set({ user: null, isPreview: true, isGuest: true });
         return;
       }
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (!session) return;
+      if (
+        event === 'INITIAL_SESSION' ||
+        event === 'SIGNED_IN' ||
+        event === 'TOKEN_REFRESHED' ||
+        event === 'USER_UPDATED'
+      ) {
         window.setTimeout(() => void (async () => {
           const currentUser = get().user;
           if (currentUser && currentUser.id === session.user.id) {
+            set({ isPreview: false, isGuest: false });
             return;
           }
           try {
             const profile = await resolveOrCreateProfile(session.user);
-            set({ user: profile, error: null });
+            set({ user: profile, isPreview: false, isGuest: false, error: null });
           } catch (error: unknown) {
             set({ error: getAuthErrorMessage(error, 'session_restore') });
           }

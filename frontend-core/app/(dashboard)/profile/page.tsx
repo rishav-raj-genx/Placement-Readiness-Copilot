@@ -82,9 +82,23 @@ export default function ProfilePage() {
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [confirmDeleteText, setConfirmDeleteText] = useState('');
+  const [hasSession, setHasSession] = useState(false);
 
   const resumeFileInputRef = useRef<HTMLInputElement>(null);
   const linkedinFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setHasSession(true);
+        if (!user) {
+          useAuthStore.getState().hydrate();
+        }
+      } else {
+        setHasSession(false);
+      }
+    });
+  }, [user]);
 
   useEffect(() => {
     if (candidate) {
@@ -425,7 +439,19 @@ export default function ProfilePage() {
   // Full Profile Form Save (Basic goals + document drops)
   const handleSave = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!user) {
+    let currentUser = user;
+    if (!currentUser) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        currentUser = useAuthStore.getState().user;
+        if (!currentUser) {
+          useAuthStore.getState().hydrate();
+          currentUser = useAuthStore.getState().user;
+        }
+      }
+    }
+
+    if (!currentUser) {
       toast.info('Please sign in or create an account to save your profile.');
       router.push('/auth?mode=login');
       return;
@@ -440,7 +466,7 @@ export default function ProfilePage() {
       if (newResume) {
         const isDocx = newResume.name.toLowerCase().endsWith('.docx');
         const ext = isDocx ? 'docx' : 'pdf';
-        const path = `${user.id}/resume.${ext}`;
+        const path = `${currentUser.id}/resume.${ext}`;
         const contentType = isDocx
           ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
           : 'application/pdf';
@@ -453,7 +479,7 @@ export default function ProfilePage() {
       }
 
       if (newLinkedIn) {
-        const path = `${user.id}/linkedin.pdf`;
+        const path = `${currentUser.id}/linkedin.pdf`;
         const { error: uploadError } = await supabase.storage
           .from('candidate-documents')
           .upload(path, newLinkedIn, { upsert: true, contentType: 'application/pdf' });
@@ -467,7 +493,7 @@ export default function ProfilePage() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: user.id,
+            userId: currentUser.id,
             displayName: displayName.trim(),
             targetRole: targetRole.trim(),
             githubUsername: normalizeUsername(github),
@@ -488,6 +514,9 @@ export default function ProfilePage() {
 
       if (!updateSuccessful) {
         const fullPayload: Record<string, unknown> = {
+          id: currentUser.id,
+          email: currentUser.email,
+          role: currentUser.role || 'student',
           display_name: displayName.trim(),
           target_role: targetRole.trim(),
           github_username: normalizeUsername(github),
@@ -502,8 +531,7 @@ export default function ProfilePage() {
 
         const { error: profileError } = await supabase
           .from('profiles')
-          .update(fullPayload)
-          .eq('id', user.id);
+          .upsert(fullPayload, { onConflict: 'id' });
 
         if (profileError) {
           // If leetcode_url, linkedin_url or linkedin_text is not yet in the DB schema, retry without them
@@ -520,8 +548,7 @@ export default function ProfilePage() {
             delete fullPayload.linkedin_text;
             const { error: retryError } = await supabase
               .from('profiles')
-              .update(fullPayload)
-              .eq('id', user.id);
+              .upsert(fullPayload, { onConflict: 'id' });
             if (retryError) throw retryError;
           } else {
             throw profileError;
@@ -531,42 +558,39 @@ export default function ProfilePage() {
 
       profileSaved = true;
 
-      try {
-        const profileData = {
-          userId: user.id,
-          displayName: displayName.trim(),
-          targetRole: targetRole.trim(),
-          githubUsername: normalizeUsername(github),
-          resumePath,
-          linkedinPath,
-        };
-        const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || '';
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (internalKey) {
-          headers['Authorization'] = `Bearer ${internalKey}`;
-        }
-        const response = await fetch('/api/profile/review', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(profileData),
-        });
+      // Automatically fire an asynchronous background request to /api/profile-review/analyze to calculate the new readiness score
+      const currentUserId = currentUser.id;
+      void (async () => {
+        try {
+          const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || '';
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          if (internalKey) {
+            headers['Authorization'] = `Bearer ${internalKey}`;
+          }
 
-        if (response.ok) {
-          const payload: unknown = await response.json().catch(() => null);
-          if (typeof payload === 'object' && payload !== null && 'readiness' in payload) {
-            const normalized = normalizeReadinessScore((payload as { readiness: unknown }).readiness);
-            if (normalized) {
-              useProfileStore.setState({ readiness: normalized });
+          const response = await fetch('/api/profile-review/analyze', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId: currentUserId }),
+          });
+
+          if (response.ok) {
+            const payload: unknown = await response.json().catch(() => null);
+            if (typeof payload === 'object' && payload !== null && 'readiness' in payload) {
+              const normalized = normalizeReadinessScore((payload as { readiness: unknown }).readiness);
+              if (normalized) {
+                useProfileStore.setState({ readiness: normalized });
+              }
             }
           }
+        } catch (err: unknown) {
+          console.warn('AI scoring service re-index error bypassed:', err);
+        } finally {
+          await hydrate(currentUserId);
         }
-        await hydrate(user.id);
-      } catch (err: unknown) {
-        console.warn('AI scoring service re-index error bypassed:', err);
-        await hydrate(user.id);
-      }
+      })();
 
       setNewResume(null);
       setNewLinkedIn(null);
@@ -582,6 +606,8 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   };
+
+  const handleSaveAllProfile = handleSave;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-20">
@@ -623,7 +649,7 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      {!user && (
+      {!user && !hasSession && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-orange-500/30 bg-orange-950/30 p-4 text-xs text-stone-300">
           <div>
             <p className="font-semibold text-orange-400">Preview Mode — You are not signed in</p>

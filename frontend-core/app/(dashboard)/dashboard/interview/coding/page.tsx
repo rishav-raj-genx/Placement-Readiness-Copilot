@@ -1,14 +1,23 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowLeft, Code2, Lock, Mic2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
-import { CodingIDE } from '@/components/interview/coding-ide';
+import { CodingIDESkeleton } from '@/components/interview/coding-ide-skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/auth-store';
 import { checkRound1Completed } from '@/lib/round-status';
+
+const CodingIDE = dynamic(
+  () => import('@/components/interview/coding-ide').then((mod) => mod.CodingIDE),
+  {
+    ssr: false,
+    loading: () => <CodingIDESkeleton />,
+  }
+);
 
 export default function CodingInterviewPage() {
   const user = useAuthStore((state) => state.user);

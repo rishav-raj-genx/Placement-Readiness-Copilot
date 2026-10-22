@@ -14,6 +14,7 @@ import {
   Mic2,
   RefreshCw,
   Send,
+  Sparkles,
   Trophy,
 } from 'lucide-react';
 import { CurvyRoadmapTimeline } from '@/components/dashboard/CurvyRoadmapTimeline';
@@ -133,6 +134,7 @@ export default function DashboardHomePage() {
     const actions = buildNextBestActions(visibleReadiness);
     return user ? actions : actions.map((action) => ({ ...action, href: '/auth' }));
   }, [user, visibleReadiness]);
+  const isScoreNull = Boolean(user && (readiness === null || readiness.totalScore === null || readiness.totalScore === undefined));
   const score = user ? visibleReadiness?.totalScore ?? 0 : 0;
   const tier = user ? readinessTier(score, visibleReadiness?.readinessLevel) : 'Building readiness';
   const rawUserName = (user as unknown as { user_metadata?: { name?: string } })?.user_metadata?.name
@@ -184,19 +186,40 @@ export default function DashboardHomePage() {
             </div>
 
             <div className="flex flex-col items-center rounded-xl border border-stone-800 bg-stone-950 p-5 sm:p-7">
-              <ReadinessRing score={score} level={tier} />
-              {user && (!readiness || !readiness.updatedAt || score === 0 || !review?.updatedAt) ? (
-                <Link
-                  href="/dashboard/profile"
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors text-center"
-                >
-                  <span>Upload your Profile to generate your first score</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              ) : !user ? (
-                <p className="mt-1 text-center text-xs text-stone-500">Preview mode · Score calculated on evidence</p>
+              {isScoreNull ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center max-w-xs min-h-[224px]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-stone-800 bg-stone-900 text-orange-500 mb-3">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-stone-200">No Readiness Score Yet</h3>
+                  <p className="mt-1 text-xs text-stone-400">
+                    Complete your profile to generate your initial readiness score
+                  </p>
+                  <Link
+                    href="/dashboard/profile"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-red-500 transition-colors shadow-sm"
+                  >
+                    <span>Complete profile</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               ) : (
-                <p className="mt-1 text-center text-xs text-stone-500">{formatUpdatedAt(visibleReadiness?.updatedAt ?? review?.updatedAt)}</p>
+                <>
+                  <ReadinessRing score={score} level={tier} />
+                  {user && (!readiness || !readiness.updatedAt || score === 0 || !review?.updatedAt) ? (
+                    <Link
+                      href="/dashboard/profile"
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors text-center"
+                    >
+                      <span>Upload your Profile to generate your first score</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  ) : !user ? (
+                    <p className="mt-1 text-center text-xs text-stone-500">Preview mode · Score calculated on evidence</p>
+                  ) : (
+                    <p className="mt-1 text-center text-xs text-stone-500">{formatUpdatedAt(visibleReadiness?.updatedAt ?? review?.updatedAt)}</p>
+                  )}
+                </>
               )}
             </div>
           </div>

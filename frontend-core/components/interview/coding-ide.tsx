@@ -36,6 +36,13 @@ import {
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
+import { CodingIDESkeleton } from '@/components/interview/coding-ide-skeleton';
+import {
+  FALLBACK_CODING_PROBLEMS,
+  type ProblemSpec,
+} from '@/lib/fallback-coding-problems';
+
+export type { ProblemSpec };
 
 // Dynamically import Monaco Editor to avoid SSR window issues
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -46,19 +53,6 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
     </div>
   ),
 });
-
-export interface ProblemSpec {
-  id: string;
-  title: string;
-  category: 'DSA' | 'Web Development';
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  description: string;
-  constraints: string[];
-  starter_code: Record<string, string>;
-  test_cases: Array<Record<string, unknown>>;
-  optimal_time_complexity: string;
-  optimal_space_complexity: string;
-}
 
 export interface EvaluationResult {
   problem_id: string;
@@ -184,21 +178,54 @@ export function CodingIDE() {
   const [isConsoleOpen, setIsConsoleOpen] = useState(true);
   const [showEndInterviewDialog, setShowEndInterviewDialog] = useState(false);
   const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
 
   useEffect(() => {
-    fetch('/api/interview/coding')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.problems && data.problems.length > 0) {
+    let active = true;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 8000);
+
+    const loadQuestions = async () => {
+      try {
+        setIsLoadingQuestions(true);
+        const res = await fetch('/api/interview/coding', {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        if (!active) return;
+        if (data.problems && Array.isArray(data.problems) && data.problems.length > 0) {
           setProblems(data.problems);
           const initial = data.problems[0];
           setActiveProblem(initial);
           setCode(initial.starter_code?.javascript || initial.starter_code?.python || '');
+          setIsLoadingQuestions(false);
+          return;
         }
-      })
-      .catch(() => {
-        toast.error('Unable to load coding problem bank.');
-      });
+        throw new Error('No problems returned');
+      } catch (err: unknown) {
+        if (!active) return;
+        console.warn('Coding questions fetch timed out or failed. Falling back to local problem bank:', err);
+        setProblems(FALLBACK_CODING_PROBLEMS);
+        const initial = FALLBACK_CODING_PROBLEMS[0];
+        setActiveProblem(initial);
+        setCode(initial.starter_code?.javascript || initial.starter_code?.python || '');
+        setIsLoadingQuestions(false);
+      }
+    };
+
+    void loadQuestions();
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   const handleSelectProblem = (prob: ProblemSpec) => {
@@ -423,6 +450,10 @@ export function CodingIDE() {
     return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   }, [evaluatedProblems]);
 
+  if (isLoadingQuestions) {
+    return <CodingIDESkeleton />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Header: Category Filter, Problem Pills, and End Interview Action */}
@@ -607,9 +638,9 @@ export function CodingIDE() {
                       <span className="text-[10px] uppercase text-stone-500 font-semibold">Sample Input</span>
                       <pre className="mt-1 rounded-lg border border-stone-800 bg-stone-950 p-2.5 text-stone-200 overflow-x-auto whitespace-pre-wrap">
                         {JSON.stringify(
-                          (activeProblem.test_cases[0] as Record<string, unknown>).input ||
-                          (activeProblem.test_cases[0] as Record<string, unknown>).operations ||
-                          (activeProblem.test_cases[0] as Record<string, unknown>).scenario,
+                          activeProblem.test_cases[0].input ||
+                          activeProblem.test_cases[0].operations ||
+                          activeProblem.test_cases[0].scenario,
                           null,
                           2
                         )}
@@ -618,13 +649,13 @@ export function CodingIDE() {
                     <div>
                       <span className="text-[10px] uppercase text-stone-500 font-semibold">Sample Output</span>
                       <pre className="mt-1 rounded-lg border border-stone-800 bg-stone-950 p-2.5 text-stone-200 overflow-x-auto whitespace-pre-wrap">
-                        {JSON.stringify((activeProblem.test_cases[0] as Record<string, unknown>).expected, null, 2)}
+                        {JSON.stringify(activeProblem.test_cases[0].expected, null, 2)}
                       </pre>
                     </div>
-                    {Boolean((activeProblem.test_cases[0] as Record<string, unknown>).explanation) && (
+                    {Boolean(activeProblem.test_cases[0].explanation) && (
                       <p className="font-sans text-xs text-stone-400 pt-1">
                         <span className="font-semibold text-stone-300">Explanation: </span>
-                        {String((activeProblem.test_cases[0] as Record<string, unknown>).explanation)}
+                        {String(activeProblem.test_cases[0].explanation)}
                       </p>
                     )}
                   </div>
