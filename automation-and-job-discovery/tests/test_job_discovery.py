@@ -152,3 +152,25 @@ def test_e2e_mode_returns_five_permitted_matches(monkeypatch):
 
     assert len(jobs) == 5
     assert all(job["source"] in {"greenhouse_ats", "lever_ats", "jobicy_rss"} for job in jobs)
+
+
+def test_cold_start_fallback_skills_when_skills_empty(monkeypatch):
+    from src.api.server import get_fallback_skills_for_role
+
+    sde_skills = get_fallback_skills_for_role("SDE")
+    assert "Python" in sde_skills
+    assert "React" in sde_skills
+
+    frontend_skills = get_fallback_skills_for_role("Frontend Engineer")
+    assert "React" in frontend_skills
+    assert "TypeScript" in frontend_skills
+
+    monkeypatch.setattr(config, "AUTOMATION_E2E_MODE", True)
+    jobs = JobAggregator().discover_jobs(
+        student_skills=[],
+        target_role="Full-Stack Software Engineer",
+        max_results=5,
+        save_to_db=False,
+    )
+    assert len(jobs) > 0
+

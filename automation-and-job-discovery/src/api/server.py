@@ -87,9 +87,38 @@ class LinkCheckRequest(BaseModel):
     claimed_keywords: Optional[List[str]] = Field(default=None, max_length=50)
 
 
+ROLE_FALLBACK_SKILLS: dict[str, list[str]] = {
+    "frontend": ["React", "TypeScript", "JavaScript", "Next.js", "HTML", "CSS", "Tailwind CSS"],
+    "backend": ["Python", "Node.js", "SQL", "PostgreSQL", "FastAPI", "Docker", "REST APIs"],
+    "full-stack": ["React", "Node.js", "Python", "SQL", "JavaScript", "TypeScript"],
+    "fullstack": ["React", "Node.js", "Python", "SQL", "JavaScript", "TypeScript"],
+    "software engineer": ["React", "Node.js", "Python", "SQL", "JavaScript", "Git"],
+    "sde": ["React", "Node.js", "Python", "SQL", "JavaScript", "Data Structures"],
+    "data": ["Python", "SQL", "Pandas", "NumPy", "Machine Learning", "PostgreSQL"],
+    "machine learning": ["Python", "PyTorch", "TensorFlow", "Scikit-Learn", "SQL", "NumPy"],
+    "ai": ["Python", "PyTorch", "Machine Learning", "LLMs", "LangChain", "FastAPI"],
+    "devops": ["Docker", "Kubernetes", "AWS", "CI/CD", "Linux", "Python", "Terraform"],
+    "cloud": ["AWS", "Docker", "Kubernetes", "Linux", "Python", "Terraform"],
+    "mobile": ["React Native", "Flutter", "iOS", "Android", "Swift", "Kotlin", "TypeScript"],
+}
+
+DEFAULT_FALLBACK_SKILLS = ["React", "Node.js", "Python", "SQL", "JavaScript", "Git"]
+
+
+def get_fallback_skills_for_role(role: Optional[str]) -> list[str]:
+    """Intelligently map target roles to high-demand core technical skills when profile skills are unparsed or empty."""
+    if not role:
+        return DEFAULT_FALLBACK_SKILLS.copy()
+    lower_role = role.lower()
+    for key, skills in ROLE_FALLBACK_SKILLS.items():
+        if key in lower_role:
+            return skills.copy()
+    return DEFAULT_FALLBACK_SKILLS.copy()
+
+
 class JobSearchRequest(BaseModel):
     student_id: Optional[str] = Field(None, max_length=128)
-    skills: List[str] = Field(..., min_length=1, max_length=50)
+    skills: Optional[List[str]] = Field(default_factory=list, max_length=50)
     target_role: Optional[str] = Field("Software Engineer Intern", max_length=128)
     boolean_query: Optional[str] = Field(None, max_length=500)
     locations: Optional[List[str]] = Field(None, max_length=20)
@@ -168,8 +197,13 @@ def discover_jobs(
 ):
     """Fetches jobs from Greenhouse, Lever, and RSS matching boolean criteria with cache control."""
     try:
+        active_skills = [s.strip() for s in (req.skills or []) if s and s.strip()]
+        if not active_skills:
+            active_skills = get_fallback_skills_for_role(req.target_role)
+            logger.info("Empty profile skills received. Using fallback skills for target role '%s': %s", req.target_role, active_skills)
+
         jobs = job_aggregator.discover_jobs(
-            student_skills=req.skills,
+            student_skills=active_skills,
             target_role=req.target_role or "Software Engineer Intern",
             boolean_query=req.boolean_query,
             locations=req.locations,

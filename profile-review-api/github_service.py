@@ -7,6 +7,8 @@ from typing import Optional
 from github import Auth, Github, GithubException, RateLimitExceededException, UnknownObjectException
 from github.Repository import Repository
 
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+
 SOURCE_DIRECTORIES = {"app", "apps", "backend", "frontend", "lib", "server", "src"}
 TEST_DIRECTORIES = {"spec", "specs", "test", "tests", "__tests__"}
 DEPENDENCY_MANIFESTS = {
@@ -424,6 +426,31 @@ def _base_github_error_profile(username: str, reason: str = "GitHub profile not 
     }
 
 
+def _is_transient_github_error(exc: BaseException) -> bool:
+    if isinstance(exc, UnknownObjectException):
+        return False
+    if isinstance(exc, GithubException):
+        status_code = getattr(exc, "status", None)
+        if status_code in (400, 401, 404):
+            return False
+        if status_code in (500, 502, 503, 504):
+            return True
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return True
+    err = str(exc).lower()
+    return any(k in err for k in ("timeout", "timed out", "connection reset", "temporary failure"))
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.2, min=0.2, max=1.5),
+    retry=retry_if_exception(_is_transient_github_error),
+    reraise=True,
+)
+def _get_user_with_retry(github: Github, username: str):
+    return github.get_user(username)
+
+
 def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, object]:
     normalized_username = username.strip().lower()
     if not normalized_username:
@@ -438,7 +465,7 @@ def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, o
     github = Github(auth=Auth.Token(token)) if token else Github()
     try:
         try:
-            user = github.get_user(normalized_username)
+            user = _get_user_with_retry(github, normalized_username)
         except UnknownObjectException:
             return _base_github_error_profile(normalized_username, "GitHub profile not found or invalid username.")
         except (RateLimitExceededException, GithubException) as exc:
@@ -449,11 +476,11 @@ def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, o
                 return cached[1]
             if status_code in (403, 429) or "rate limit" in str(exc).lower():
                 return _base_github_error_profile(normalized_username, "GitHub API rate limit exceeded.")
-            return _base_github_error_profile(normalized_username, f"GitHub API error: {str(exc)}")
+            return _base_github_error_profile(normalized_username, f"Link invalid or service unreachable: {str(exc)}")
         except Exception as exc:
             if cached:
                 return cached[1]
-            return _base_github_error_profile(normalized_username, f"GitHub connection error: {str(exc)}")
+            return _base_github_error_profile(normalized_username, f"Link invalid or service unreachable: GitHub connection error: {str(exc)}")
 
         repositories: list[dict[str, object]] = []
         rate_limited = False

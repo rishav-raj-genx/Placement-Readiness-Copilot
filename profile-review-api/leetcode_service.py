@@ -3,6 +3,7 @@ import re
 from typing import Any, Optional
 
 import httpx
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("profile_review_api.leetcode")
 
@@ -126,21 +127,37 @@ def fetch_leetcode_stats(username_or_url: str, timeout_seconds: float = 8.0) -> 
         "variables": {"username": username},
     }
 
-    try:
+    def _is_transient_leetcode_error(exc: BaseException) -> bool:
+        if isinstance(exc, (httpx.RequestError, httpx.TimeoutException, ConnectionError, OSError)):
+            return True
+        return False
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.2, min=0.2, max=1.5),
+        retry=retry_if_exception(_is_transient_leetcode_error),
+        reraise=True,
+    )
+    def _execute_query():
         with httpx.Client(timeout=timeout_seconds, follow_redirects=True) as client:
-            response = client.post(LEETCODE_GRAPHQL_URL, json=payload, headers=headers)
+            return client.post(LEETCODE_GRAPHQL_URL, json=payload, headers=headers)
+
+    try:
+        response = _execute_query()
 
         if response.status_code != 200:
             logger.warning("LeetCode GraphQL returned HTTP %s for user %s", response.status_code, username)
-            default_response["error"] = f"HTTP {response.status_code}"
+            default_response["error"] = f"Link invalid or service unreachable (HTTP {response.status_code})"
             return default_response
 
         res_data = response.json()
         if not isinstance(res_data, dict):
+            default_response["error"] = "Link invalid or service unreachable"
             return default_response
 
         data = res_data.get("data")
         if not isinstance(data, dict):
+            default_response["error"] = "Link invalid or service unreachable"
             return default_response
 
         matched_user = data.get("matchedUser")
@@ -210,5 +227,5 @@ def fetch_leetcode_stats(username_or_url: str, timeout_seconds: float = 8.0) -> 
 
     except Exception as exc:
         logger.warning("Error fetching LeetCode stats for '%s': %s", username, exc)
-        default_response["error"] = str(exc)
+        default_response["error"] = f"Link invalid or service unreachable: {exc}"
         return default_response

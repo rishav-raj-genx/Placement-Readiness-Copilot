@@ -247,7 +247,13 @@ export default function ProfilePage() {
       const recalculated = await analyze(user.id);
       setEditingField(null);
       if (recalculated) {
-        toast.success('Information updated and scores recalculated.');
+        const latestReview = useProfileStore.getState().review?.result as Record<string, unknown> | undefined;
+        const hasInvalidLinks = Boolean(latestReview?.github_error) || Boolean(latestReview?.leetcode_error);
+        if (hasInvalidLinks) {
+          toast.warning('Profile evaluated, but some links were invalid. Please check your GitHub/LeetCode URLs.');
+        } else {
+          toast.success('Information updated and scores recalculated.');
+        }
       } else {
         toast.warning('Information was saved, but score recalculation failed. Use Re-Evaluate after checking the analysis service.');
       }
@@ -580,7 +586,13 @@ export default function ProfilePage() {
       setNewResume(null);
       setNewLinkedIn(null);
       if (recalculated) {
-        toast.success('Profile updated and scores recalculated.');
+        const latestReview = useProfileStore.getState().review?.result as Record<string, unknown> | undefined;
+        const hasInvalidLinks = Boolean(latestReview?.github_error) || Boolean(latestReview?.leetcode_error);
+        if (hasInvalidLinks) {
+          toast.warning('Profile evaluated, but some links were invalid. Please check your GitHub/LeetCode URLs.');
+        } else {
+          toast.success('Profile updated and scores recalculated.');
+        }
       } else {
         toast.warning('Profile saved, but score recalculation failed. Use Re-Evaluate after checking the analysis service.');
       }

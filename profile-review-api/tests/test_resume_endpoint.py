@@ -226,3 +226,33 @@ def test_analyze_profile_without_resume_file(monkeypatch: MonkeyPatch) -> None:
     assert payload["total_readiness_score"] >= 0
 
 
+def test_analyze_profile_partial_scoring_with_invalid_links(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    response = client.post(
+        "/analyze-profile",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
+        data={
+            "github_username": "nonexistent-user-12345-fail",
+            "leetcode_url": "https://leetcode.com/nonexistent-user-12345-fail",
+            "force_refresh": "true",
+        },
+        files={
+            "resume": ("resume.pdf", create_two_page_resume(), "application/pdf"),
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    # Resume is valid and scored
+    assert payload["resume_review"]["score"] > 0
+    assert payload["resume_error"] is None
+    # GitHub failed gracefully with score 0
+    assert payload["github_review"]["score"] == 0
+    assert payload["github_error"] is not None
+    # LeetCode failed gracefully with score 0
+    assert payload["leetcode_review"]["score"] == 0
+    # Overall score succeeds
+    assert payload["total_readiness_score"] > 0
+
+
+

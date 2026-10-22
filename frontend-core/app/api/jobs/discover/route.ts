@@ -10,13 +10,13 @@ export async function POST(): Promise<NextResponse> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { data: profile, error } = await supabase.from('profiles').select('target_role,target_locations,skills,onboarding_completed_at').eq('id', user.id).single();
-    if (error || !profile?.onboarding_completed_at) return NextResponse.json({ error: 'Complete onboarding before discovering jobs.' }, { status: 409 });
+    if (error || !profile) return NextResponse.json({ error: 'Complete your profile before discovering jobs.' }, { status: 409 });
     const payload = await serviceRequest(`${getAutomationBaseUrl()}/api/discover-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         student_id: user.id,
-        target_role: profile.target_role,
+        target_role: profile.target_role || 'Software Engineer',
         locations: profile.target_locations ?? [],
         skills: profile.skills ?? [],
         max_results: 20,

@@ -149,10 +149,15 @@ class JobAggregator:
         """
         Discovers, filters, scores, and ranks jobs for a student profile.
         """
+        effective_skills = [s.strip() for s in (student_skills or []) if s and s.strip()]
+        if not effective_skills:
+            from src.api.server import get_fallback_skills_for_role
+            effective_skills = get_fallback_skills_for_role(target_role)
+
         # If boolean query is not explicitly given, automatically construct one
         if not boolean_query:
             boolean_query = BooleanSearchParser.build_query_from_profile(
-                skills=student_skills,
+                skills=effective_skills,
                 target_role=target_role,
                 locations=locations or ["remote", "bangalore", "india", "worldwide"],
             )
@@ -164,7 +169,7 @@ class JobAggregator:
 
         # 2. Boolean filter & scoring
         matched_jobs: List[Dict[str, Any]] = []
-        clean_skills = [s.strip() for s in student_skills if s.strip()]
+        clean_skills = effective_skills
 
         for job in deduped:
             searchable_text = f"{job['title']} {job['company']} {job.get('location', '')} {job.get('description', '')}"

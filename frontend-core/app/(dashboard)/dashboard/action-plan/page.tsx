@@ -236,7 +236,24 @@ export default function ActionPlanPage() {
         if (latestReview) {
           setDbReviewData(latestReview as unknown as RawReviewResult);
         }
-        toast.success('Screening criteria re-evaluated!');
+
+        const reviewRecord = (latestReview || {}) as Record<string, unknown>;
+        const githubErr = reviewRecord.github_error as string | undefined;
+        const leetcodeErr = reviewRecord.leetcode_error as string | undefined;
+        const ghRev = reviewRecord.github_review as { score?: number } | undefined;
+        const lcRev = reviewRecord.leetcode_review as { score?: number } | undefined;
+
+        const hasInvalidLinks =
+          Boolean(githubErr) ||
+          Boolean(leetcodeErr) ||
+          (ghRev?.score === 0 && Boolean(profile?.githubUsername)) ||
+          (lcRev?.score === 0 && Boolean(profile?.leetcodeUrl));
+
+        if (hasInvalidLinks) {
+          toast.warning('Profile evaluated, but some links were invalid. Please check your GitHub/LeetCode URLs.');
+        } else {
+          toast.success('Screening criteria re-evaluated!');
+        }
         await fetchDetailedData();
       } else {
         const errorMsg = useProfileStore.getState().error;
@@ -247,6 +264,8 @@ export default function ActionPlanPage() {
       toast.error(message);
     }
   };
+
+  const handleReEvaluate = handleReanalyze;
 
   const handleTriggerLiveCheck = async (project: ProjectProfileItem) => {
     if (!project.liveUrl) {

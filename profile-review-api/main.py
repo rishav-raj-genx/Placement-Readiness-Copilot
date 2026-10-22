@@ -326,6 +326,7 @@ def review_github(
     try:
         data = fetch_github_data(username)
         if "reason" in data and data.get("score") == 0 and not data.get("repositories"):
+            reason_str = str(data.get("reason", "Link invalid or service unreachable"))
             return GithubReview(
                 score=0,
                 has_pinned_repos=False,
@@ -335,7 +336,7 @@ def review_github(
                 has_ci_cd=False,
                 has_architecture_diagrams=False,
                 code_quality_score=0,
-                specific_fixes=[str(data.get("reason", "GitHub profile not found or invalid username."))],
+                specific_fixes=[reason_str],
             )
         return evaluate_github(data)
     except ValueError as exc:
@@ -366,9 +367,10 @@ def review_leetcode(
         return LeetCodeReview(**stats)
     except Exception as exc:
         logger.warning("Error in review_leetcode endpoint for '%s': %s", username, exc)
-        return LeetCodeReview(username=username, exists=False, score=0, error=str(exc))
+        return LeetCodeReview(username=username, exists=False, score=0, error="Link invalid or service unreachable")
 
 
+@app.post("/analyze", response_model=AnalyzeProfileResponse, include_in_schema=False)
 @app.post("/analyze-profile", response_model=AnalyzeProfileResponse)
 async def analyze_profile(
     resume: Annotated[UploadFile | None, File()] = None,
@@ -382,26 +384,28 @@ async def analyze_profile(
     if force_refresh:
         logger.info("Forced profile refresh requested; bypassing all persisted analysis results.")
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # PILLAR 1: RESUME EVALUATION (Graceful Degradation)
+    # ──────────────────────────────────────────────────────────────────────────
     resume_review: ReviewResult
     resume_error: str | None = None
     extracted_resume_text = ""
 
-    # Check if resume file is missing or unprovided
-    if resume is None or not getattr(resume, "filename", None):
-        logger.warning("No resume file supplied or resume path is missing. Returning 0 score for resume pillar.")
-        resume_review = ReviewResult(
-            score=0,
-            page_count=0,
-            is_one_page=False,
-            is_ats_friendly=False,
-            uses_action_verbs=False,
-            has_spelling_or_grammar_issues=False,
-            has_clean_visual_layout=False,
-            specific_fixes=["No resume document uploaded. Upload a PDF or DOCX resume to evaluate your resume score."],
-        )
-        resume_error = "No resume document provided."
-    else:
-        try:
+    try:
+        if resume is None or not getattr(resume, "filename", None):
+            logger.warning("No resume file supplied or resume path is missing. Returning 0 score for resume pillar.")
+            resume_review = ReviewResult(
+                score=0,
+                page_count=0,
+                is_one_page=False,
+                is_ats_friendly=False,
+                uses_action_verbs=False,
+                has_spelling_or_grammar_issues=False,
+                has_clean_visual_layout=False,
+                specific_fixes=["No resume document uploaded. Upload a PDF or DOCX resume to evaluate your resume score."],
+            )
+            resume_error = "No resume document provided."
+        else:
             extracted_resume = await extract_pdf_text(resume)
             extracted_resume_text = extracted_resume.text
             if not extracted_resume_text.strip():
@@ -423,34 +427,36 @@ async def analyze_profile(
                     extracted_resume.page_count,
                     layout_geometry=extracted_resume.layout_geometry,
                 )
-        except HTTPException as exc:
-            resume_error = str(exc.detail)
-            logger.warning("Resume document extraction failed: %s", resume_error)
-            resume_review = ReviewResult(
-                score=0,
-                page_count=1,
-                is_one_page=True,
-                is_ats_friendly=False,
-                uses_action_verbs=False,
-                has_spelling_or_grammar_issues=False,
-                has_clean_visual_layout=False,
-                specific_fixes=[f"Resume could not be fully parsed: {resume_error}"],
-            )
-        except Exception as exc:
-            resume_error = "Resume analysis temporarily unavailable."
-            logger.error("Unexpected resume analysis error: %s", exc, exc_info=True)
-            resume_review = ReviewResult(
-                score=0,
-                page_count=1,
-                is_one_page=True,
-                is_ats_friendly=False,
-                uses_action_verbs=False,
-                has_spelling_or_grammar_issues=False,
-                has_clean_visual_layout=False,
-                specific_fixes=["Resume analysis encountered an unexpected processing issue."],
-            )
+    except HTTPException as exc:
+        resume_error = str(exc.detail)
+        logger.warning("Resume document extraction failed: %s", resume_error)
+        resume_review = ReviewResult(
+            score=0,
+            page_count=1,
+            is_one_page=True,
+            is_ats_friendly=False,
+            uses_action_verbs=False,
+            has_spelling_or_grammar_issues=False,
+            has_clean_visual_layout=False,
+            specific_fixes=[f"Resume could not be fully parsed: {resume_error}"],
+        )
+    except Exception as exc:
+        resume_error = "Link invalid or service unreachable: Resume analysis failed."
+        logger.error("Unexpected resume analysis error: %s", exc, exc_info=True)
+        resume_review = ReviewResult(
+            score=0,
+            page_count=1,
+            is_one_page=True,
+            is_ats_friendly=False,
+            uses_action_verbs=False,
+            has_spelling_or_grammar_issues=False,
+            has_clean_visual_layout=False,
+            specific_fixes=["Link invalid or service unreachable: Resume analysis encountered an issue."],
+        )
 
-    # Independent error isolation: GitHub failure does not abort the entire review
+    # ──────────────────────────────────────────────────────────────────────────
+    # PILLAR 2: GITHUB EVALUATION (Graceful Degradation)
+    # ──────────────────────────────────────────────────────────────────────────
     github_review: GithubReview | None = None
     github_error: str | None = None
     clean_github_username = (github_username or "").strip()
@@ -458,6 +464,7 @@ async def analyze_profile(
         try:
             github_data = fetch_github_data(clean_github_username, force_refresh=force_refresh)
             if "reason" in github_data and github_data.get("score") == 0 and not github_data.get("repositories"):
+                reason_msg = str(github_data.get("reason", "Link invalid or service unreachable"))
                 github_review = GithubReview(
                     score=0,
                     has_pinned_repos=False,
@@ -467,14 +474,14 @@ async def analyze_profile(
                     has_ci_cd=False,
                     has_architecture_diagrams=False,
                     code_quality_score=0,
-                    specific_fixes=[str(github_data.get("reason", "GitHub profile not found or invalid username."))],
+                    specific_fixes=[reason_msg],
                 )
-                github_error = str(github_data.get("reason"))
+                github_error = reason_msg
             else:
                 github_review = evaluate_github(github_data)
         except Exception as exc:
             logger.warning("GitHub evaluation error for user %s: %s", clean_github_username, exc)
-            github_error = str(exc)
+            github_error = "Link invalid or service unreachable"
             github_review = GithubReview(
                 score=0,
                 has_pinned_repos=False,
@@ -484,11 +491,14 @@ async def analyze_profile(
                 has_ci_cd=False,
                 has_architecture_diagrams=False,
                 code_quality_score=0,
-                specific_fixes=["GitHub profile not found or invalid username."],
+                specific_fixes=["Link invalid or service unreachable: GitHub profile not found or could not be verified."],
             )
 
-    linkedin_review = None
-    linkedin_error = None
+    # ──────────────────────────────────────────────────────────────────────────
+    # PILLAR 3: LINKEDIN EVALUATION (Graceful Degradation)
+    # ──────────────────────────────────────────────────────────────────────────
+    linkedin_review: LinkedInReviewResult | None = None
+    linkedin_error: str | None = None
     if linkedin_pdf is not None:
         try:
             extracted_linkedin = await extract_pdf_text(linkedin_pdf)
@@ -499,21 +509,27 @@ async def analyze_profile(
         except HTTPException as exc:
             linkedin_error = str(exc.detail)
             logger.warning("LinkedIn document analysis failed: %s", linkedin_error)
+            linkedin_review = None
         except Exception as exc:
-            linkedin_error = "LinkedIn analysis temporarily unavailable."
+            linkedin_error = "Link invalid or service unreachable"
             logger.error("Unexpected LinkedIn analysis error: %s", exc, exc_info=True)
+            linkedin_review = None
 
-    leetcode_review = None
-    leetcode_error = None
+    # ──────────────────────────────────────────────────────────────────────────
+    # PILLAR 4: LEETCODE EVALUATION (Graceful Degradation)
+    # ──────────────────────────────────────────────────────────────────────────
+    leetcode_review: LeetCodeReview | None = None
+    leetcode_error: str | None = None
     if leetcode_url and leetcode_url.strip():
         try:
             stats = fetch_leetcode_stats(leetcode_url)
             leetcode_review = LeetCodeReview(**stats)
-            leetcode_error = stats.get("error")
+            if not stats.get("exists") or stats.get("error"):
+                leetcode_error = stats.get("error") or "Link invalid or service unreachable"
         except Exception as exc:
             logger.warning("LeetCode fetch error for %s: %s", leetcode_url, exc)
-            leetcode_review = LeetCodeReview(username=leetcode_url, exists=False, score=0, error=str(exc))
-            leetcode_error = str(exc)
+            leetcode_review = LeetCodeReview(username=leetcode_url, exists=False, score=0, error="Link invalid or service unreachable")
+            leetcode_error = "Link invalid or service unreachable"
 
     # Subtotal calculation over available document reviews
     scores = [resume_review.score]
