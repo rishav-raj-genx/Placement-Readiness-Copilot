@@ -149,6 +149,7 @@ class JobAggregator:
         """
         Discovers, filters, scores, and ranks jobs for a student profile.
         """
+        has_provided_skills = bool([s.strip() for s in (student_skills or []) if s and s.strip()])
         effective_skills = [s.strip() for s in (student_skills or []) if s and s.strip()]
         if not effective_skills:
             from src.api.server import get_fallback_skills_for_role
@@ -156,8 +157,9 @@ class JobAggregator:
 
         # If boolean query is not explicitly given, automatically construct one
         if not boolean_query:
+            query_skills = effective_skills if has_provided_skills else []
             boolean_query = BooleanSearchParser.build_query_from_profile(
-                skills=effective_skills,
+                skills=query_skills,
                 target_role=target_role,
                 locations=locations or ["remote", "bangalore", "india", "worldwide"],
             )
@@ -223,6 +225,43 @@ class JobAggregator:
                 "boolean_matched": matches_query,
             }
             matched_jobs.append(job_record)
+
+        if not matched_jobs and not has_provided_skills:
+            for job in deduped:
+                searchable_text = f"{job['title']} {job['company']} {job.get('location', '')} {job.get('description', '')}".lower()
+                role_words = [w.lower() for w in target_role.split() if len(w) > 2]
+                if any(w in searchable_text for w in role_words) or any(w in job['title'].lower() for w in ["software", "engineer", "developer", "intern"]):
+                    relevance, match_reason = self._compute_relevance(
+                        job=job,
+                        student_skills=clean_skills,
+                        matched_skills=[],
+                        target_role=target_role,
+                        matches_boolean=False,
+                    )
+                    is_intern = any(
+                        k in job["title"].lower() or k in job.get("description", "").lower()
+                        for k in ["intern", "internship", "co-op", "trainee", "graduate"]
+                    )
+                    job_record = {
+                        "id": job["id"],
+                        "title": job["title"],
+                        "company": job["company"],
+                        "location": job.get("location", "Remote"),
+                        "url": job["url"],
+                        "source": job["source"],
+                        "description": job.get("description", "") or match_reason,
+                        "required_skills": list(job.get("required_skills") or []),
+                        "matched_skills": [],
+                        "relevance_score": max(50, relevance),
+                        "match_reason": f"Recommended based on your target role ({target_role}).",
+                        "is_remote": job.get("is_remote", False),
+                        "job_type": "internship/entry-level" if is_intern else "full_time",
+                        "employment_type": "internship" if is_intern else "full_time",
+                        "publication_status": "published",
+                        "posted_at": job.get("posted_at"),
+                        "boolean_matched": True,
+                    }
+                    matched_jobs.append(job_record)
 
         # Sort by relevance score descending
         matched_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)

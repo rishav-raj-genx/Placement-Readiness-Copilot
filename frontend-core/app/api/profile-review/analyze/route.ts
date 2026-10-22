@@ -663,8 +663,8 @@ export async function POST(request?: Request): Promise<NextResponse> {
       review = await serviceRequest(`${getProfileReviewBaseUrl()}/analyze-profile`, {
         method: 'POST',
         body: form,
-        timeoutMs: 50_000,
-        maxRetries: 0,
+        timeoutMs: 60_000,
+        maxRetries: 3,
       });
     } catch (exc) {
       const message = exc instanceof Error ? exc.message : 'AI analyzer service failure';

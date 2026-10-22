@@ -100,4 +100,61 @@ describe('serviceRequest authentication and secret validation', () => {
       /Service authentication secret is not configured on the microservice \(https:\/\/profile-review-api\.onrender\.com\)\. Please set INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET/
     );
   });
+
+  it('retries 502/503/504 errors up to 3 times and yields timeout error on 504 exhaustion', async () => {
+    vi.stubEnv('INTERNAL_SERVICE_SECRET', 'valid-client-token');
+
+    let callCount = 0;
+    const fetchMock = vi.fn(async () => {
+      callCount++;
+      return new Response(JSON.stringify({ detail: 'Gateway Timeout' }), {
+        status: 504,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      serviceRequest('https://profile-review-api.onrender.com/analyze-profile', {
+        method: 'POST',
+        initialBackoffMs: 1,
+        maxBackoffMs: 2,
+        maxRetries: 3,
+      })
+    ).rejects.toThrowError('Service request timed out.');
+
+    // 1 initial attempt + 3 retries = 4 attempts total
+    expect(callCount).toBe(4);
+  });
+
+  it('successfully recovers from transient 502 errors after retry', async () => {
+    vi.stubEnv('INTERNAL_SERVICE_SECRET', 'valid-client-token');
+
+    let callCount = 0;
+    const fetchMock = vi.fn(async () => {
+      callCount++;
+      if (callCount < 3) {
+        return new Response(JSON.stringify({ detail: 'Bad Gateway' }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ status: 'ok', data: 'recovered' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await serviceRequest('https://profile-review-api.onrender.com/analyze-profile', {
+      method: 'POST',
+      initialBackoffMs: 1,
+      maxBackoffMs: 2,
+      maxRetries: 3,
+    });
+
+    expect(result).toEqual({ status: 'ok', data: 'recovered' });
+    expect(callCount).toBe(3);
+  });
 });
+

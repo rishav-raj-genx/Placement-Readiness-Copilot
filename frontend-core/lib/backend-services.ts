@@ -80,7 +80,7 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
   while (true) {
     attempt++;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000);
     const headers = new Headers(options.headers);
     if (!headers.has('Authorization')) {
       const serviceToken = getInternalServiceToken();
@@ -139,7 +139,15 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
         throw new Error(`Service request failed: ${detail}`);
       }
 
+      const isTimeout =
+        response.status === 504 ||
+        detail.toLowerCase().includes('timed out') ||
+        detail.toLowerCase().includes('timeout');
+
       if (attempt > maxRetries) {
+        if (isTimeout) {
+          throw new Error('Service request timed out.');
+        }
         throw new Error(`Service request failed after ${attempt} attempts: ${detail}`);
       }
 
@@ -164,13 +172,24 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
     } catch (error) {
       clearTimeout(timeout);
 
-      // Re-throw immediately if this is an explicit non-retriable 4xx failure
-      if (error instanceof Error && error.message.startsWith('Service request failed:')) {
+      // Re-throw immediately if this is an explicit non-retriable failure
+      if (
+        error instanceof Error &&
+        (error.message.startsWith('Service request failed:') ||
+          error.message.startsWith('Service request rejected:') ||
+          error.message.startsWith('Service authentication secret is not configured') ||
+          error.message.startsWith('Server Misconfiguration:'))
+      ) {
         throw error;
       }
 
       if (attempt > maxRetries) {
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (
+          error instanceof Error &&
+          (error.name === 'AbortError' ||
+            error.message.toLowerCase().includes('timed out') ||
+            error.message.toLowerCase().includes('timeout'))
+        ) {
           throw new Error('Service request timed out.');
         }
         throw error;

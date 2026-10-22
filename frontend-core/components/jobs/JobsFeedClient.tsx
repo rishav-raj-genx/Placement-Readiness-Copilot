@@ -191,8 +191,9 @@ export function JobsFeedClient({ profile, initialJobs, initialError }: JobsFeedC
       if (data && Array.isArray(data.jobs) && data.jobs.length > 0) {
         const normalized = normalizeDiscoveredJobs(data.jobs);
         const roleFiltered = filterDiscoveredJobsForTargetRole(normalized, profile?.targetRole ?? '');
-        const ranked = personalizeAndRankDiscoveredJobs(roleFiltered, profile?.skills ?? []);
-        setJobs(ranked.length > 0 ? ranked : roleFiltered);
+        const jobsToRank = roleFiltered.length > 0 ? roleFiltered : normalized;
+        const ranked = personalizeAndRankDiscoveredJobs(jobsToRank, profile?.skills ?? []);
+        setJobs(ranked.length > 0 ? ranked : jobsToRank);
         router.refresh();
       }
     } catch (err: unknown) {
@@ -204,11 +205,11 @@ export function JobsFeedClient({ profile, initialJobs, initialError }: JobsFeedC
   }, [profile?.skills, profile?.targetRole, router]);
 
   useEffect(() => {
-    if (initialJobs.length === 0 && !autoTriggeredRef.current) {
+    if ((jobs.length === 0 || initialJobs.length === 0) && !autoTriggeredRef.current) {
       autoTriggeredRef.current = true;
       void triggerDiscover();
     }
-  }, [initialJobs.length, triggerDiscover]);
+  }, [jobs.length, initialJobs.length, triggerDiscover]);
 
   return (
     <>

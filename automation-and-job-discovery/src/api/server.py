@@ -197,15 +197,32 @@ def discover_jobs(
 ):
     """Fetches jobs from Greenhouse, Lever, and RSS matching boolean criteria with cache control."""
     try:
-        active_skills = [s.strip() for s in (req.skills or []) if s and s.strip()]
-        if not active_skills:
-            active_skills = get_fallback_skills_for_role(req.target_role)
-            logger.info("Empty profile skills received. Using fallback skills for target role '%s': %s", req.target_role, active_skills)
+        raw_skills = [s.strip() for s in (req.skills or []) if s and s.strip()]
+        target_role = (req.target_role or "Full-Stack Software Engineer").strip()
+        if not target_role:
+            target_role = "Full-Stack Software Engineer"
+
+        # If skills array is empty, strictly execute search based purely on candidate's target_role
+        if not raw_skills:
+            active_skills = get_fallback_skills_for_role(target_role)
+            logger.info(
+                "Empty profile skills received. Strictly executing job search based purely on target role '%s' with fallback skills: %s",
+                target_role,
+                active_skills,
+            )
+            boolean_query = req.boolean_query or BooleanSearchParser.build_query_from_profile(
+                skills=[],
+                target_role=target_role,
+                locations=req.locations or ["remote", "bangalore", "india", "worldwide"],
+            )
+        else:
+            active_skills = raw_skills
+            boolean_query = req.boolean_query
 
         jobs = job_aggregator.discover_jobs(
             student_skills=active_skills,
-            target_role=req.target_role or "Software Engineer Intern",
-            boolean_query=req.boolean_query,
+            target_role=target_role,
+            boolean_query=boolean_query,
             locations=req.locations,
             max_results=req.max_results or 20,
             force_refresh=req.force_refresh or False,

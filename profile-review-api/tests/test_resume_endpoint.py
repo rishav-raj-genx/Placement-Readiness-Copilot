@@ -255,4 +255,31 @@ def test_analyze_profile_partial_scoring_with_invalid_links(monkeypatch: MonkeyP
     assert payload["total_readiness_score"] > 0
 
 
+def test_analyze_profile_bulletproof_when_pillar_raises_exception(monkeypatch: MonkeyPatch) -> None:
+    from unittest.mock import patch
 
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+
+    with patch("main.fetch_leetcode_stats", side_effect=RuntimeError("LeetCode connection timeout")), \
+         patch("main.fetch_github_data", side_effect=Exception("GitHub API down")):
+        response = client.post(
+            "/analyze-profile",
+            headers={"Authorization": "Bearer test-secret-key-1234"},
+            data={
+                "github_username": "anyuser",
+                "leetcode_url": "https://leetcode.com/anyuser",
+                "force_refresh": "true",
+            },
+            files={
+                "resume": ("resume.pdf", create_two_page_resume(), "application/pdf"),
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["resume_review"]["score"] > 0
+        assert payload["github_review"]["score"] == 0
+        assert payload["github_error"] is not None
+        assert payload["leetcode_review"]["score"] == 0
+        assert payload["leetcode_error"] is not None
+        assert payload["total_readiness_score"] > 0

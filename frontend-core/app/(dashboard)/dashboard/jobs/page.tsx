@@ -91,13 +91,15 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
     }
 
     const jobsValue: unknown = jobData;
+    const normalizedJobs = normalizeDiscoveredJobs(jobsValue);
     const roleFilteredJobs = filterDiscoveredJobsForTargetRole(
-      normalizeDiscoveredJobs(jobsValue),
+      normalizedJobs,
       profile?.targetRole ?? '',
     );
+    const effectiveJobs = roleFilteredJobs.length > 0 ? roleFilteredJobs : normalizedJobs;
     return {
       profile,
-      jobs: personalizeAndRankDiscoveredJobs(roleFilteredJobs, profile?.skills ?? []),
+      jobs: personalizeAndRankDiscoveredJobs(effectiveJobs, profile?.skills ?? []),
       error: null,
     };
   } catch {
