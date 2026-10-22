@@ -1,0 +1,7 @@
+{
+  "python.analysis.extraPaths": [
+    "./mock-interview",
+    "./automation-and-job-discovery/src",
+    "./profile-review-api"
+  ]
+}

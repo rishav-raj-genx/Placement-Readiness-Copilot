@@ -11,7 +11,7 @@ from urllib import request
 from urllib.error import HTTPError, URLError
 from uuid import uuid4
 
-from scoring.schemas import DimensionScore, InterviewResult, TranscriptTurn
+from .schemas import DimensionScore, InterviewResult, TranscriptTurn
 
 
 class ResultStore(Protocol):
