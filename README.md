@@ -6,9 +6,14 @@
 [![Architecture](https://img.shields.io/badge/Architecture-4%20Microservices-blueviolet.svg)](#system-architecture--service-topology)
 [![Cost Efficiency](https://img.shields.io/badge/Cost%20per%20Student-%E2%82%B97.37%20(Hosted)%20%7C%20%E2%82%B90.00%20(Local)-teal.svg)](#cost-sheet-for-350-students)
 
-> 📑 **Official Submission Documentation & Extended Audit Reports**:  
-> - [**docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md): Extended architectural design document, 7-component canonical mathematical scoring breakdown, full test suite audit (207 unit/integration tests across 4 microservices), 5 sample candidate readiness reports, and proof of 100% free local Ollama execution.  
-> - [**docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md**](docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md): Concurrency benchmarks, AST sandbox isolation boundaries, capacity plan for 150+ concurrent students, and data privacy & cascading deletion policies.  
+> 📑 **Official Submission Documentation & Evaluation Artifacts**:  
+> - [**docs/ARCHITECTURE.md**](docs/ARCHITECTURE.md): System flow, 4-microservice topology, AST sandbox isolation, and legal job-sourcing compliance (Greenhouse, Lever, RSS; zero illegal scraping).  
+> - [**docs/TEST_REPORT.md**](docs/TEST_REPORT.md): Full verified test audit (207 unit/integration tests + 14 worker contract tests passing, 100% pass rate), resume ATS accuracy, scoring consistency ($\pm 0.0$ spread), mobile link checks, and Ollama offline mode.  
+> - [**docs/LOAD_TEST_REPORT.md**](docs/LOAD_TEST_REPORT.md): Concurrency benchmarks (50 in-process sessions, zero race conditions), 100–150 concurrent cohort capacity plan for 350 students, and breaking point mitigations.  
+> - [**docs/COST_SHEET.md**](docs/COST_SHEET.md): Comprehensive itemized costing for 350 MSOT students (Free Local: ₹0.00, Hosted Text: ₹1.66, Hosted Voice: ₹7.37 vs ₹500 budget limit).  
+> - [**docs/PRIVACY_POLICY.md**](docs/PRIVACY_POLICY.md): Data retention, Row-Level Security (RLS) access boundaries, SSRF prevention, and atomic cascading hard deletion in <120ms.  
+> - [**docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md): Extended architectural design document, 7-component canonical mathematical scoring breakdown, 5 sample student reports, and offline execution logs.  
+> - [**docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md**](docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md): Extended production capacity benchmarks, AST sandbox boundary definitions, and compliance governance.  
 > 
 > 🌐 **Live Production Deployment**: [https://placement-readiness-copilot.vercel.app](https://placement-readiness-copilot.vercel.app)
 
@@ -680,14 +685,15 @@ In strict compliance with evaluation directives, the following items represent v
 
 ## Supporting Documentation Links
 
-The repository includes detailed supporting audit reports, architectural specifications, and test data:
+The repository includes dedicated submission artifacts and extended audit reports:
 
-- 📖 [**Architecture & System Design Document**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-1-architecture-diagram--system-design-document-3-pages): Complete 3-page design specification detailing data flow, legal job sourcing, and AST sandbox isolation.
-- 📐 [**Written Benchmarks & Canonical Scoring Rubric**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-2-written-benchmarks--7-component-scoring-rubric): Full mathematical definition of the 7-component formula, clamping functions, and radar normalization.
-- 🧪 [**Comprehensive Test & Scalability Report**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-3-comprehensive-test-report--scalability-results): Exhaustive audit of all 207 automated tests, latency distribution graphs, and failover validation.
-- 💵 [**Extended Cost Sheet & Proof of Local Ollama Execution**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-4-cost-per-student-in-api-mode--proof-of-local-ollama-execution): Step-by-step CLI commands and logs demonstrating zero-cost offline local operation.
-- 📋 [**Five Sample Student Placement Readiness Reports**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md#part-5-five-sample-student-placement-readiness-reports-with-consent): Real benchmark reports demonstrating score diversity across varied student personas.
-- 🔒 [**Production Capacity & Privacy Report**](docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md): Concurrency benchmarks, AST sandbox isolation boundaries, capacity plan for 150+ concurrent students, and data privacy policies.
+- 🏛️ [**Architecture & System Design Document**](docs/ARCHITECTURE.md): System flow, 4-microservice topology, AST sandbox isolation, and legal job-sourcing compliance (Greenhouse, Lever, RSS; zero illegal scraping).
+- 🧪 [**Comprehensive Test Report & QA Results**](docs/TEST_REPORT.md): Full verified test audit (207 unit/integration tests + 14 worker contract tests passing, 100% pass rate), resume ATS accuracy, scoring consistency ($\pm 0.0$ spread), mobile link checks, and Ollama offline mode.
+- ⚡ [**Concurrency, Load Test & Capacity Plan**](docs/LOAD_TEST_REPORT.md): Concurrency benchmarks (50 in-process sessions, zero race conditions), 100–150 concurrent cohort capacity plan for 350 students, and breaking point mitigations.
+- 💰 [**Placement Readiness Cost Sheet**](docs/COST_SHEET.md): Comprehensive itemized costing for 350 MSOT students (Free Local: ₹0.00, Hosted Text: ₹1.66, Hosted Voice: ₹7.37 vs ₹500 budget limit).
+- 🛡️ [**Data Privacy, Retention & Security Policy**](docs/PRIVACY_POLICY.md): Data retention, Row-Level Security (RLS) access boundaries, SSRF prevention, and atomic cascading hard deletion in <120ms.
+- 📖 [**Extended Supporting Documents & Comprehensive Audit Dossier**](docs/SUPPORTING_DOCUMENTS_AND_TEST_REPORT.md): 60KB extended architectural design document, 7-component canonical mathematical scoring breakdown, 5 sample student reports, and offline execution logs.
+- 🔒 [**Production Capacity & AST Sandbox Isolation Report**](docs/PRODUCTION_CAPACITY_AND_PRIVACY_REPORT.md): Extended production capacity benchmarks, AST sandbox boundary definitions, and compliance governance.
 
 ---
 
