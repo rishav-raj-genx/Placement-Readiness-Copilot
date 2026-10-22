@@ -112,11 +112,15 @@ def verify_service_token(authorization: Annotated[str | None, Header()] = None) 
     if is_e2e_mode():
         return "authorized"
 
-    expected_key = os.getenv("PROFILE_REVIEW_SERVICE_TOKEN") or os.getenv("INTERNAL_SERVICE_KEY")
+    expected_key = (
+        os.getenv("PROFILE_REVIEW_SERVICE_TOKEN")
+        or os.getenv("INTERNAL_SERVICE_KEY")
+        or os.getenv("INTERNAL_SERVICE_SECRET")
+    )
     if not expected_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Service authentication secret is not configured on the server.",
+            detail="Service authentication secret is not configured on the server. Please define INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET in your server environment variables.",
         )
 
     if not authorization or not authorization.startswith("Bearer "):

@@ -39,7 +39,11 @@ def authenticate_student(
     raw_token = token.strip()
 
     # 1. Internal service key authorization (service-to-service communication)
-    expected_service_key = os.getenv("MOCK_INTERVIEW_SERVICE_TOKEN") or os.getenv("INTERNAL_SERVICE_KEY")
+    expected_service_key = (
+        os.getenv("MOCK_INTERVIEW_SERVICE_TOKEN")
+        or os.getenv("INTERNAL_SERVICE_KEY")
+        or os.getenv("INTERNAL_SERVICE_SECRET")
+    )
     if expected_service_key and hmac.compare_digest(raw_token, expected_service_key):
         return str(requested_student_id) if requested_student_id else "service_caller"
 

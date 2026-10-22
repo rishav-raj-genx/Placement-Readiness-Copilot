@@ -51,7 +51,11 @@ def verify_service_token(
     if is_e2e_mode():
         return True
 
-    expected_token = os.environ.get("AUTOMATION_SERVICE_TOKEN") or os.environ.get("INTERNAL_SERVICE_KEY")
+    expected_token = (
+        os.environ.get("AUTOMATION_SERVICE_TOKEN")
+        or os.environ.get("INTERNAL_SERVICE_KEY")
+        or os.environ.get("INTERNAL_SERVICE_SECRET")
+    )
     if not expected_token:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

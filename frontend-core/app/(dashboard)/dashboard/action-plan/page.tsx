@@ -1194,13 +1194,13 @@ export default function ActionPlanPage() {
                   </div>
                 </div>
 
-                {/* Footer Practice CTA */}
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-800/80 bg-stone-950/70 p-4">
-                  <div className="text-xs text-stone-400">
-                    Ready to practice algorithms in the Placement Readiness IDE?
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {leetcodeUrl && (
+                {/* Footer LeetCode Profile */}
+                {leetcodeUrl && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-800/80 bg-stone-950/70 p-4">
+                    <div className="text-xs text-stone-400">
+                      External Coding Profile
+                    </div>
+                    <div className="flex items-center gap-3">
                       <a
                         href={leetcodeUrl.startsWith('http') ? leetcodeUrl : `https://${leetcodeUrl}`}
                         target="_blank"
@@ -1209,14 +1209,9 @@ export default function ActionPlanPage() {
                       >
                         <ExternalLink className="h-3.5 w-3.5" /> View LeetCode Profile
                       </a>
-                    )}
-                    <Link href="/dashboard/interview/coding">
-                      <Button size="sm" className="bg-[#D93829] text-white hover:bg-red-600 text-xs font-semibold gap-1.5 shadow-md shadow-black/40">
-                        <Code2 className="h-3.5 w-3.5" /> Launch Coding IDE
-                      </Button>
-                    </Link>
+                    </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </section>

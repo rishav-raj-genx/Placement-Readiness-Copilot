@@ -62,6 +62,7 @@ export interface ServiceRequestOptions extends RequestInit {
 function getInternalServiceToken(): string {
   const token = firstConfigured(
     process.env.INTERNAL_SERVICE_KEY,
+    process.env.INTERNAL_SERVICE_SECRET,
     process.env.PROFILE_REVIEW_SERVICE_TOKEN,
     process.env.AUTOMATION_SERVICE_TOKEN,
   );
@@ -85,6 +86,12 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
       const serviceToken = getInternalServiceToken();
       if (serviceToken) {
         headers.set('Authorization', `Bearer ${serviceToken}`);
+      } else {
+        clearTimeout(timeout);
+        const errorMsg =
+          'Service authentication secret is not configured on the server. Please define INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET in your .env.local file or Vercel dashboard environment variables.';
+        console.error(`[backend-services] Configuration Error: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
     }
 
@@ -107,6 +114,14 @@ export async function serviceRequest(url: string, options: ServiceRequestOptions
         typeof payload === 'object' && payload !== null && 'detail' in payload
           ? String((payload as Record<string, unknown>).detail)
           : `${response.status} ${response.statusText}`;
+
+      if (detail.includes('Service authentication secret is not configured')) {
+        let origin = url;
+        try { origin = new URL(url).origin; } catch {}
+        throw new Error(
+          `Service authentication secret is not configured on the microservice (${origin}). Please set INTERNAL_SERVICE_KEY or INTERNAL_SERVICE_SECRET in your backend deployment environment variables (e.g., on Render).`
+        );
+      }
 
       // 4xx errors (excluding 429 Too Many Requests) fail immediately without retrying
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
