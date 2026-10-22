@@ -89,7 +89,9 @@ export default function DashboardHomePage() {
   }, [hydrateApplications, hydrateProfile, user?.id]);
 
   useEffect(() => {
-    const completed = isTourCompleted({
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const forceTour = params?.get('tour') === '1' || params?.get('intro') === '1';
+    const completed = !forceTour && isTourCompleted({
       userId: user?.id,
       onboardingCompletedAt: user?.onboardingCompletedAt,
     });

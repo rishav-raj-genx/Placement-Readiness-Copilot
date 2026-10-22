@@ -22,7 +22,7 @@ export default function Home() {
   }, [hydrate, isHydrated]);
 
   useEffect(() => {
-    if (!mounted || !isHydrated) return;
+    if (!mounted) return;
 
     const completed = isTourCompleted({
       userId: user?.id,
@@ -34,9 +34,9 @@ export default function Home() {
     } else {
       setShowIntro(true);
     }
-  }, [isHydrated, mounted, router, user]);
+  }, [mounted, router, user]);
 
-  if (!mounted || !isHydrated) {
+  if (!mounted) {
     return <div className="min-h-screen bg-[#1a1310]" />;
   }
 

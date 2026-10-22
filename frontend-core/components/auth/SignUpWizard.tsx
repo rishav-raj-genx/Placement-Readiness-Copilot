@@ -644,7 +644,7 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
       if (userId && isSupabaseConfigured) hydrate();
 
       toast.success('Profile saved! Opening your readiness dashboard.');
-      router.replace('/dashboard');
+      router.replace('/dashboard?tour=1');
       router.refresh();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unable to complete dashboard navigation.';
