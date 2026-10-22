@@ -29,6 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const user = useAuthStore((state) => state.user);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const hydrateAuth = useAuthStore((state) => state.hydrate);
+  const profile = useProfileStore((state) => state.profile);
   const hydrateProfile = useProfileStore((state) => state.hydrate);
   const analyzeProfile = useProfileStore((state) => state.analyze);
   const hydrateApplications = useApplicationStore((state) => state.hydrate);
@@ -119,7 +120,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="p-4"><DashboardNavigation onNavigate={() => setMobileOpen(false)} /></div>
               </SheetContent>
             </Sheet>
-            <Link href="/dashboard" className="flex items-center gap-2 font-semibold"><HireableLogo size={25} />Hireable</Link>
+            <div className="flex items-center gap-2">
+              <Link href="/dashboard" className="flex items-center gap-2 font-semibold"><HireableLogo size={25} />Hireable</Link>
+            </div>
+            <div className="flex items-center gap-2">
+              {profile?.isPremium ? (
+                <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  Pro
+                </span>
+              ) : (
+                <span
+                  data-testid="mobile-interview-credits-counter"
+                  className={cn(
+                    'rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                    (profile?.interviewCredits ?? 3) <= 0
+                      ? 'border-[#D93829]/50 bg-[#D93829]/15 text-[#FF6B4A] font-semibold'
+                      : 'border-stone-700 bg-stone-800 text-stone-300'
+                  )}
+                >
+                  {user ? `${profile?.interviewCredits ?? 3} left` : '3 free'}
+                </span>
+              )}
+            </div>
           </div>
 
           <TopHeader />

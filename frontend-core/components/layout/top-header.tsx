@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { NotificationBell } from '@/components/ui/NotificationBell';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useInterviewStore } from '@/stores/interview-store';
 import { useProfileStore } from '@/stores/profile-store';
@@ -35,6 +36,8 @@ export function TopHeader() {
   const score = readiness?.totalScore;
   const pageTitle = getPageTitle(pathname);
 
+  const formattedCredits = credits === 1 ? '1 interview left' : `${credits} interviews left`;
+
   return (
     <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-stone-800 bg-stone-950/95 px-6 backdrop-blur-sm md:flex">
       {pageTitle && <p className="text-sm font-semibold text-stone-200">{pageTitle}</p>}
@@ -48,8 +51,16 @@ export function TopHeader() {
             Premium Active
           </span>
         ) : (
-          <span className="rounded-md border border-stone-700 bg-stone-800 px-2.5 py-1 text-xs font-medium text-stone-300">
-            {user ? `${credits} interviews left` : '3 free interviews'}
+          <span
+            data-testid="interview-credits-counter"
+            className={cn(
+              'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+              credits <= 0
+                ? 'border-[#D93829]/50 bg-[#D93829]/15 text-[#FF6B4A] font-semibold shadow-[0_0_12px_rgba(217,56,41,0.25)]'
+                : 'border-stone-700 bg-stone-800 text-stone-300'
+            )}
+          >
+            {user ? formattedCredits : '3 free interviews'}
           </span>
         )}
         <NotificationBell />

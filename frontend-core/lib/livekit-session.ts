@@ -59,6 +59,18 @@ export function resolveLiveKitConnectionUrl(
   throw new Error('The LiveKit server stream is initializing. Please try again shortly.');
 }
 
+export class LiveKitApiError extends Error {
+  code?: string;
+  status: number;
+
+  constructor(message: string, code?: string, status: number = 500) {
+    super(message);
+    this.name = 'LiveKitApiError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
 export function readLiveKitApiError(payload: unknown, status: number): string {
   if (isRecord(payload) && typeof payload.error === 'string' && payload.error.trim()) {
     return payload.error.trim();
@@ -153,7 +165,9 @@ export async function createInterviewSession(
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(readLiveKitApiError(payload, response.status));
+    const message = readLiveKitApiError(payload, response.status);
+    const code = isRecord(payload) && typeof payload.code === 'string' ? payload.code : undefined;
+    throw new LiveKitApiError(message, code, response.status);
   }
 
   return parseLiveKitSessionResponse(payload, livekitUrl);

@@ -42,6 +42,7 @@ export interface UserProfile {
   projects: CandidateProject[];
   coCurricular?: CoCurricularProfile;
   interviewCredits?: number;
+  interviewCount?: number;
   isPremium?: boolean;
   onboardingCompletedAt?: string;
   updatedAt?: string;

@@ -58,8 +58,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const [liveKitResults, setLiveKitResults] = useState<LiveKitResultsPayload | null>(null);
   const [liveKitLoading, setLiveKitLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [codeHistory, setCodeHistory] = useState<string | null>(null);
 
-  const isLiveKitId = id.startsWith('intv_');
+  const isLiveKitId = id.startsWith('intv_') || id.startsWith('coding_');
   const session = getSession(id);
 
   // Load LiveKit results from the store, session/local storage, database, or instant synthesis
@@ -108,13 +109,16 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       try {
         const { data } = await supabase
           .from('interview_sessions')
-          .select('result, target_role, completed_at, audio_url, transcript')
+          .select('result, target_role, completed_at, audio_url, transcript, code_history')
           .eq('id', id)
           .maybeSingle();
 
         if (data) {
           if (data.audio_url) {
             setAudioUrl(data.audio_url);
+          }
+          if (typeof data.code_history === 'string' && data.code_history.trim()) {
+            setCodeHistory(data.code_history);
           }
           if (data.result) {
             const normalized = normalizeInterviewResult(data.result);
@@ -173,6 +177,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         results={liveKitResults}
         loading={liveKitLoading}
         audioUrl={audioUrl}
+        codeHistory={codeHistory}
       />
     );
   }
@@ -450,11 +455,13 @@ function LiveKitResultsView({
   results,
   loading,
   audioUrl,
+  codeHistory,
 }: {
   id: string;
   results: LiveKitResultsPayload | null;
   loading: boolean;
   audioUrl?: string | null;
+  codeHistory?: string | null;
 }) {
   const router = useRouter();
   const [round2Completed, setRound2Completed] = useState(false);
@@ -800,6 +807,27 @@ function LiveKitResultsView({
           </CardContent>
         </Card>
       )}
+
+      <Card className="rounded-2xl border border-stone-800 bg-stone-900 shadow-md shadow-black/40">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Code2 className="h-4 w-4 text-[#D93829]" />
+            <CardTitle className="text-sm font-semibold text-stone-200">Completed code snapshot</CardTitle>
+          </div>
+          <CardDescription className="text-xs text-stone-400">The final Round 2 submission retained with this interview.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {codeHistory ? (
+            <pre className="max-h-[32rem] overflow-auto rounded-xl border border-stone-800 bg-stone-950 p-4 text-xs leading-relaxed text-stone-300">
+              <code>{codeHistory}</code>
+            </pre>
+          ) : (
+            <p className="rounded-xl border border-dashed border-stone-800 px-4 py-8 text-center text-xs text-stone-500">
+              No Round 2 code snapshot was saved for this session.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Replayable Timestamped Transcript & Audio Player for Auditing */}
       <InterviewAuditPlayer

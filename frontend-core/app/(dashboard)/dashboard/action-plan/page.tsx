@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   Copy,
   Check,
-  Download,
   RefreshCw,
   FileText,
   GitBranch,
@@ -22,7 +21,6 @@ import {
   Loader2,
   ExternalLink,
   Smartphone,
-  Terminal,
   Target,
   Flame,
   ChevronRight,
@@ -144,7 +142,6 @@ export default function ActionPlanPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'resume' | 'github' | 'projects' | 'linkedin' | 'leetcode'>('all');
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
-  const [copiedRawJson, setCopiedRawJson] = useState(false);
   const [verifyingProjectId, setVerifyingProjectId] = useState<string | null>(null);
 
   const fetchDetailedData = useCallback(async () => {
@@ -219,38 +216,11 @@ export default function ActionPlanPage() {
     return [];
   }, [profile?.projects]);
 
-  const rawJsonFormatted = useMemo(() => {
-    const payload = {
-      review: activeResult,
-      readiness: readiness,
-      live_checks: liveChecks,
-    };
-    return JSON.stringify(payload, null, 2);
-  }, [activeResult, readiness, liveChecks]);
-
   const handleCopyText = (text: string, key: string) => {
     void navigator.clipboard.writeText(text);
     setCopiedIndex(key);
     toast.success('Snippet copied to clipboard');
     setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  const handleCopyRawJson = () => {
-    void navigator.clipboard.writeText(rawJsonFormatted);
-    setCopiedRawJson(true);
-    toast.success('Complete review JSON copied to clipboard');
-    setTimeout(() => setCopiedRawJson(false), 2000);
-  };
-
-  const handleDownloadJson = () => {
-    const blob = new Blob([rawJsonFormatted], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `faang-action-plan-diagnostic-${user?.id || 'candidate'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Downloaded complete diagnostic review JSON');
   };
 
   const handleReanalyze = async () => {
@@ -341,15 +311,6 @@ export default function ActionPlanPage() {
             {isAnalyzing ? 'Evaluating...' : 'Re-Evaluate Profile'}
           </Button>
 
-          <Button
-            onClick={handleDownloadJson}
-            variant="outline"
-            className="border-stone-800 bg-stone-900 text-xs font-semibold text-stone-300 hover:border-stone-700 hover:bg-stone-800 gap-1.5"
-            title="Download uncompressed evaluation JSON"
-          >
-            <Download className="h-3.5 w-3.5 text-stone-400" />
-            Export JSON
-          </Button>
         </div>
       </div>
 
@@ -1245,38 +1206,6 @@ export default function ActionPlanPage() {
             </Card>
           </section>
 
-          {/* ============================================================== */}
-          {/* SECTION 6: COMPLETE UNCOMPRESSED REVIEW JSON INSPECTOR         */}
-          {/* ============================================================== */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-stone-300 flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-stone-400" />
-                Raw Database Review Payload (Complete Uncompressed JSON)
-              </h3>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopyRawJson}
-                className="h-7 border-stone-800 bg-stone-900 text-xs text-stone-300 hover:bg-stone-800 gap-1.5"
-              >
-                {copiedRawJson ? (
-                  <>
-                    <Check className="h-3 w-3 text-orange-400" />
-                    <span className="text-orange-400">Copied JSON</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3" />
-                    <span>Copy JSON</span>
-                  </>
-                )}
-              </Button>
-            </div>
-            <pre className="max-h-72 overflow-auto rounded-2xl border border-stone-800 bg-stone-950 p-4 font-mono text-xs text-stone-400 leading-relaxed">
-              {rawJsonFormatted}
-            </pre>
-          </section>
         </div>
       )}
     </div>

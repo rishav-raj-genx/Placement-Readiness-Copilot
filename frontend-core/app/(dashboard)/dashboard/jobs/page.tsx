@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { TrackedApplyLink } from '@/components/jobs/TrackedApplyLink';
 import {
   DISCOVERED_JOB_COLUMNS,
+  filterDiscoveredJobsForTargetRole,
   normalizeDiscoveredJobs,
   normalizeProfileSkills,
   personalizeAndRankDiscoveredJobs,
@@ -122,9 +123,13 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
     }
 
     const jobsValue: unknown = jobData;
+    const roleFilteredJobs = filterDiscoveredJobsForTargetRole(
+      normalizeDiscoveredJobs(jobsValue),
+      profile?.targetRole ?? '',
+    );
     return {
       profile,
-      jobs: personalizeAndRankDiscoveredJobs(normalizeDiscoveredJobs(jobsValue), profile?.skills ?? []),
+      jobs: personalizeAndRankDiscoveredJobs(roleFilteredJobs, profile?.skills ?? []),
       error: null,
     };
   } catch {

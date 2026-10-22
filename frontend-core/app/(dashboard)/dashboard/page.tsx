@@ -51,8 +51,7 @@ const GUEST_MOCK_READINESS: ReadinessScore = {
 
 const QUICK_LINKS = [
   { href: '/dashboard/interview', label: 'Interview Studio', description: 'Round 1 technical viva & speech practice', icon: Mic2 },
-  { href: '/dashboard/interview/coding', label: 'Coding IDE', description: 'Round 2 DSA & web dev challenge', icon: Code2 },
-  { href: '/dashboard/review-details', label: 'Detailed Review', description: 'Pass/fail audit, rewrites & raw JSON', icon: Trophy },
+  { href: '/dashboard/review-details', label: 'Detailed Review', description: 'Pass/fail audit, evidence, and rewrites', icon: Trophy },
   { href: '/dashboard/tracker', label: 'Applications', description: 'Internshala-style ATS pipeline tracker', icon: KanbanSquare },
   { href: '/dashboard/jobs', label: 'Jobs & Internships', description: 'Verified role matches & 1-click apply', icon: BriefcaseBusiness },
   { href: '/dashboard/profile', label: 'Profile Evidence', description: 'Manage resume, GitHub, and credentials', icon: Files },
@@ -421,7 +420,7 @@ export default function DashboardHomePage() {
 
         <section aria-labelledby="quick-links-heading">
           <div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-semibold text-stone-400">Continue</p><h2 id="quick-links-heading" className="mt-1 text-xl font-bold text-stone-100">Quick links</h2></div></div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {QUICK_LINKS.map(({ href, label, description, icon: Icon }) => (
               <Link key={href} href={!user && href !== '/dashboard/jobs' ? '/auth' : href} className="group rounded-2xl border border-stone-800 bg-stone-900 p-5 transition hover:border-red-600/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
                 <div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-stone-800 text-red-500"><Icon className="h-5 w-5" aria-hidden="true" /></span><ArrowRight className="h-4 w-4 text-stone-600 transition-transform group-hover:translate-x-1 group-hover:text-red-500" aria-hidden="true" /></div>

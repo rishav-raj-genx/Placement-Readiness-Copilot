@@ -257,9 +257,25 @@ async def entrypoint(ctx: JobContext) -> None:
 
     async def enforce_max_duration() -> None:
         target_minutes = session_config.effective_max_minutes
-        max_seconds = 1200 if target_minutes >= 20 else 900
+        max_seconds = target_minutes * 60
         await asyncio.sleep(max_seconds)
         logger.info("Maximum interview duration reached (%d sec); finalizing the session", max_seconds)
+        closing_text = (
+            "We have reached the configured interview time. Thank you for your answers; "
+            "I am finalizing your detailed feedback now."
+        )
+        finalizer.record("assistant", closing_text, timestamp_sec=float(max_seconds))
+        with suppress(Exception):
+            await ctx.room.local_participant.publish_data(
+                encode_event(
+                    transcript_event(
+                        text=closing_text,
+                        speaker="interviewer",
+                        is_final=True,
+                    )
+                ),
+                reliable=True,
+            )
         await finish_and_close()
 
     duration_task = asyncio.create_task(enforce_max_duration())
@@ -294,9 +310,9 @@ def _duration_from_metadata(metadata: Mapping[str, object]) -> int:
         or cfg_map.get("duration_minutes")
         or cfg_map.get("target_duration_minutes")
     )
-    if isinstance(val, (int, float)) and 5 <= int(val) <= 60:
+    if isinstance(val, (int, float)) and int(val) in {15, 20}:
         return int(val)
-    if isinstance(val, str) and val.isdigit() and 5 <= int(val) <= 60:
+    if isinstance(val, str) and val.isdigit() and int(val) in {15, 20}:
         return int(val)
     return 15
 

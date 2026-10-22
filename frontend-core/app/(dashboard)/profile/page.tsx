@@ -30,7 +30,6 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { supabase } from '@/lib/supabase-client';
 import { validatePdf, validateResumeFile, normalizeUsername } from '@/lib/onboarding';
-import { normalizeReadinessScore } from '@/lib/data-adapters';
 import type { ProjectItem } from '@/types';
 
 type DocumentKind = 'resume' | 'linkedin';
@@ -49,6 +48,7 @@ export default function ProfilePage() {
   const readiness = useProfileStore((state) => state.readiness);
   const isAnalyzing = useProfileStore((state) => state.isAnalyzing);
   const hydrate = useProfileStore((state) => state.hydrate);
+  const analyze = useProfileStore((state) => state.analyze);
   const candidate = profile ?? user;
 
   const [displayName, setDisplayName] = useState('');
@@ -143,7 +143,7 @@ export default function ProfilePage() {
 
       const { error: uploadError } = await supabase.storage
         .from('candidate-documents')
-        .upload(path, file, { upsert: true, contentType });
+        .upload(path, file, { upsert: true, contentType, cacheControl: '0' });
 
       if (uploadError) throw uploadError;
 
@@ -158,8 +158,12 @@ export default function ProfilePage() {
 
       if (dbError) throw dbError;
 
-      await hydrate(user.id);
-      toast.success(`${kind === 'resume' ? 'Resume' : 'LinkedIn document'} updated successfully.`);
+      const recalculated = await analyze(user.id);
+      if (recalculated) {
+        toast.success(`${kind === 'resume' ? 'Resume' : 'LinkedIn document'} updated and scores recalculated.`);
+      } else {
+        toast.warning('The document was saved, but score recalculation failed. Use Re-Evaluate after checking the analysis service.');
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Document upload failed.');
     }
@@ -190,7 +194,7 @@ export default function ProfilePage() {
       if (kind === 'resume') setNewResume(null);
       else setNewLinkedIn(null);
 
-      await hydrate(user.id);
+      await analyze(user.id);
       toast.success(`${kind === 'resume' ? 'Resume' : 'LinkedIn document'} deleted.`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete document.');
@@ -240,9 +244,13 @@ export default function ProfilePage() {
         .eq('id', user.id);
 
       if (error) throw error;
-      await hydrate(user.id);
+      const recalculated = await analyze(user.id);
       setEditingField(null);
-      toast.success('Information updated successfully.');
+      if (recalculated) {
+        toast.success('Information updated and scores recalculated.');
+      } else {
+        toast.warning('Information was saved, but score recalculation failed. Use Re-Evaluate after checking the analysis service.');
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Update failed.');
     } finally {
@@ -277,7 +285,7 @@ export default function ProfilePage() {
       else if (field === 'linkedinUrl') setLinkedinUrl('');
       else if (field === 'linkedinText') setLinkedinText('');
 
-      await hydrate(user.id);
+      await analyze(user.id);
       toast.success('Data point deleted.');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete data point.');
@@ -481,7 +489,7 @@ export default function ProfilePage() {
 
         const { error: uploadError } = await supabase.storage
           .from('candidate-documents')
-          .upload(path, newResume, { upsert: true, contentType });
+          .upload(path, newResume, { upsert: true, contentType, cacheControl: '0' });
         if (uploadError) throw uploadError;
         resumePath = path;
       }
@@ -490,7 +498,7 @@ export default function ProfilePage() {
         const path = `${currentUser.id}/linkedin.pdf`;
         const { error: uploadError } = await supabase.storage
           .from('candidate-documents')
-          .upload(path, newLinkedIn, { upsert: true, contentType: 'application/pdf' });
+          .upload(path, newLinkedIn, { upsert: true, contentType: 'application/pdf', cacheControl: '0' });
         if (uploadError) throw uploadError;
         linkedinPath = path;
       }
@@ -566,43 +574,16 @@ export default function ProfilePage() {
 
       profileSaved = true;
 
-      // Automatically fire an asynchronous background request to /api/profile-review/analyze to calculate the new readiness score
       const currentUserId = currentUser.id;
-      void (async () => {
-        try {
-          const internalKey = process.env.INTERNAL_SERVICE_KEY || process.env.NEXT_PUBLIC_INTERNAL_SERVICE_KEY || '';
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          if (internalKey) {
-            headers['Authorization'] = `Bearer ${internalKey}`;
-          }
-
-          const response = await fetch('/api/profile-review/analyze', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ userId: currentUserId }),
-          });
-
-          if (response.ok) {
-            const payload: unknown = await response.json().catch(() => null);
-            if (typeof payload === 'object' && payload !== null && 'readiness' in payload) {
-              const normalized = normalizeReadinessScore((payload as { readiness: unknown }).readiness);
-              if (normalized) {
-                useProfileStore.setState({ readiness: normalized });
-              }
-            }
-          }
-        } catch (err: unknown) {
-          console.warn('AI scoring service re-index error bypassed:', err);
-        } finally {
-          await hydrate(currentUserId);
-        }
-      })();
+      const recalculated = await analyze(currentUserId);
 
       setNewResume(null);
       setNewLinkedIn(null);
-      toast.success('Profile updated successfully.');
+      if (recalculated) {
+        toast.success('Profile updated and scores recalculated.');
+      } else {
+        toast.warning('Profile saved, but score recalculation failed. Use Re-Evaluate after checking the analysis service.');
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to update profile.';
       if (profileSaved) {

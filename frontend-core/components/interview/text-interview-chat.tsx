@@ -58,6 +58,9 @@ export function TextInterviewChat({
   const socketRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<LiveKitTranscriptEntry[]>([]);
+  const finishRequestedRef = useRef(false);
+  const finishDeliveredRef = useRef(false);
+  const finishFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   messagesRef.current = messages;
   const statusRef = useRef(status);
   statusRef.current = status;
@@ -143,7 +146,20 @@ export function TextInterviewChat({
               setReadyToFinish(true);
               setIsWaitingResponse(false);
               toast.info('All interview questions completed. You can now submit for scoring.');
+            } else if (data.event === 'closing') {
+              const text = String(data.text || 'The configured interview time has ended. Finalizing your feedback now.');
+              setMessages((previous) => [...previous, {
+                id: `closing_${Date.now()}`,
+                speaker: 'interviewer',
+                text,
+                timestamp: Date.now(),
+                final: true,
+              }]);
+              setStatus('finishing');
             } else if (data.event === 'result') {
+              if (finishDeliveredRef.current) return;
+              finishDeliveredRef.current = true;
+              if (finishFallbackRef.current) clearTimeout(finishFallbackRef.current);
               const rawResult = data.result || data;
               const normalized = normalizeInterviewResult(rawResult);
               normalized.transcript = messagesRef.current;
@@ -185,6 +201,7 @@ export function TextInterviewChat({
       if (socketRef.current) {
         socketRef.current.close();
       }
+      if (finishFallbackRef.current) clearTimeout(finishFallbackRef.current);
     };
   }, [difficulty, durationMinutes, experienceLevel, interviewId, onFinish, targetRole, topics, userId]);
 
@@ -212,6 +229,8 @@ export function TextInterviewChat({
   };
 
   const handleFinish = async () => {
+    if (finishRequestedRef.current || finishDeliveredRef.current) return;
+    finishRequestedRef.current = true;
     setStatus('finishing');
     toast.info('Finishing text interview and evaluating rubric...');
 
@@ -219,12 +238,15 @@ export function TextInterviewChat({
       socketRef.current.send(JSON.stringify({ event: 'finish' }));
 
       // Fallback timeout in case server does not return result event promptly
-      setTimeout(() => {
+      finishFallbackRef.current = setTimeout(() => {
+        if (finishDeliveredRef.current) return;
+        finishDeliveredRef.current = true;
         const synthesized = compileInterviewResults(targetRole, messagesRef.current);
         synthesized.transcript = messagesRef.current;
         void onFinish(synthesized, messagesRef.current);
       }, 3000);
     } else {
+      finishDeliveredRef.current = true;
       const synthesized = compileInterviewResults(targetRole, messagesRef.current);
       synthesized.transcript = messagesRef.current;
       void onFinish(synthesized, messagesRef.current);

@@ -135,9 +135,21 @@ export async function POST(request: NextRequest) {
       ? profile.interview_credits
       : 3;
 
-    if (!isPremium && availableCredits <= 0) {
+    const { count: sessionCount } = await dbClient
+      .from('interview_sessions')
+      .select('id', { count: 'exact', head: true })
+      .or(`user_id.eq.${user.id},student_id.eq.${user.id}`);
+
+    const totalSessions = typeof sessionCount === 'number' ? sessionCount : 0;
+
+    if (!isPremium && (totalSessions >= 3 || availableCredits <= 0)) {
       return NextResponse.json(
-        { error: 'Premium required. Out of credits.' },
+        {
+          error: 'Free tier limit reached. You have completed your 3 free mock interviews.',
+          code: 'LIMIT_EXCEEDED',
+          count: totalSessions,
+          limit: 3,
+        },
         { status: 403 },
       );
     }

@@ -108,15 +108,15 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       finishTimeoutRef.current = null;
     }
     await finalizeRecording();
-    markRound1Completed(user?.id);
 
     // Deep state saving to backend database
     const transcriptTurns = p.transcript && p.transcript.length > 0
       ? p.transcript
       : liveKitStore.currentInterview?.transcripts || [];
 
+    let persisted = false;
     try {
-      await fetch('/api/interview/complete', {
+      const response = await fetch('/api/interview/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -127,20 +127,32 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           status: 'completed',
         }),
       });
+      if (!response.ok) {
+        const payload: unknown = await response.json().catch(() => null);
+        const message = typeof payload === 'object' && payload !== null && 'error' in payload
+          ? String(payload.error)
+          : 'Interview completion could not be persisted.';
+        throw new Error(message);
+      }
+      persisted = true;
     } catch (saveErr) {
-      console.warn('Backend interview completion persist warning:', saveErr);
+      toast.error(saveErr instanceof Error ? saveErr.message : 'Interview completion could not be persisted.');
     }
 
     if (typeof window !== 'undefined') {
       sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
       localStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
-      localStorage.setItem('interview_round1_completed', 'true');
     }
     liveKitStore.setResults(p);
-    if (user?.id) {
+    if (persisted) {
+      markRound1Completed(user?.id);
+    }
+    if (persisted && user?.id) {
       void useProfileStore.getState().analyze(user.id);
     }
-    toast.success('Interview completed! Viewing results...');
+    toast.success(persisted
+      ? 'Interview completed. Round 2 is now unlocked.'
+      : 'Interview ended. Results are available, but Round 2 remains locked until persistence succeeds.');
     router.push(`/dashboard/interview/results/${id}`);
   }, [finalizeRecording, id, liveKitStore, router, user?.id]);
 
@@ -354,8 +366,9 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           experienceLevel={sessionMeta?.experienceLevel}
           userId={user?.id}
           onFinish={async (resultsPayload) => {
+            let persisted = false;
             try {
-              await fetch('/api/interview/complete', {
+              const response = await fetch('/api/interview/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -366,23 +379,32 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                   status: 'completed',
                 }),
               });
+              if (!response.ok) {
+                const payload: unknown = await response.json().catch(() => null);
+                const message = typeof payload === 'object' && payload !== null && 'error' in payload
+                  ? String(payload.error)
+                  : 'Interview completion could not be persisted.';
+                throw new Error(message);
+              }
+              persisted = true;
             } catch (saveErr) {
-              console.warn('Backend text interview completion persist warning:', saveErr);
+              toast.error(saveErr instanceof Error ? saveErr.message : 'Interview completion could not be persisted.');
             }
 
             if (typeof window !== 'undefined') {
               sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
               localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
-              localStorage.setItem('interview_round1_completed', 'true');
             }
-            markRound1Completed(user?.id);
+            if (persisted) markRound1Completed(user?.id);
             liveKitStore.setResults(resultsPayload);
 
-            if (user?.id) {
+            if (persisted && user?.id) {
               void useProfileStore.getState().analyze(user.id);
             }
 
-            toast.success('Interview completed! Viewing results...');
+            toast.success(persisted
+              ? 'Interview completed. Round 2 is now unlocked.'
+              : 'Interview ended. Results are available, but Round 2 remains locked until persistence succeeds.');
             router.push(`/dashboard/interview/results/${id}`);
           }}
           onAbandon={() => {

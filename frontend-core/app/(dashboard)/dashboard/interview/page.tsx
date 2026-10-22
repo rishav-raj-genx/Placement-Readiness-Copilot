@@ -12,9 +12,14 @@ import { PageHeader } from '@/components/shared/page-header';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
-import { createInterviewSession, getLiveKitClientConfiguration } from '@/lib/livekit-session';
+import {
+  LiveKitApiError,
+  createInterviewSession,
+  getLiveKitClientConfiguration,
+} from '@/lib/livekit-session';
 import { resolveInterviewFocusTopics } from '@/lib/interview-config';
 import { RoleCombobox } from '@/components/interview/RoleCombobox';
+import { InterviewLimitModal } from '@/components/interview/InterviewLimitModal';
 import { checkRound1Completed } from '@/lib/round-status';
 import type { CompanyType, Difficulty, ExperienceLevel, LiveKitSessionRequest } from '@/types';
 import { toast } from '@/lib/toast';
@@ -53,6 +58,7 @@ export default function ConfigureInterviewPage() {
   const interviewCredits = typeof profile?.interviewCredits === 'number' ? profile.interviewCredits : 3;
   const isLocked = !isPremium && interviewCredits <= 0;
 
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [roundType, setRoundType] = useState<'round1' | 'round2' | 'both'>('round1');
   const [isRound1Done, setIsRound1Done] = useState(false);
   const [targetRole, setTargetRole] = useState('');
@@ -102,9 +108,17 @@ export default function ConfigureInterviewPage() {
     setTargetRole(value);
   }, []);
 
+  const handleStartClick = () => {
+    if (isLocked || interviewCredits <= 0) {
+      setShowPaywallModal(true);
+      return;
+    }
+    void begin();
+  };
+
   const begin = async () => {
-    if (isLocked) {
-      toast.error('Out of Free Credits. Upgrade to Premium.');
+    if (isLocked || interviewCredits <= 0) {
+      setShowPaywallModal(true);
       return;
     }
 
@@ -157,6 +171,13 @@ export default function ConfigureInterviewPage() {
       );
       router.push(`/dashboard/interview/session/${session.interviewId}?mode=${mode}&provider=${provider}`);
     } catch (error) {
+      if (
+        (error instanceof LiveKitApiError && (error.code === 'LIMIT_EXCEEDED' || error.status === 403)) ||
+        (error instanceof Error && (error.message.includes('LIMIT_EXCEEDED') || error.message.includes('Free tier limit') || error.message.includes('Out of credits')))
+      ) {
+        setShowPaywallModal(true);
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Unable to create the interview.';
       setCreateError(message);
       toast.error(message);
@@ -217,6 +238,10 @@ export default function ConfigureInterviewPage() {
           onClick={() => {
             if (!user) {
               router.push('/signup?redirect=/dashboard/interview');
+              return;
+            }
+            if (isLocked || interviewCredits <= 0) {
+              setShowPaywallModal(true);
               return;
             }
             if (!isRound1Done) {
@@ -520,37 +545,47 @@ export default function ConfigureInterviewPage() {
             </Link>
           ) : (
             <Button
-              onClick={() => void begin()}
-              disabled={isCreating || isLaunchingRound2 || isLocked}
+              onClick={handleStartClick}
+              disabled={isCreating || isLaunchingRound2}
+              data-testid="start-interview-button"
               className={
                 isLocked
-                  ? 'rounded-lg border border-stone-700 bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-400 cursor-not-allowed'
+                  ? 'rounded-lg border border-[#D93829]/50 bg-[#D93829]/20 px-4 py-2 text-xs font-semibold text-[#FF6B4A] shadow-[0_0_15px_rgba(217,56,41,0.25)] transition-all hover:bg-[#D93829]/30 hover:border-[#D93829] active:bg-[#D93829]/40 cursor-pointer'
                   : 'rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] disabled:opacity-50'
               }
             >
-              {isLocked ? (
-                <>
-                  <Lock className="mr-2 h-4 w-4 text-orange-400" />
-                  Out of Credits (Locked)
-                </>
-              ) : isCreating || isLaunchingRound2 ? (
+              {isCreating || isLaunchingRound2 ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : isLocked ? (
+                <Lock className="mr-2 h-4 w-4 text-[#FF6B4A]" />
               ) : null}
-              {!isLocked && roundType === 'round2' ? (
+              {isLocked ? (
+                <>Start Interview</>
+              ) : roundType === 'round2' ? (
                 <>
                   <Code2 className="mr-2 h-4 w-4" />
                   Launch coding IDE (Round 2)
                 </>
-              ) : !isLocked ? (
+              ) : (
                 <>
                   Begin technical viva (Round 1)
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
-              ) : null}
+              )}
             </Button>
           )}
         </div>
       </section>
+
+      {/* Paywall Modal for Exhausted Free Tier */}
+      <InterviewLimitModal
+        isOpen={showPaywallModal}
+        onClose={() => setShowPaywallModal(false)}
+        onReturnToDashboard={() => {
+          setShowPaywallModal(false);
+          router.push('/dashboard');
+        }}
+      />
     </div>
   );
 }

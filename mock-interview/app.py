@@ -216,6 +216,65 @@ def create_app(
         session: InterviewSession | None = None
         student_id: str | None = None
         interview_id: str | None = None
+        duration_task: asyncio.Task[None] | None = None
+        finalization_lock = asyncio.Lock()
+        finalized = asyncio.Event()
+
+        async def finalize_session(reason: str) -> None:
+            nonlocal session
+            async with finalization_lock:
+                if finalized.is_set() or session is None:
+                    return
+
+                if reason == "duration_exceeded":
+                    await websocket.send_json(
+                        {
+                            "event": "closing",
+                            "reason": reason,
+                            "text": (
+                                "We have reached the configured interview time. "
+                                "Thank you for your answers; I am finalizing your feedback now."
+                            ),
+                        }
+                    )
+
+                if interview_id:
+                    await asyncio.to_thread(
+                        session_persistence.save_transcript,
+                        interview_id,
+                        session.transcript,
+                    )
+                result = await asyncio.to_thread(session.finish)
+                if interview_id:
+                    await asyncio.to_thread(session_persistence.save, interview_id, result)
+                if persistence is not None and student_id is not None:
+                    await asyncio.to_thread(persistence.save, student_id, result)
+                if (
+                    student_id
+                    and not getattr(result, "is_abandoned", False)
+                    and not getattr(result, "is_provisional", False)
+                ):
+                    record_round1_completed(student_id)
+                await websocket.send_json(
+                    {
+                        "event": "result",
+                        "reason": reason,
+                        "result": result.model_dump(mode="json"),
+                    }
+                )
+                finalized.set()
+
+        async def enforce_duration_limit(active_session: InterviewSession) -> None:
+            remaining_seconds = max(
+                0.0,
+                (active_session.config.effective_max_minutes * 60)
+                - active_session.elapsed_seconds,
+            )
+            await asyncio.sleep(remaining_seconds)
+            await finalize_session("duration_exceeded")
+            with contextlib.suppress(RuntimeError):
+                await websocket.close(code=1000, reason="Interview duration completed")
+
         try:
             while True:
                 raw_message = await websocket.receive_json()
@@ -224,28 +283,7 @@ def create_app(
                 message = raw_message
                 event = message.get("event")
 
-                # Check duration limit if session is active
-                if session is not None and session.elapsed_seconds >= session.config.effective_max_minutes * 60:
-                    if interview_id:
-                        await asyncio.to_thread(
-                            session_persistence.save_transcript,
-                            interview_id,
-                            session.transcript,
-                        )
-                    result = await asyncio.to_thread(session.finish)
-                    if interview_id:
-                        await asyncio.to_thread(session_persistence.save, interview_id, result)
-                    if persistence is not None and student_id is not None:
-                        await asyncio.to_thread(persistence.save, student_id, result)
-                    if student_id and not getattr(result, "is_abandoned", False) and not getattr(result, "is_provisional", False):
-                        record_round1_completed(student_id)
-                    await websocket.send_json(
-                        {
-                            "event": "result",
-                            "reason": "duration_exceeded",
-                            "result": result.model_dump(mode="json"),
-                        }
-                    )
+                if finalized.is_set():
                     return
 
                 if event == "start":
@@ -266,7 +304,14 @@ def create_app(
                     )
                     cfg_raw = message.get("session_config")
                     cfg = SessionConfig.model_validate(cfg_raw) if isinstance(cfg_raw, dict) else None
+                    if cfg is not None:
+                        if cfg.target_duration_minutes not in {15, 20}:
+                            raise ValueError("interview duration must be 15 or 20 minutes")
+                        cfg = cfg.model_copy(
+                            update={"max_duration_minutes": cfg.target_duration_minutes}
+                        )
                     session = InterviewSession(adapt_resume(resume_raw), scoring_llm, config=cfg)
+                    duration_task = asyncio.create_task(enforce_duration_limit(session))
                     greeting = session.greeting()
                     await _send_voice_event(websocket, "greeting", greeting, text_to_speech)
                     await _send_next_question(websocket, session, text_to_speech)
@@ -300,22 +345,7 @@ def create_app(
                 elif event == "finish":
                     if session is None:
                         raise ValueError("send a start event before finishing")
-                    if interview_id:
-                        await asyncio.to_thread(
-                            session_persistence.save_transcript,
-                            interview_id,
-                            session.transcript,
-                        )
-                    result = await asyncio.to_thread(session.finish)
-                    if interview_id:
-                        await asyncio.to_thread(session_persistence.save, interview_id, result)
-                    if persistence is not None and student_id is not None:
-                        await asyncio.to_thread(persistence.save, student_id, result)
-                    if student_id and not getattr(result, "is_abandoned", False) and not getattr(result, "is_provisional", False):
-                        record_round1_completed(student_id)
-                    await websocket.send_json(
-                        {"event": "result", "result": result.model_dump(mode="json")}
-                    )
+                    await finalize_session("student_requested")
                     return
                 else:
                     raise ValueError("event must be start, answer, audio_answer, or finish")
@@ -331,6 +361,11 @@ def create_app(
         except (AuthenticationError, TypeError, ValueError, RuntimeError, OSError) as exc:
             with contextlib.suppress(Exception):
                 await websocket.send_json({"event": "error", "message": str(exc)})
+        finally:
+            if duration_task and duration_task is not asyncio.current_task():
+                duration_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await duration_task
 
 
     return app

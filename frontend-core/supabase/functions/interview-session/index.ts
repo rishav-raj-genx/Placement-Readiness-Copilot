@@ -255,11 +255,23 @@ Deno.serve(async (req: Request) => {
     const isPremium = profile.is_premium === true;
     const interviewCredits = typeof profile.interview_credits === "number"
       ? profile.interview_credits
-      : 0;
+      : 3;
 
-    if (!isPremium && interviewCredits <= 0) {
+    const { count: sessionCount } = await serviceClient
+      .from("interview_sessions")
+      .select("id", { count: "exact", head: true })
+      .or(`user_id.eq.${jwtUserId},student_id.eq.${jwtUserId}`);
+
+    const totalSessions = typeof sessionCount === "number" ? sessionCount : 0;
+
+    if (!isPremium && (totalSessions >= 3 || interviewCredits <= 0)) {
       return new Response(
-        JSON.stringify({ error: "Premium required. Out of credits." }),
+        JSON.stringify({
+          error: "Free tier limit reached. You have completed your 3 free mock interviews.",
+          code: "LIMIT_EXCEEDED",
+          count: totalSessions,
+          limit: 3,
+        }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Award, Brain, Clock, Filter, History, Radio } from 'lucide-react';
+import { ArrowRight, Award, Brain, Clock, Code2, FileText, Filter, History, Radio } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +18,14 @@ import {
 } from '@/components/ui/select';
 import { useAuthStore } from '@/stores/auth-store';
 import { supabase } from '@/lib/supabase-client';
+import {
+  isInterviewRecord as isRecord,
+  isInterviewSessionCompleted,
+  normalizeInterviewTranscript,
+  parseInterviewRecord,
+  readInterviewStringArray,
+  type InterviewTranscriptTurn,
+} from '@/lib/interview-history';
 
 interface LiveKitHistoryEntry {
   id: string;
@@ -34,6 +42,7 @@ interface LiveKitHistoryEntry {
   interview_score?: number | null;
   viva_score?: number | null;
   ide_score?: number | null;
+  transcript?: unknown;
 }
 
 interface HistoryEntry {
@@ -49,12 +58,11 @@ interface HistoryEntry {
   vivaScore?: number;
   ideScore?: number;
   topics: string[];
-}
-
-type UnknownRecord = Record<string, unknown>;
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  summary: string;
+  strengths: string[];
+  improvementAreas: string[];
+  transcript: InterviewTranscriptTurn[];
+  codeHistory: string | null;
 }
 
 function readString(value: unknown): string | null {
@@ -62,9 +70,7 @@ function readString(value: unknown): string | null {
 }
 
 function readStringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
-    : [];
+  return readInterviewStringArray(value);
 }
 
 function readPositiveNumber(value: unknown): number | null {
@@ -90,8 +96,8 @@ function resolveRoundScores(session: LiveKitHistoryEntry): {
   overallScore?: number;
 } {
   const config = isRecord(session.config) ? session.config : {};
-  const vivaScores = isRecord(session.viva_scores) ? session.viva_scores : {};
-  const result = isRecord(session.result) ? session.result : {};
+  const vivaScores = parseInterviewRecord(session.viva_scores);
+  const result = parseInterviewRecord(session.result);
   const codingResult = isRecord(result.coding_result) ? result.coding_result : {};
 
   // Check explicit viva_score / ide_score fields first
@@ -154,13 +160,19 @@ function elapsedMinutes(session: LiveKitHistoryEntry): number | null {
 
 function toHistoryEntry(session: LiveKitHistoryEntry): HistoryEntry {
   const config = isRecord(session.config) ? session.config : {};
+  const result = parseInterviewRecord(session.result);
+  const vivaScores = parseInterviewRecord(session.viva_scores);
   const { vivaScore, ideScore, overallScore } = resolveRoundScores(session);
+  const completed = isInterviewSessionCompleted(session);
+  const transcriptSource = Array.isArray(session.transcript) && session.transcript.length > 0
+    ? session.transcript
+    : result.transcript;
 
   return {
     id: session.id,
     targetRole: session.target_role || 'Software Engineer',
     type: readString(config.type) ?? 'live_audio',
-    status: session.status,
+    status: completed ? 'completed' : session.status,
     completedAt: session.completed_at,
     createdAt: session.created_at,
     difficulty: readString(config.difficulty),
@@ -169,7 +181,23 @@ function toHistoryEntry(session: LiveKitHistoryEntry): HistoryEntry {
     vivaScore,
     ideScore,
     topics: readStringArray(config.topics),
+    summary: readString(vivaScores.summary) ?? readString(result.summary) ?? '',
+    strengths: readStringArray(vivaScores.strengths).length > 0
+      ? readStringArray(vivaScores.strengths)
+      : readStringArray(result.strengths),
+    improvementAreas: readStringArray(vivaScores.improvement_areas).length > 0
+      ? readStringArray(vivaScores.improvement_areas)
+      : readStringArray(result.improvement_areas ?? result.weak_areas),
+    transcript: normalizeInterviewTranscript(transcriptSource),
+    codeHistory: readString(session.code_history) ?? readString(result.code_history),
   };
+}
+
+function formatTranscriptTime(value: number | null): string {
+  if (value === null) return '';
+  const minutes = Math.floor(value / 60).toString().padStart(2, '0');
+  const seconds = Math.floor(value % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
 }
 
 export default function InterviewHistoryPage() {
@@ -198,7 +226,7 @@ export default function InterviewHistoryPage() {
           const { data: history, error: queryError } = await supabase
             .from('interview_sessions')
             .select('*')
-            .eq('student_id', activeUserId) // CRITICAL PRIVACY LOCK
+            .or(`student_id.eq.${activeUserId},user_id.eq.${activeUserId}`)
             .order('created_at', { ascending: false });
 
           if (queryError) {
@@ -325,8 +353,9 @@ export default function InterviewHistoryPage() {
         <div className="space-y-3">
           {filteredEntries.map((entry) => (
             <Card key={entry.id} className="rounded-xl border border-stone-800 bg-[#28201E] shadow-none transition-colors hover:border-stone-700">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="space-y-1.5">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-stone-100">{entry.targetRole}</span>
                     <Badge variant="outline" className="gap-1 border-stone-700 bg-stone-800 font-mono text-[11px] text-stone-300">
@@ -381,21 +410,85 @@ export default function InterviewHistoryPage() {
                       ))}
                     </div>
                   )}
+                  </div>
+
+                  {entry.status === 'completed' ? (
+                    <Link href={`/dashboard/interview/results/${entry.id}`}>
+                      <Button variant="outline" size="sm" className="rounded-lg border-stone-700 bg-stone-800 text-xs font-medium text-stone-200 transition-colors hover:border-[#D93829] hover:bg-stone-700 hover:text-white">
+                        Full results
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/dashboard/interview">
+                      <Button variant="ghost" size="sm" className="rounded-lg text-xs text-stone-400 transition-colors hover:bg-stone-800 hover:text-stone-200">
+                        Start a new viva
+                      </Button>
+                    </Link>
+                  )}
                 </div>
 
-                {entry.status === 'completed' ? (
-                  <Link href={`/dashboard/interview/results/${entry.id}`}>
-                    <Button variant="outline" size="sm" className="rounded-lg border-stone-700 bg-stone-800 text-xs font-medium text-stone-200 transition-colors hover:border-[#D93829] hover:bg-stone-700 hover:text-white">
-                      View Feedback
-                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href="/dashboard/interview">
-                    <Button variant="ghost" size="sm" className="rounded-lg text-xs text-stone-400 transition-colors hover:bg-stone-800 hover:text-stone-200">
-                      Retry
-                    </Button>
-                  </Link>
+                {entry.status === 'completed' && (
+                  <div className="space-y-3 border-t border-stone-800 pt-4">
+                    <div className="rounded-lg border border-stone-800 bg-stone-950/50 p-3">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-stone-200">
+                        <FileText className="h-3.5 w-3.5 text-[#D93829]" /> AI feedback
+                      </p>
+                      <p className="mt-1.5 text-xs leading-relaxed text-stone-400">
+                        {entry.summary || 'The completed interview did not include a written summary.'}
+                      </p>
+                      {(entry.strengths.length > 0 || entry.improvementAreas.length > 0) && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-400">Strengths</p>
+                            <ul className="mt-1 space-y-1 text-xs text-stone-400">
+                              {entry.strengths.map((item) => <li key={item}>• {item}</li>)}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-400">Improve</p>
+                            <ul className="mt-1 space-y-1 text-xs text-stone-400">
+                              {entry.improvementAreas.map((item) => <li key={item}>• {item}</li>)}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <details className="rounded-lg border border-stone-800 bg-stone-950/40">
+                      <summary className="cursor-pointer px-3 py-2.5 text-xs font-semibold text-stone-300">
+                        Full viva transcript ({entry.transcript.length} turns)
+                      </summary>
+                      <div className="max-h-96 space-y-2 overflow-y-auto border-t border-stone-800 p-3">
+                        {entry.transcript.length > 0 ? entry.transcript.map((turn) => (
+                          <div key={turn.id} className="rounded-lg border border-stone-800 bg-stone-900/70 p-3">
+                            <div className="flex items-center justify-between gap-3 text-[11px]">
+                              <span className={turn.speaker === 'student' ? 'font-semibold text-stone-200' : 'font-semibold text-orange-400'}>
+                                {turn.speaker === 'student' ? 'Candidate' : 'Interviewer'}
+                              </span>
+                              {turn.timestampSeconds !== null && <span className="font-mono text-stone-500">{formatTranscriptTime(turn.timestampSeconds)}</span>}
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-stone-400">{turn.text}</p>
+                          </div>
+                        )) : (
+                          <p className="py-4 text-center text-xs text-stone-500">No transcript was retained for this session.</p>
+                        )}
+                      </div>
+                    </details>
+
+                    <details className="rounded-lg border border-stone-800 bg-stone-950/40">
+                      <summary className="flex cursor-pointer items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-stone-300">
+                        <Code2 className="h-3.5 w-3.5 text-[#D93829]" /> Completed code snapshot
+                      </summary>
+                      <div className="border-t border-stone-800 p-3">
+                        {entry.codeHistory ? (
+                          <pre className="max-h-96 overflow-auto rounded-lg bg-stone-950 p-3 text-xs leading-relaxed text-stone-300"><code>{entry.codeHistory}</code></pre>
+                        ) : (
+                          <p className="py-3 text-xs text-stone-500">No Round 2 code was attached to this interview record.</p>
+                        )}
+                      </div>
+                    </details>
+                  </div>
                 )}
               </CardContent>
             </Card>

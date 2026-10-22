@@ -106,9 +106,26 @@ export async function POST(request: NextRequest) {
       ? profile.interview_credits
       : 3;
 
-    if (!isPremium && availableCredits <= 0) {
+    // Check lifetime interview count from interview_sessions
+    const { count: sessionCount, error: countError } = await adminClient
+      .from('interview_sessions')
+      .select('id', { count: 'exact', head: true })
+      .or(`user_id.eq.${user.id},student_id.eq.${user.id}`);
+
+    if (countError) {
+      console.warn('[Interview Start] Failed to query interview_sessions count:', countError);
+    }
+
+    const totalSessions = typeof sessionCount === 'number' ? sessionCount : 0;
+
+    if (!isPremium && (totalSessions >= 3 || availableCredits <= 0)) {
       return NextResponse.json(
-        { error: 'Premium required. Out of credits.' },
+        {
+          error: 'Free tier limit reached. You have completed your 3 free mock interviews.',
+          code: 'LIMIT_EXCEEDED',
+          count: totalSessions,
+          limit: 3,
+        },
         { status: 403 },
       );
     }
@@ -219,12 +236,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Strict credit deduction: If credits > 0 and user is not premium, decrement immediately
-    let remainingCredits = availableCredits;
-    if (!isPremium && availableCredits > 0) {
+    // Strict credit deduction: If user is not premium, decrement immediately
+    let remainingCredits = Math.max(0, 3 - (totalSessions + 1));
+    if (!isPremium) {
+      const nextCredits = Math.max(0, Math.min(availableCredits - 1, remainingCredits));
       const { data: updatedProfile, error: updateError } = await adminClient
         .from('profiles')
-        .update({ interview_credits: Math.max(0, availableCredits - 1) })
+        .update({ interview_credits: nextCredits })
         .eq('id', user.id)
         .select('interview_credits')
         .single();

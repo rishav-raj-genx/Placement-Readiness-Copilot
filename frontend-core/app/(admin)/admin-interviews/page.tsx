@@ -50,7 +50,7 @@ async function loadFacultyVivas(): Promise<FacultyVivaData> {
     const { data: completedVivas, error: sessionError } = await supabaseAdmin
       .from('interview_sessions')
       .select('*')
-      .eq('status', 'completed')
+      .or('status.eq.completed,status.eq.complete,status.eq.finished,completed_at.not.is.null,result.not.is.null')
       .order('created_at', { ascending: false });
 
     if (sessionError) {

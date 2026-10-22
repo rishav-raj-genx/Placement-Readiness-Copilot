@@ -120,6 +120,62 @@ function timestamp(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const TARGET_ROLE_STOP_WORDS = new Set([
+  'and',
+  'developer',
+  'engineer',
+  'engineering',
+  'intern',
+  'internship',
+  'junior',
+  'senior',
+  'software',
+]);
+
+function normalizedRoleText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9+#.]+/g, ' ').trim();
+}
+
+function roleTerms(targetRole: string): string[] {
+  const normalizedRole = normalizedRoleText(targetRole);
+  const baseTerms = normalizedRole
+    .split(/\s+/)
+    .filter((term) => term.length > 1 && !TARGET_ROLE_STOP_WORDS.has(term));
+  const aliases: string[] = [];
+
+  if (/front[\s-]?end/.test(normalizedRole)) aliases.push('frontend', 'front end', 'react', 'ui');
+  if (/back[\s-]?end/.test(normalizedRole)) aliases.push('backend', 'back end', 'api', 'server');
+  if (/full[\s-]?stack/.test(normalizedRole)) aliases.push('fullstack', 'full stack', 'frontend', 'backend');
+  if (/data/.test(normalizedRole)) aliases.push('data', 'analytics', 'analyst');
+  if (/machine learning|\bml\b|artificial intelligence|\bai\b/.test(normalizedRole)) aliases.push('machine learning', 'ml', 'ai');
+  if (/devops|site reliability|\bsre\b/.test(normalizedRole)) aliases.push('devops', 'sre', 'platform', 'cloud');
+  if (/mobile|android|ios/.test(normalizedRole)) aliases.push('mobile', 'android', 'ios');
+  if (baseTerms.length === 0 && /software|developer|engineer/.test(normalizedRole)) {
+    aliases.push('software', 'developer', 'engineer');
+  }
+
+  return Array.from(new Set([...baseTerms, ...aliases]));
+}
+
+export function filterDiscoveredJobsForTargetRole(
+  jobs: DiscoveredJob[],
+  targetRole: string,
+): DiscoveredJob[] {
+  const terms = roleTerms(targetRole);
+  if (terms.length === 0) return jobs;
+
+  return jobs.filter((job) => {
+    if (job.is_msot_post) return true;
+    const searchable = normalizedRoleText([
+      job.title,
+      job.description,
+      job.job_type,
+      ...job.required_skills,
+    ].join(' '));
+    return terms.some((term) => searchable.includes(term));
+  });
+}
+
 export function personalizeAndRankDiscoveredJobs(
   jobs: DiscoveredJob[],
   profileSkills: string[],

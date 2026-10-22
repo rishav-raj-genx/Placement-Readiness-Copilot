@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
 import { createSupabaseServiceClient } from '@/lib/supabase-service-server';
+import { normalizeInterviewTranscript } from '@/lib/interview-history';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +14,25 @@ interface CompleteSessionPayload {
   viva_scores?: Record<string, unknown>;
   result?: Record<string, unknown>;
   status?: string;
+}
+
+interface PersistedTranscriptTurn {
+  speaker: 'ai' | 'student';
+  text: string;
+  timestamp_sec: number | null;
+  turn_id: number;
+}
+
+function normalizePersistedTranscript(value: unknown): PersistedTranscriptTurn[] {
+  const source = typeof value === 'string' && value.trim() && !value.trim().startsWith('[')
+    ? [{ speaker: 'student', text: value }]
+    : value;
+  return normalizeInterviewTranscript(source).map((turn, index) => ({
+    speaker: turn.speaker === 'student' ? 'student' : 'ai',
+    text: turn.text,
+    timestamp_sec: turn.timestampSeconds,
+    turn_id: index + 1,
+  }));
 }
 
 export async function POST(request: NextRequest) {
@@ -56,21 +76,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized to modify this session.' }, { status: 403 });
     }
 
-    // Prepare transcript JSON array
-    let normalizedTranscript: unknown[] = [];
-    if (Array.isArray(body.transcript)) {
-      normalizedTranscript = body.transcript;
-    } else if (typeof body.transcript === 'string') {
-      try {
-        const parsed = JSON.parse(body.transcript);
-        if (Array.isArray(parsed)) normalizedTranscript = parsed;
-        else normalizedTranscript = [{ speaker: 'student', text: body.transcript }];
-      } catch {
-        normalizedTranscript = [{ speaker: 'student', text: body.transcript }];
-      }
-    } else if (Array.isArray(existingSession.transcript) && existingSession.transcript.length > 0) {
-      normalizedTranscript = existingSession.transcript;
-    }
+    // Canonical JSONB transcript array. Prefer submitted final STT turns, then the
+    // worker-persisted transcript, without allowing an empty browser payload to erase it.
+    const submittedTranscript = normalizePersistedTranscript(body.transcript);
+    const existingTranscript = normalizePersistedTranscript(existingSession.transcript);
+    const normalizedTranscript = submittedTranscript.length > 0
+      ? submittedTranscript
+      : existingTranscript;
 
     // Code snapshot from Round 2
     const codeHistory = body.codeHistory?.trim() || body.code_history?.trim() || existingSession.code_history || null;
@@ -151,6 +163,7 @@ export async function POST(request: NextRequest) {
       .from('interview_sessions')
       .update({
         status: 'completed',
+        interview_score: finalScore,
         transcript: normalizedTranscript,
         code_history: codeHistory,
         viva_scores: vivaScores,

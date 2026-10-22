@@ -3,6 +3,10 @@ import { getProfileReviewBaseUrl, serviceRequest } from '@/lib/backend-services'
 import { normalizeUserProfile, isRecord } from '@/lib/profile-adapters';
 import { createAdminClient } from '@/lib/supabase-server';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
+import {
+  normalizeLeetCodeStats,
+  type LeetCodeStats,
+} from '@/lib/leetcode';
 
 export const runtime = 'nodejs';
 
@@ -186,87 +190,63 @@ async function computeCodingPracticeScore(
   leetcodeUrl: string | null | undefined,
   studentId: string,
   admin: ReturnType<typeof createAdminClient>,
-  currentCodingScore: number
-): Promise<number> {
+  currentCodingScore: number,
+  existingReview?: unknown,
+): Promise<{ score: number; review: LeetCodeStats | null }> {
   let score = 0;
+  let review = normalizeLeetCodeStats(existingReview, leetcodeUrl ? extractLeetcodeUsername(leetcodeUrl) : '');
 
   // 1. Fetch live LeetCode stats via microservice or direct public GraphQL
   if (leetcodeUrl && leetcodeUrl.trim().length > 0) {
     const username = extractLeetcodeUsername(leetcodeUrl);
     if (username) {
-      try {
-        const res = await serviceRequest(
-          `${getProfileReviewBaseUrl()}/review/leetcode/${encodeURIComponent(username)}`,
-          { timeoutMs: 6_000 }
-        );
-        if (isRecord(res) && typeof res.score === 'number' && Number.isFinite(res.score)) {
-          score = Math.max(score, res.score);
+      if (!review) {
+        try {
+          const response = await serviceRequest(
+            `${getProfileReviewBaseUrl()}/review/leetcode/${encodeURIComponent(username)}`,
+            { timeoutMs: 8_000, maxRetries: 1 },
+          );
+          review = normalizeLeetCodeStats(response, username);
+        } catch {
+          // The direct public API below is an independent fallback.
         }
-      } catch {
-        // Graceful direct GraphQL fallback if profile review API is unavailable
+      }
+
+      if (!review || (review.exists && review.total_solved === 0 && review.score === 0)) {
         try {
           const gqlRes = await fetch('https://leetcode.com/graphql', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+              Referer: `https://leetcode.com/u/${encodeURIComponent(username)}/`,
             },
+            cache: 'no-store',
             body: JSON.stringify({
               query: `query getUserProfile($username: String!) {
                 matchedUser(username: $username) {
+                  username
                   submitStats: submitStatsGlobal {
                     acSubmissionNum { difficulty count }
                   }
+                  profile { ranking }
                 }
-                userContestRanking(username: $username) { rating }
+                userContestRanking(username: $username) { rating globalRanking }
               }`,
               variables: { username },
             }),
           });
           if (gqlRes.ok) {
-            const json = (await gqlRes.json()) as {
-              data?: {
-                matchedUser?: {
-                  submitStats?: {
-                    acSubmissionNum?: Array<{ difficulty?: string; count?: number }>;
-                  };
-                };
-                userContestRanking?: { rating?: number };
-              };
-            };
-            const matched = json?.data?.matchedUser;
-            if (matched) {
-              let total = 0, med = 0, hard = 0;
-              for (const item of matched.submitStats?.acSubmissionNum ?? []) {
-                const diff = (item.difficulty || '').toLowerCase();
-                const count = Number(item.count || 0);
-                if (diff === 'all') total = count;
-                else if (diff === 'medium') med = count;
-                else if (diff === 'hard') hard = count;
-              }
-              const rating = Number(json?.data?.userContestRanking?.rating || 0);
-              if (total >= 300 && (med + hard) >= 150) {
-                score = Math.max(score, 100);
-              } else if (total > 0) {
-                const vol = Math.min(70, (total / 300) * 70);
-                const qual = Math.min(25, ((med + hard) / 150) * 20 + Math.min(5, hard / 4));
-                const bonus = rating >= 1850 ? 15 : rating >= 1650 ? 10 : rating >= 1500 ? 5 : (hard >= 10 ? 5 : 0);
-                score = Math.max(score, Math.min(100, Math.round(vol + qual + bonus)));
-              }
-            }
+            const directReview = normalizeLeetCodeStats(await gqlRes.json(), username);
+            if (directReview) review = directReview;
           }
         } catch {
-          // Profile does not exist or network unreachable: fails gracefully
+          // Preserve the service response or prior verified score if LeetCode is unavailable.
         }
       }
     }
 
-    if (score === 0) {
-      const url = leetcodeUrl.trim().toLowerCase();
-      if (url.includes('leetcode.com') || url.includes('hackerrank.com') || url.includes('codeforces.com')) {
-        score = 40;
-      }
-    }
+    if (review) score = review.score;
   }
 
   // 2. Completed Round 2 Coding Practice sessions in interview_sessions
@@ -296,16 +276,19 @@ async function computeCodingPracticeScore(
         })
       );
       score = Math.max(score, Math.round((bestSessionScore / 100) * 100));
-    } else if (currentCodingScore > 0) {
+    } else if (leetcodeUrl && !review && currentCodingScore > 0) {
       score = Math.max(score, currentCodingScore);
     }
   } catch {
-    if (currentCodingScore > 0) {
+    if (leetcodeUrl && !review && currentCodingScore > 0) {
       score = Math.max(score, currentCodingScore);
     }
   }
 
-  return Math.min(100, Math.max(0, score));
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    review,
+  };
 }
 
 /**
@@ -516,6 +499,12 @@ export async function POST(request?: Request): Promise<NextResponse> {
       if (typeof bodyData.githubUsername === 'string') {
         updatePayload.github_username = bodyData.githubUsername.trim();
       }
+      if (typeof bodyData.leetcodeUrl === 'string') {
+        updatePayload.leetcode_url = bodyData.leetcodeUrl.trim() || null;
+      }
+      if (typeof bodyData.codingProfileUrl === 'string') {
+        updatePayload.coding_profile_url = bodyData.codingProfileUrl.trim() || null;
+      }
       if (typeof bodyData.resumePath === 'string') {
         updatePayload.resume_pdf_path = bodyData.resumePath;
       }
@@ -523,19 +512,9 @@ export async function POST(request?: Request): Promise<NextResponse> {
         updatePayload.linkedin_pdf_path = bodyData.linkedinPath;
       }
 
-      try {
-        const { error: patchError } = await admin.from('profiles').update(updatePayload).eq('id', studentId);
-        if (patchError) {
-          const errStr = (patchError.message || '').toLowerCase();
-          if (patchError.code === 'PGRST204' || errStr.includes('column')) {
-            delete updatePayload.leetcode_url;
-            delete updatePayload.coding_profile_url;
-            delete updatePayload.linkedin_text;
-            await admin.from('profiles').update(updatePayload).eq('id', studentId);
-          }
-        }
-      } catch (profileUpdateErr) {
-        console.warn('Profile sync in analyze route bypassed on error:', profileUpdateErr);
+      const { error: patchError } = await admin.from('profiles').update(updatePayload).eq('id', studentId);
+      if (patchError) {
+        throw new AnalysisError('Failed to save profile evidence before analysis.', 500, 'PROFILE_UPDATE_FAILED');
       }
     }
 
@@ -551,6 +530,12 @@ export async function POST(request?: Request): Promise<NextResponse> {
     const effectiveGithubUsername = (typeof bodyData?.githubUsername === 'string' && bodyData.githubUsername)
       ? bodyData.githubUsername.trim()
       : (profile.githubUsername ?? '');
+
+    const effectiveLeetcodeUrl = typeof bodyData?.leetcodeUrl === 'string'
+      ? bodyData.leetcodeUrl.trim()
+      : typeof bodyData?.codingProfileUrl === 'string'
+        ? bodyData.codingProfileUrl.trim()
+        : profile.leetcodeUrl || profile.codingProfileUrl || '';
 
     // ──────────────────────────────────────────────────────────────────────────
     // PHASE 1: PRESERVE EXISTING SCORES (DEEP MERGE)
@@ -593,6 +578,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
       try {
         const form = new FormData();
         form.append('github_username', effectiveGithubUsername);
+        form.append('leetcode_url', effectiveLeetcodeUrl);
         const isResumeDocx = validResumePath ? validResumePath.toLowerCase().endsWith('.docx') : false;
         form.append('resume', resumeBlob, isResumeDocx ? 'resume.docx' : 'resume.pdf');
         if (linkedinDownloadData) {
@@ -657,7 +643,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // Merge State: preserve untouched categories like GitHub and Mock Interview.
     // Zero fake passes: only real parsed/calculated scores or preserved verified scores.
     const updatedScores: ProfileScores = {
-      resume: (typeof newResumeScore === 'number' && newResumeScore > 0)
+      resume: (typeof newResumeScore === 'number')
         ? newResumeScore
         : (currentScores.resume > 0 ? currentScores.resume : 0),
 
@@ -665,11 +651,11 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
       mock_interview: mockInterviewScore > 0 ? mockInterviewScore : 0,
 
-      github: (typeof newGithubScore === 'number' && newGithubScore > 0)
+      github: (typeof newGithubScore === 'number')
         ? newGithubScore
         : (currentScores.github > 0 ? currentScores.github : 0),
 
-      linkedin: (typeof newLinkedinScore === 'number' && newLinkedinScore > 0)
+      linkedin: (typeof newLinkedinScore === 'number')
         ? newLinkedinScore
         : (currentScores.linkedin > 0 ? currentScores.linkedin : 0),
 
@@ -693,19 +679,15 @@ export async function POST(request?: Request): Promise<NextResponse> {
     updatedScores.projects = projectsScore;
 
     // Derived "Coding Practice" (LeetCode & problem solving) recalculation
-    const codingProfileUrl = profile.leetcodeUrl
-      || profile.codingProfileUrl
-      || (profile as unknown as { leetcode_url?: string }).leetcode_url
-      || (profile as unknown as { coding_profile_url?: string }).coding_profile_url;
-
-    const codingPracticeScore = await computeCodingPracticeScore(
-      codingProfileUrl,
+    const codingPractice = await computeCodingPracticeScore(
+      effectiveLeetcodeUrl,
       studentId,
       admin,
-      currentScores.coding_practice > 0 ? currentScores.coding_practice : currentScores.leetcode
+      currentScores.coding_practice > 0 ? currentScores.coding_practice : currentScores.leetcode,
+      safeReview.leetcode_review,
     );
-    updatedScores.coding_practice = codingPracticeScore;
-    updatedScores.leetcode = codingPracticeScore;
+    updatedScores.coding_practice = codingPractice.score;
+    updatedScores.leetcode = codingPractice.score;
 
     // ──────────────────────────────────────────────────────────────────────────
     // PHASE 3: MASTER READINESS CALCULATION (CANONICAL 7-CATEGORY 100-POINT MATRIX)
@@ -855,6 +837,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // Database Commit 2: candidate_profile_reviews table
     const finalReviewPayload = {
       ...(isRecord(review) ? review : {}),
+      ...(codingPractice.review ? { leetcode_review: codingPractice.review } : {}),
       scores: updatedScores,
       readiness_score: totalReadiness,
       total_readiness_score: totalReadiness,
@@ -873,13 +856,13 @@ export async function POST(request?: Request): Promise<NextResponse> {
       throw new AnalysisError('Failed to persist completed profile review.', 500, 'DATABASE_ERROR');
     }
 
-    // Database Commit 3: safe sync to profiles table if supported
-    try {
-      await admin.from('profiles').update({
+    // Database Commit 3: keep the canonical profile score snapshot in sync.
+    const { error: profileScoreSaveError } = await admin.from('profiles').update({
+        scores: updatedScores,
         updated_at: completedAt,
       }).eq('id', studentId);
-    } catch {
-      // Ignored
+    if (profileScoreSaveError) {
+      throw new AnalysisError('Failed to persist profile scores.', 500, 'PROFILE_SCORE_SAVE_FAILED');
     }
 
     // Frontend Sync: Return complete, recalculated object
@@ -907,38 +890,27 @@ export async function POST(request?: Request): Promise<NextResponse> {
     });
   } catch (error) {
     const errorId = crypto.randomUUID();
-    console.warn(`[ProfileAnalysisFallback:${errorId}]`, error);
+    console.warn(`[ProfileAnalysisFailed:${errorId}]`, error);
+    const message = error instanceof Error ? error.message : 'Profile analysis failed.';
 
-    // Fallback ensuring scores are preserved even if an unexpected error occurs
     if (studentId) {
       try {
-        const fallbackScores = await fetchCurrentScores(admin, studentId);
-        const derivedProjects = Math.round((fallbackScores.resume + fallbackScores.github) / 2);
-        fallbackScores.projects = derivedProjects;
-        const total = Math.round(
-          (fallbackScores.resume +
-            fallbackScores.github +
-            derivedProjects +
-            fallbackScores.linkedin +
-            fallbackScores.mock_interview) / 5
-        );
-        return NextResponse.json({
-          success: true,
-          message: 'Profile saved with preserved scores.',
-          scores: fallbackScores,
-          totalReadiness: total,
-          readiness_score: total,
-          calculationSource: 'fallback_preserved',
-        });
+        const failedAt = new Date().toISOString();
+        await admin.from('candidate_profile_reviews').upsert({
+          student_id: studentId,
+          status: 'failed',
+          error_message: message,
+          updated_at: failedAt,
+        }, { onConflict: 'student_id' });
       } catch {
-        // Fall through to error response
+        // The original analysis error remains the response source of truth.
       }
     }
 
     return NextResponse.json({
-      success: true,
-      message: 'Profile saved locally.',
-      calculationSource: 'local_fallback',
-    });
+      error: message,
+      code: error instanceof AnalysisError ? error.code : 'ANALYSIS_FAILED',
+      errorId,
+    }, { status: error instanceof AnalysisError ? error.status : 500 });
   }
 }
