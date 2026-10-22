@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Loader2, Eye, EyeOff, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff, Mail, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import { getAuthenticatedDestination } from '@/lib/auth-routing';
@@ -19,6 +19,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   const router = useRouter();
   const { signIn, isLoading, error, clearError } = useAuthStore();
 
+  const [isAdminMode, setIsAdminMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -43,7 +44,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
 
       if (state.user) {
         setIsRedirecting(true);
-        toast.success('Welcome back to Hireable');
+        toast.success(isAdminMode ? 'Welcome to Faculty & Admin Portal' : 'Welcome back to Hireable');
         const destination = getAuthenticatedDestination({
           role: state.user.role,
           onboardingCompleted: Boolean(state.user.onboardingCompletedAt),
@@ -64,7 +65,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
   if (isRedirecting) {
     return (
       <SegmentedLoader
-        message="Loading candidate workspace…"
+        message={isAdminMode ? 'Loading administrative portal…' : 'Loading candidate workspace…'}
         subtitle="Verifying credentials…"
         fullScreen
       />
@@ -83,14 +84,25 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
       {/* Header */}
       <div className="mb-7">
         <div className="inline-flex items-center gap-1.5 rounded border border-stone-700 bg-stone-800 px-2.5 py-0.5 font-mono text-xs uppercase tracking-wider text-stone-300">
-          <ShieldCheck className="h-3.5 w-3.5 text-[#D93829]" />
-          <span>Placement Copilot</span>
+          {isAdminMode ? (
+            <>
+              <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
+              <span>Faculty & Admin Portal</span>
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="h-3.5 w-3.5 text-[#D93829]" />
+              <span>Placement Copilot</span>
+            </>
+          )}
         </div>
         <h2 className="mt-3 font-[var(--font-display)] text-2xl font-bold tracking-tight text-stone-100 sm:text-3xl">
-          Welcome back
+          {isAdminMode ? 'Faculty & Admin Portal' : 'Welcome back'}
         </h2>
         <p className="mt-1.5 text-xs text-stone-400 sm:text-sm">
-          Sign in to review your readiness scores and practice mock viva sessions.
+          {isAdminMode
+            ? 'Sign in to manage technical vivas, review transcripts, and post MSOT job listings.'
+            : 'Sign in to review your readiness scores and practice mock viva sessions.'}
         </p>
       </div>
 
@@ -114,7 +126,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
               autoCapitalize="none"
               spellCheck={false}
               className="h-11 w-full rounded-lg border border-stone-800 bg-stone-900/90 px-3.5 text-sm text-stone-100 outline-none transition-colors placeholder:text-stone-500 focus:border-[#D93829] focus:ring-1 focus:ring-[#D93829]"
-              placeholder="name@college.edu"
+              placeholder={isAdminMode ? 'faculty@institution.edu' : 'name@college.edu'}
             />
             <Mail className="pointer-events-none absolute right-3.5 top-3.5 h-4 w-4 text-stone-500" />
           </div>
@@ -179,7 +191,7 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
             </>
           ) : (
             <>
-              <span>Sign in</span>
+              <span>{isAdminMode ? 'Sign in to Portal' : 'Sign in'}</span>
               <ArrowRight className="h-4 w-4" />
             </>
           )}
@@ -187,18 +199,44 @@ export function LoginForm({ onToggleSignUp, redirectTo }: LoginFormProps) {
 
       </form>
 
-      {/* Toggle to Signup */}
-      <div className="mt-7 border-t border-stone-800 pt-5 text-center">
-        <p className="text-xs text-stone-400">
-          New candidate?{' '}
-          <button
-            type="button"
-            onClick={onToggleSignUp}
-            className="font-medium text-[#D93829] transition-colors hover:underline"
-          >
-            Create your account &rarr;
-          </button>
-        </p>
+      {/* Pathway Switcher */}
+      <div className="mt-7 border-t border-stone-800 pt-5 text-center space-y-2">
+        {isAdminMode ? (
+          <div>
+            <p className="text-xs text-stone-400">
+              Candidate looking for interviews?{' '}
+              <button
+                type="button"
+                onClick={() => setIsAdminMode(false)}
+                className="font-medium text-[#D93829] transition-colors hover:underline"
+              >
+                Candidate Sign in &rarr;
+              </button>
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-stone-400">
+              New candidate?{' '}
+              <button
+                type="button"
+                onClick={onToggleSignUp}
+                className="font-medium text-[#D93829] transition-colors hover:underline"
+              >
+                Create your account &rarr;
+              </button>
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsAdminMode(true)}
+                className="text-[11px] text-stone-400 transition-colors hover:text-stone-200"
+              >
+                Staff & Faculty Access &rarr;
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </motion.div>
   );
