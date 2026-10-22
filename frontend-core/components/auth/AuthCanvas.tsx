@@ -134,7 +134,7 @@ export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProp
             </button>
           </div>
 
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-md sm:max-w-lg">
             <AnimatePresence mode="wait">
               {mode === 'login' ? (
                 <LoginForm
