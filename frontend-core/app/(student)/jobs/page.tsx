@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';
 import { JobBoard } from '@/components/jobs/job-board';
 import { ApplicationKanban } from '@/components/jobs/application-kanban';
+import { EmptyState } from '@/components/shared/empty-state';
 import { useApplicationStore } from '@/stores/application-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useJobStore } from '@/stores/job-store';
 import { normalizeDiscoveredJobs } from '@/lib/data-adapters';
 import type { JobPosting } from '@/types';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { isOfficialJob } from '@/lib/jobs';
 import { matchesJobProfile } from '@/lib/job-matching';
 
@@ -180,12 +181,20 @@ function JobsWorkspace() {
       )}
 
       {tab === 'tracker' && applicationsHydrated && applications.length === 0 && (
-        <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-stone-800 bg-stone-900/40 p-8 text-center">
-          <div>
-            <BriefcaseBusiness className="mx-auto h-7 w-7 text-stone-500" />
-            <h2 className="mt-3 text-sm font-semibold text-stone-200">No applications yet</h2>
-            <p className="mt-1 text-xs text-stone-400">Apply to a matched job and it will appear here.</p>
-          </div>
+        <div className="rounded-2xl border border-stone-800 bg-[#28201E] p-8">
+          <EmptyState
+            icon={<BriefcaseBusiness className="h-6 w-6 text-stone-400" />}
+            title="No applications tracked yet"
+            description="Apply to a matched opportunity or log an application to view your stage progression."
+            action={
+              <Button
+                onClick={() => setTab('matched')}
+                className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
+              >
+                Discover Jobs
+              </Button>
+            }
+          />
         </div>
       )}
     </div>

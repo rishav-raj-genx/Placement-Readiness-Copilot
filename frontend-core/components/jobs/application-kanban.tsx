@@ -124,8 +124,9 @@ function Column({
           <ApplicationCard key={application.id} application={application} onMove={onMove} />
         ))}
         {safeApps.length === 0 && (
-          <div className="rounded-lg border border-dashed border-stone-800/60 p-4 text-center text-[11px] text-stone-500">
-            Drop cards here
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-800/80 bg-stone-900/20 py-8 px-3 text-center text-[11px] text-stone-500 transition-colors">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-stone-500">Empty stage</span>
+            <p className="mt-1 text-stone-400">Drop applications here</p>
           </div>
         )}
       </div>

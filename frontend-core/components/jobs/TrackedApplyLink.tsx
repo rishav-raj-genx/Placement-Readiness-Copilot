@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useApplicationStore } from '@/stores/application-store';
 import { useAuthStore } from '@/stores/auth-store';

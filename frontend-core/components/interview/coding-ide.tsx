@@ -33,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { CodingIDESkeleton } from '@/components/interview/coding-ide-skeleton';
@@ -179,6 +179,7 @@ export function CodingIDE() {
   const [showEndInterviewDialog, setShowEndInterviewDialog] = useState(false);
   const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -422,20 +423,28 @@ export function CodingIDE() {
   };
 
   // End Interview / Finalize Round 2
-  const handleFinalizeAssessment = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('interview_round2_completed', 'true');
-      sessionStorage.setItem('interview_round2_completed', 'true');
-      localStorage.setItem('interview_round2_evaluations', JSON.stringify(evaluatedProblems));
-      localStorage.setItem('interview_round2_average_score', String(averageScore || 85));
+  const handleFinalizeAssessment = async () => {
+    if (isFinalizing) return;
+    setIsFinalizing(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('interview_round2_completed', 'true');
+        sessionStorage.setItem('interview_round2_completed', 'true');
+        localStorage.setItem('interview_round2_evaluations', JSON.stringify(evaluatedProblems));
+        localStorage.setItem('interview_round2_average_score', String(averageScore || 85));
+      }
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (currentUserId) {
+        await useProfileStore.getState().analyze(currentUserId).catch(() => null);
+      }
+      setIsInterviewCompleted(true);
+      setShowEndInterviewDialog(false);
+      toast.success('Round 2 coding assessment saved and completed!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error finalizing assessment.');
+    } finally {
+      setIsFinalizing(false);
     }
-    const currentUserId = useAuthStore.getState().user?.id;
-    if (currentUserId) {
-      void useProfileStore.getState().analyze(currentUserId);
-    }
-    setIsInterviewCompleted(true);
-    setShowEndInterviewDialog(false);
-    toast.success('Round 2 coding assessment saved and completed!');
   };
 
   const filteredProblems = problems.filter((p) => {
@@ -773,10 +782,16 @@ export function CodingIDE() {
                           />
                           <Button
                             size="sm"
+                            disabled={!followUpAnswer.trim() || isAutoAdvancing}
                             onClick={handleSendFollowUp}
-                            className="w-full rounded-lg bg-[#D93829] text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
+                            className="w-full rounded-lg bg-[#D93829] text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] disabled:opacity-50"
                           >
-                            <Send className="mr-1.5 h-3.5 w-3.5" /> Submit response
+                            {isAutoAdvancing ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            <span>Submit response</span>
                           </Button>
                         </div>
                       )}
@@ -902,8 +917,8 @@ export function CodingIDE() {
               <Button
                 variant="outline"
                 onClick={handleRunTests}
-                disabled={isRunningTests}
-                className="h-10 px-4 sm:px-5 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all hover:border-stone-600 active:scale-[0.98]"
+                disabled={isRunningTests || isEvaluating}
+                className="h-10 px-4 sm:px-5 rounded-xl border border-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold text-xs flex items-center gap-2 shadow-sm transition-all hover:border-stone-600 active:scale-[0.98] disabled:opacity-50"
               >
                 {isRunningTests ? (
                   <Loader2 className="h-4 w-4 animate-spin text-orange-600" />
@@ -915,8 +930,8 @@ export function CodingIDE() {
 
               <Button
                 onClick={handleSubmitSolution}
-                disabled={isEvaluating}
-                className="h-10 px-5 sm:px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-black/40 transition-all active:scale-[0.98]"
+                disabled={isEvaluating || isRunningTests}
+                className="h-10 px-5 sm:px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-black/40 transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {isEvaluating ? (
                   <Loader2 className="h-4 w-4 animate-spin text-white" />
@@ -1140,10 +1155,12 @@ export function CodingIDE() {
               Continue Coding
             </AlertDialogCancel>
             <AlertDialogAction
+              disabled={isFinalizing}
               onClick={handleFinalizeAssessment}
-              className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold"
+              className="bg-[#D93829] hover:bg-[#C22F21] text-white font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              Submit &amp; Complete Exam
+              {isFinalizing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <span>Submit &amp; Complete Exam</span>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

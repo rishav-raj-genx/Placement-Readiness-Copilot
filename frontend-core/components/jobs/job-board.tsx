@@ -1,7 +1,9 @@
 'use client';
 
-import { BriefcaseBusiness, ExternalLink, MapPin } from 'lucide-react';
+import { useState } from 'react';
+import { BriefcaseBusiness, ExternalLink, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/shared/empty-state';
 import type { JobPosting } from '@/types';
 
 interface JobBoardProps {
@@ -11,13 +13,26 @@ interface JobBoardProps {
 }
 
 export function JobBoard({ jobs, onApply, emptyMessage }: JobBoardProps) {
+  const [applyingId, setApplyingId] = useState<string | null>(null);
+
+  const handleApply = async (job: JobPosting): Promise<void> => {
+    if (applyingId) return;
+    setApplyingId(job.id);
+    try {
+      await onApply(job);
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
   if (jobs.length === 0) {
     return (
-      <div className="grid min-h-56 place-items-center rounded-2xl border border-stone-800 bg-[#28201E] p-8 text-center">
-        <div>
-          <BriefcaseBusiness className="mx-auto mb-3 h-6 w-6 text-stone-500" />
-          <p className="text-xs text-stone-400">{emptyMessage}</p>
-        </div>
+      <div className="rounded-2xl border border-stone-800 bg-[#28201E] p-8">
+        <EmptyState
+          icon={<BriefcaseBusiness className="h-6 w-6 text-stone-400" />}
+          title="No opportunities found"
+          description={emptyMessage}
+        />
       </div>
     );
   }
@@ -57,11 +72,12 @@ export function JobBoard({ jobs, onApply, emptyMessage }: JobBoardProps) {
             </span>
             <Button
               size="sm"
-              disabled={!job.applicationUrl}
-              onClick={() => void onApply(job)}
+              disabled={!job.applicationUrl || applyingId === job.id}
+              onClick={() => void handleApply(job)}
               className="rounded-lg bg-[#D93829] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] disabled:opacity-50"
             >
-              Apply and log
+              {applyingId === job.id && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              <span>Apply and log</span>
               <ExternalLink className="ml-1.5 h-3 w-3" />
             </Button>
           </div>
@@ -70,3 +86,5 @@ export function JobBoard({ jobs, onApply, emptyMessage }: JobBoardProps) {
     </div>
   );
 }
+
+export default JobBoard;

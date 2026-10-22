@@ -290,17 +290,34 @@ export default function InterviewHistoryPage() {
         <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="py-12">
             <EmptyState
-              icon={<History className="h-6 w-6 text-stone-500" />}
+              icon={<History className="h-6 w-6 text-stone-400" />}
               title={entries.length ? 'No interviews match these filters' : 'No mock interviews yet'}
-              description={entries.length ? 'Change the filters to view another interview.' : 'Completed and abandoned mock interviews will appear here.'}
-              action={entries.length ? undefined : (
-                <Link href="/dashboard/interview">
-                  <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]">
-                    <Brain className="mr-1.5 h-3.5 w-3.5" />
-                    Start interview
+              description={
+                entries.length
+                  ? 'Try adjusting or resetting your round type and status filters to view previous recordings.'
+                  : 'Practice realistic technical viva and live coding interviews with autonomous AI feedback and speech analysis.'
+              }
+              action={
+                entries.length ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTypeFilter('all');
+                      setStatusFilter('all');
+                    }}
+                    className="rounded-lg border-stone-700 bg-stone-800 text-xs font-semibold text-stone-200 hover:bg-stone-700"
+                  >
+                    Reset filters
                   </Button>
-                </Link>
-              )}
+                ) : (
+                  <Link href="/dashboard/interview">
+                    <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]">
+                      <Brain className="mr-1.5 h-3.5 w-3.5" />
+                      Start Technical Viva
+                    </Button>
+                  </Link>
+                )
+              }
             />
           </CardContent>
         </Card>

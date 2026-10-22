@@ -17,7 +17,7 @@ import { resolveInterviewFocusTopics } from '@/lib/interview-config';
 import { RoleCombobox } from '@/components/interview/RoleCombobox';
 import { checkRound1Completed } from '@/lib/round-status';
 import type { CompanyType, Difficulty, ExperienceLevel, LiveKitSessionRequest } from '@/types';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 const durations = [15, 20] as const;
 const difficulties: Difficulty[] = ['easy', 'medium', 'hard', 'adaptive'];
@@ -66,6 +66,7 @@ export default function ConfigureInterviewPage() {
   const [companyType, setCompanyType] = useState<CompanyType>('other');
   const [targetCompany, setTargetCompany] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [isLaunchingRound2, setIsLaunchingRound2] = useState(false);
   const livekitConfiguration = getLiveKitClientConfiguration();
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function ConfigureInterviewPage() {
     }
 
     if (roundType === 'round2') {
+      setIsLaunchingRound2(true);
       router.push('/dashboard/interview/coding');
       return;
     }
@@ -519,11 +521,11 @@ export default function ConfigureInterviewPage() {
           ) : (
             <Button
               onClick={() => void begin()}
-              disabled={isCreating || isLocked}
+              disabled={isCreating || isLaunchingRound2 || isLocked}
               className={
                 isLocked
                   ? 'rounded-lg border border-stone-700 bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-400 cursor-not-allowed'
-                  : 'rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]'
+                  : 'rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] disabled:opacity-50'
               }
             >
               {isLocked ? (
@@ -531,7 +533,7 @@ export default function ConfigureInterviewPage() {
                   <Lock className="mr-2 h-4 w-4 text-orange-400" />
                   Out of Credits (Locked)
                 </>
-              ) : isCreating ? (
+              ) : isCreating || isLaunchingRound2 ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
               {!isLocked && roundType === 'round2' ? (

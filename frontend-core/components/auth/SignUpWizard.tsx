@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase-client';
 import {
   normalizeGithubUsername,

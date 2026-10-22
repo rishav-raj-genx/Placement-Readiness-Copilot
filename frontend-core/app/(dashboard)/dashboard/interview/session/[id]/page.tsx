@@ -36,7 +36,7 @@ import { useLiveKitInterviewStore } from '@/stores/livekit-interview-store';
 import { useInterviewStore } from '@/stores/interview-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase-client';
 import { markRound1Completed } from '@/lib/round-status';
 import type {
@@ -813,8 +813,13 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
               <AlertDialogCancel className="border-stone-800 bg-stone-900 text-stone-300 hover:bg-stone-800">
                 Continue interview
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleFinishInterview} className="bg-[#D93829] text-xs font-semibold text-white hover:bg-[#C22F21]">
-                Finish and view results
+              <AlertDialogAction
+                disabled={isFinishing}
+                onClick={handleFinishInterview}
+                className="bg-[#D93829] text-xs font-semibold text-white hover:bg-[#C22F21] inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isFinishing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>Finish and view results</span>
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

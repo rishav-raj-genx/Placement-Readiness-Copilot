@@ -23,7 +23,7 @@ import {
   ShieldAlert,
   CheckCircle2,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { BreakdownMeter } from '@/components/readiness/breakdown-meter';
 import { READINESS_CATEGORY_LABELS, readinessTier } from '@/lib/dashboard-readiness';
 import { useAuthStore } from '@/stores/auth-store';
@@ -69,6 +69,8 @@ export default function ProfilePage() {
 
   // Project Modal State
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isSavingField, setIsSavingField] = useState(false);
   const [editingProjectIndex, setEditingProjectIndex] = useState<number | null>(null);
   const [verifyingProjectIndex, setVerifyingProjectIndex] = useState<number | null>(null);
   const [projectForm, setProjectForm] = useState<{
@@ -205,7 +207,8 @@ export default function ProfilePage() {
   };
 
   const saveFieldEditor = async () => {
-    if (!user || !editingField) return;
+    if (!user || !editingField || isSavingField) return;
+    setIsSavingField(true);
 
     try {
       let dbColumn = '';
@@ -242,6 +245,8 @@ export default function ProfilePage() {
       toast.success('Information updated successfully.');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Update failed.');
+    } finally {
+      setIsSavingField(false);
     }
   };
 
@@ -344,11 +349,12 @@ export default function ProfilePage() {
   };
 
   const saveProjectModal = async () => {
-    if (!user) return;
+    if (!user || isSavingProject) return;
     if (!projectForm.title.trim() && !projectForm.description.trim()) {
       toast.error('Please provide a project title or description.');
       return;
     }
+    setIsSavingProject(true);
 
     const item: ProjectItem = {
       title: projectForm.title.trim() || 'Untitled Project',
@@ -388,6 +394,8 @@ export default function ProfilePage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to save project.');
+    } finally {
+      setIsSavingProject(false);
     }
   };
 
@@ -858,7 +866,7 @@ export default function ProfilePage() {
             disabled={isSaving || isAnalyzing}
             className="flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 px-7 py-3 text-xs font-bold text-white shadow-md shadow-black/40 transition-all active:scale-[0.98] disabled:opacity-50"
           >
-            {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+            {isAnalyzing || isSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
             <span>{isAnalyzing ? 'Recalculating Scores...' : isSaving ? 'Saving Changes...' : 'Save Profile Changes'}</span>
           </button>
         </div>
@@ -1263,10 +1271,12 @@ export default function ProfilePage() {
               </button>
               <button
                 type="button"
+                disabled={isSavingField}
                 onClick={() => void saveFieldEditor()}
-                className="rounded-lg bg-orange-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-500"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-500 disabled:opacity-50"
               >
-                Save Changes
+                {isSavingField && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>Save Changes</span>
               </button>
             </div>
           </div>
@@ -1358,10 +1368,12 @@ export default function ProfilePage() {
               </button>
               <button
                 type="button"
+                disabled={isSavingProject}
                 onClick={() => void saveProjectModal()}
-                className="rounded-lg bg-orange-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-500"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-500 disabled:opacity-50"
               >
-                Save Project
+                {isSavingProject && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>Save Project</span>
               </button>
             </div>
           </div>

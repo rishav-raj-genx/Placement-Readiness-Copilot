@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, Eye, EyeOff, Mail, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { getAuthenticatedDestination } from '@/lib/auth-routing';
 import { SegmentedLoader } from '@/components/ui/SegmentedLoader';
 import { getAuthErrorMessage } from '@/lib/auth-errors';

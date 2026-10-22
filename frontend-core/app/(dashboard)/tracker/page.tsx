@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BriefcaseBusiness, KanbanSquare, Loader2, Plus, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { ApplicationKanban, KANBAN_COLUMNS } from '@/components/jobs/application-kanban';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -151,11 +151,11 @@ export default function TrackerPage() {
         <Card className="rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
           <CardContent className="py-14">
             <EmptyState
-              icon={<BriefcaseBusiness className="h-6 w-6 text-stone-500" />}
-              title="No applications yet"
-              description="Manually create an application or save a matched job to track your pipeline."
+              icon={<BriefcaseBusiness className="h-6 w-6 text-stone-400" />}
+              title="No applications tracked yet"
+              description="Manually create an application or save a recommended role from Job Matches to build your hiring pipeline."
               action={
-                <div className="flex gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   <Button
                     onClick={() => setIsAddModalOpen(true)}
                     className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
@@ -164,8 +164,8 @@ export default function TrackerPage() {
                     Create application
                   </Button>
                   <Link href="/dashboard/jobs">
-                    <Button variant="outline" className="rounded-lg border-stone-700 bg-stone-850 px-4 text-xs text-stone-300">
-                      Browse job matches
+                    <Button variant="outline" className="rounded-lg border-stone-700 bg-stone-800 px-4 text-xs font-semibold text-stone-200 hover:bg-stone-700">
+                      Discover Jobs
                     </Button>
                   </Link>
                 </div>

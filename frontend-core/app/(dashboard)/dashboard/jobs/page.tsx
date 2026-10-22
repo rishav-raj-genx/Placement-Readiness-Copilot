@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -7,8 +8,12 @@ import {
   MapPin,
   Radar,
   ShieldCheck,
+  Sparkles,
   Wifi,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/shared/empty-state';
 import { TrackedApplyLink } from '@/components/jobs/TrackedApplyLink';
 import {
   DISCOVERED_JOB_COLUMNS,
@@ -293,15 +298,34 @@ export default async function JobsPage() {
           </div>
         </section>
       ) : (
-        <section className="mt-6 rounded-2xl border border-dashed border-stone-800 bg-stone-900/30 px-6 py-16 text-center">
-          <BriefcaseBusiness className="mx-auto h-8 w-8 text-stone-500" aria-hidden="true" />
-          <h2 className="mt-3 text-base font-bold text-stone-200">No jobs available right now.</h2>
-          <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-stone-400">
-            {error
-              ? 'Job feeds are updating in the background. Please refresh in a moment.'
-              : 'The discovery engine is scanning verified ATS feeds and official MSOT postings. New roles will appear here as they match your profile.'}
-          </p>
-        </section>
+        <Card className="mt-6 rounded-2xl border border-stone-800 bg-[#28201E] shadow-none">
+          <CardContent className="py-14">
+            <EmptyState
+              icon={<BriefcaseBusiness className="h-6 w-6 text-stone-400" />}
+              title="No jobs available right now"
+              description={
+                error
+                  ? 'Job feeds are updating in the background. Please refresh in a moment.'
+                  : 'The discovery engine is scanning verified ATS feeds and official MSOT postings. Complete your candidate profile to unlock calibrated opportunities.'
+              }
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Link href="/dashboard/profile">
+                    <Button className="rounded-lg bg-[#D93829] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]">
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      Complete Profile
+                    </Button>
+                  </Link>
+                  <Link href="/tracker">
+                    <Button variant="outline" className="rounded-lg border-stone-700 bg-stone-800 px-4 text-xs font-semibold text-stone-200 hover:bg-stone-700">
+                      View Application Tracker
+                    </Button>
+                  </Link>
+                </div>
+              }
+            />
+          </CardContent>
+        </Card>
       )}
     </div>
   );
