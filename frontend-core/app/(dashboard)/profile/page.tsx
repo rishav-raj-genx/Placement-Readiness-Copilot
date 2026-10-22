@@ -55,6 +55,7 @@ export default function ProfilePage() {
   const [targetRole, setTargetRole] = useState('Full-Stack Software Engineer');
   const [github, setGithub] = useState('');
   const [leetcodeUrl, setLeetcodeUrl] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
   const [linkedinText, setLinkedinText] = useState('');
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,7 +64,7 @@ export default function ProfilePage() {
   const [newLinkedIn, setNewLinkedIn] = useState<File | null>(null);
 
   // Modals & Inline Editors for "Manage Data"
-  const [editingField, setEditingField] = useState<'github' | 'leetcode' | 'linkedinText' | null>(null);
+  const [editingField, setEditingField] = useState<'github' | 'leetcode' | 'linkedinUrl' | 'linkedinText' | null>(null);
   const [fieldValueDraft, setFieldValueDraft] = useState('');
 
   // Project Modal State
@@ -91,6 +92,7 @@ export default function ProfilePage() {
       setTargetRole(candidate.targetRole || 'Full-Stack Software Engineer');
       setGithub(candidate.githubUsername || '');
       setLeetcodeUrl(candidate.leetcodeUrl || '');
+      setLinkedinUrl(candidate.linkedinUrl || '');
       setLinkedinText(candidate.linkedinText || '');
       setProjects(candidate.projects || []);
     }
@@ -180,10 +182,11 @@ export default function ProfilePage() {
   };
 
   // Field Edit / Delete Handlers
-  const openFieldEditor = (field: 'github' | 'leetcode' | 'linkedinText') => {
+  const openFieldEditor = (field: 'github' | 'leetcode' | 'linkedinUrl' | 'linkedinText') => {
     setEditingField(field);
     if (field === 'github') setFieldValueDraft(github);
     else if (field === 'leetcode') setFieldValueDraft(leetcodeUrl);
+    else if (field === 'linkedinUrl') setFieldValueDraft(linkedinUrl);
     else if (field === 'linkedinText') setFieldValueDraft(linkedinText);
   };
 
@@ -201,6 +204,10 @@ export default function ProfilePage() {
         dbColumn = 'leetcode_url';
         cleanVal = cleanVal || null;
         setLeetcodeUrl(cleanVal || '');
+      } else if (editingField === 'linkedinUrl') {
+        dbColumn = 'linkedin_url';
+        cleanVal = cleanVal || null;
+        setLinkedinUrl(cleanVal || '');
       } else if (editingField === 'linkedinText') {
         dbColumn = 'linkedin_text';
         cleanVal = cleanVal || null;
@@ -224,7 +231,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleDeleteField = async (field: 'github' | 'leetcode' | 'linkedinText') => {
+  const handleDeleteField = async (field: 'github' | 'leetcode' | 'linkedinUrl' | 'linkedinText') => {
     if (!user) return;
     try {
       const dbColumn =
@@ -232,7 +239,9 @@ export default function ProfilePage() {
           ? 'github_username'
           : field === 'leetcode'
             ? 'leetcode_url'
-            : 'linkedin_text';
+            : field === 'linkedinUrl'
+              ? 'linkedin_url'
+              : 'linkedin_text';
 
       const { error } = await supabase
         .from('profiles')
@@ -246,6 +255,7 @@ export default function ProfilePage() {
 
       if (field === 'github') setGithub('');
       else if (field === 'leetcode') setLeetcodeUrl('');
+      else if (field === 'linkedinUrl') setLinkedinUrl('');
       else if (field === 'linkedinText') setLinkedinText('');
 
       await hydrate(user.id);
@@ -458,6 +468,7 @@ export default function ProfilePage() {
             targetRole: targetRole.trim(),
             githubUsername: normalizeUsername(github),
             leetcodeUrl: leetcodeUrl.trim() || null,
+            linkedinUrl: linkedinUrl.trim() || null,
             linkedinText: linkedinText.trim() || null,
             projects: projects.length > 0 ? projects : null,
             resumePath,
@@ -477,6 +488,7 @@ export default function ProfilePage() {
           target_role: targetRole.trim(),
           github_username: normalizeUsername(github),
           leetcode_url: leetcodeUrl.trim() || null,
+          linkedin_url: linkedinUrl.trim() || null,
           linkedin_text: linkedinText.trim() || null,
           projects: projects.length > 0 ? projects : null,
           resume_pdf_path: resumePath,
@@ -490,15 +502,17 @@ export default function ProfilePage() {
           .eq('id', user.id);
 
         if (profileError) {
-          // If leetcode_url or linkedin_text is not yet in the DB schema, retry without them
+          // If leetcode_url, linkedin_url or linkedin_text is not yet in the DB schema, retry without them
           const errStr = (profileError.message || '').toLowerCase();
           if (
             profileError.code === 'PGRST204' ||
             errStr.includes('leetcode_url') ||
+            errStr.includes('linkedin_url') ||
             errStr.includes('linkedin_text') ||
             errStr.includes('column')
           ) {
             delete fullPayload.leetcode_url;
+            delete fullPayload.linkedin_url;
             delete fullPayload.linkedin_text;
             const { error: retryError } = await supabase
               .from('profiles')
@@ -911,6 +925,40 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* LinkedIn Profile URL */}
+          <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-stone-200">LinkedIn Profile URL</span>
+                <span className={linkedinUrl ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider' : 'text-stone-500 bg-stone-900/80 border border-stone-800 px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider'}>
+                  {linkedinUrl ? 'Linked' : 'Not set'}
+                </span>
+              </div>
+              <p className="mt-2 truncate text-xs text-stone-400 font-mono">
+                {linkedinUrl || 'No LinkedIn profile connected'}
+              </p>
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-stone-800/80 pt-3">
+              <button
+                type="button"
+                onClick={() => openFieldEditor('linkedinUrl')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-700 bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-200 transition-colors hover:bg-stone-700"
+              >
+                <Edit3 className="h-3 w-3" />
+                <span>Edit</span>
+              </button>
+              <button
+                type="button"
+                disabled={!linkedinUrl}
+                onClick={() => void handleDeleteField('linkedinUrl')}
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+
           {/* GitHub Coding Profile */}
           <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-4 flex flex-col justify-between">
             <div>
@@ -1111,7 +1159,9 @@ export default function ProfilePage() {
                   ? 'Edit GitHub Handle'
                   : editingField === 'leetcode'
                     ? 'Edit LeetCode Profile URL'
-                    : 'Edit Extracted / Bio Text'}
+                    : editingField === 'linkedinUrl'
+                      ? 'Edit LinkedIn Profile URL'
+                      : 'Edit Extracted / Bio Text'}
               </h3>
               <button
                 type="button"
@@ -1136,7 +1186,13 @@ export default function ProfilePage() {
                   type="text"
                   value={fieldValueDraft}
                   onChange={(e) => setFieldValueDraft(e.target.value)}
-                  placeholder={editingField === 'github' ? 'octocat or github.com/octocat' : 'https://leetcode.com/u/handle'}
+                  placeholder={
+                    editingField === 'github'
+                      ? 'octocat or github.com/octocat'
+                      : editingField === 'linkedinUrl'
+                        ? 'https://linkedin.com/in/username'
+                        : 'https://leetcode.com/u/handle'
+                  }
                   className="w-full rounded-xl border border-stone-800 bg-stone-950 px-4 py-3 text-sm text-stone-100 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/50"
                 />
               )}

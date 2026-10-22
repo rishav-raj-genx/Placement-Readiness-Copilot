@@ -7,7 +7,8 @@ export type RoadmapCategory =
   | 'github'
   | 'linkedin'
   | 'leetcode'
-  | 'coding_practice';
+  | 'coding_practice'
+  | 'co_curricular';
 
 export type RoadmapStatus = 'Evidence needed' | 'Action required' | 'In progress' | 'Ready';
 
@@ -45,11 +46,12 @@ export const READINESS_CATEGORY_LABELS: readonly { key: RoadmapCategory; label: 
 
 export const ALL_READINESS_PILLARS: readonly { key: RoadmapCategory; label: string; maxPoints: number; weight: number }[] = [
   { key: 'resume', label: 'Resume', maxPoints: 25, weight: 0.25 },
-  { key: 'projects', label: 'Projects', maxPoints: 20, weight: 0.20 },
+  { key: 'projects', label: 'Projects', maxPoints: 25, weight: 0.25 },
   { key: 'mock_interview', label: 'Mock Interview', maxPoints: 20, weight: 0.20 },
-  { key: 'github', label: 'GitHub', maxPoints: 15, weight: 0.15 },
-  { key: 'linkedin', label: 'LinkedIn', maxPoints: 10, weight: 0.10 },
-  { key: 'leetcode', label: 'LeetCode', maxPoints: 10, weight: 0.10 },
+  { key: 'github', label: 'GitHub', maxPoints: 10, weight: 0.10 },
+  { key: 'coding_practice', label: 'Coding Practice', maxPoints: 10, weight: 0.10 },
+  { key: 'linkedin', label: 'LinkedIn', maxPoints: 5, weight: 0.05 },
+  { key: 'co_curricular', label: 'Co-curricular', maxPoints: 5, weight: 0.05 },
 ];
 
 interface RoadmapDefinition {
@@ -174,6 +176,11 @@ const RECOMMENDATION_DEFINITIONS: Record<RoadmapCategory, RecommendationDefiniti
     title: 'Sharpen your LeetCode DSA stats',
     description: (score) => `Your LeetCode score is ${score}/100. Aim for >300 solved problems with solid Medium/Hard ratio for full 10 points.`,
     href: '/dashboard/interview/coding',
+  },
+  co_curricular: {
+    title: 'Showcase co-curricular achievements',
+    description: (score) => `Your co-curricular score is ${score}/100. Add verified certifications, hackathons, or leadership achievements (5 pts max).`,
+    href: '/dashboard/profile',
   },
 };
 
