@@ -50,6 +50,7 @@ export const ALL_READINESS_PILLARS: readonly { key: RoadmapCategory; label: stri
   { key: 'mock_interview', label: 'Mock Interview', maxPoints: 20, weight: 0.20 },
   { key: 'github', label: 'GitHub', maxPoints: 10, weight: 0.10 },
   { key: 'coding_practice', label: 'Coding Practice', maxPoints: 10, weight: 0.10 },
+  { key: 'leetcode', label: 'LeetCode', maxPoints: 10, weight: 0.10 },
   { key: 'linkedin', label: 'LinkedIn', maxPoints: 5, weight: 0.05 },
   { key: 'co_curricular', label: 'Co-curricular', maxPoints: 5, weight: 0.05 },
 ];

@@ -256,7 +256,8 @@ async def entrypoint(ctx: JobContext) -> None:
         session.shutdown()
 
     async def enforce_max_duration() -> None:
-        max_seconds = session_config.effective_max_minutes * 60
+        duration_mins = session_config.effective_max_minutes
+        max_seconds = 1200 if duration_mins >= 20 else 900
         await asyncio.sleep(max_seconds)
         logger.info("Maximum interview duration reached (%d sec); finalizing the session", max_seconds)
         await finish_and_close()

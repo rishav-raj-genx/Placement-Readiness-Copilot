@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Verify session belongs to authenticated user or user is admin
     const { data: existingSession, error: fetchError } = await adminClient
       .from('interview_sessions')
-      .select('id, user_id, student_id, target_role, config, code_history, transcript')
+      .select('id, user_id, student_id, target_role, config, code_history, transcript, interview_score, viva_scores, result')
       .eq('id', interviewId)
       .maybeSingle();
 
@@ -75,34 +75,64 @@ export async function POST(request: NextRequest) {
     // Code snapshot from Round 2
     const codeHistory = body.codeHistory?.trim() || body.code_history?.trim() || existingSession.code_history || null;
 
-    // Granular viva scores with fallback
-    const rawScores = body.vivaScores || body.viva_scores || (body.result ? body.result : {});
-    const targetRole = existingSession.target_role || 'Software Engineer';
+    // Granular viva scores extracted exclusively from database session record (anti-tampering)
+    const sessionVivaScores =
+      typeof existingSession.viva_scores === 'object' && existingSession.viva_scores !== null
+        ? (existingSession.viva_scores as Record<string, unknown>)
+        : {};
+    const sessionResult =
+      typeof existingSession.result === 'object' && existingSession.result !== null
+        ? (existingSession.result as Record<string, unknown>)
+        : {};
 
-    const finalScore =
-      typeof rawScores.interview_score === 'number'
-        ? rawScores.interview_score
-        : typeof rawScores.finalScore === 'number'
-        ? rawScores.finalScore
-        : typeof rawScores.overall_score === 'number'
-        ? rawScores.overall_score
+    const rawServerScore =
+      existingSession.interview_score ??
+      sessionVivaScores.interview_score ??
+      sessionResult.interview_score;
+
+    const serverScore =
+      typeof rawServerScore === 'number' && Number.isFinite(rawServerScore)
+        ? Math.max(0, Math.min(100, rawServerScore))
         : 72;
 
+    const targetRole = existingSession.target_role || 'Software Engineer';
+    const finalScore = serverScore;
+
     const summary =
-      typeof rawScores.summary === 'string' && rawScores.summary.trim()
-        ? rawScores.summary.trim()
+      typeof sessionVivaScores.summary === 'string' && sessionVivaScores.summary.trim()
+        ? sessionVivaScores.summary.trim()
+        : typeof sessionResult.summary === 'string' && sessionResult.summary.trim()
+        ? sessionResult.summary.trim()
         : `Completed mock interview viva for ${targetRole}. Candidate addressed core concepts and technical trade-offs.`;
+
+    const strengths =
+      Array.isArray(sessionVivaScores.strengths) && sessionVivaScores.strengths.length > 0
+        ? sessionVivaScores.strengths
+        : Array.isArray(sessionResult.strengths) && sessionResult.strengths.length > 0
+        ? sessionResult.strengths
+        : ['Demonstrated fundamental knowledge in target domain'];
+
+    const improvementAreas =
+      Array.isArray(sessionVivaScores.improvement_areas) && sessionVivaScores.improvement_areas.length > 0
+        ? sessionVivaScores.improvement_areas
+        : Array.isArray(sessionResult.improvement_areas) && sessionResult.improvement_areas.length > 0
+        ? sessionResult.improvement_areas
+        : ['Provide more quantified scale and latency benchmarks'];
+
+    const dimensions =
+      sessionVivaScores.dimensions ||
+      sessionResult.dimensions || {
+        technical_depth: { score: finalScore, feedback: 'Strong foundational understanding' },
+        communication: { score: Math.min(100, finalScore + 4), feedback: 'Clear articulation' },
+        behavioral: { score: Math.min(100, finalScore + 2), feedback: 'Professional structured responses' },
+      };
 
     const vivaScores = {
       interview_score: finalScore,
       summary,
-      strengths: Array.isArray(rawScores.strengths) ? rawScores.strengths : ['Demonstrated fundamental knowledge in target domain'],
-      improvement_areas: Array.isArray(rawScores.improvement_areas) ? rawScores.improvement_areas : ['Provide more quantified scale and latency benchmarks'],
-      dimensions: rawScores.dimensions || {
-        technical_depth: { score: finalScore, feedback: 'Strong foundational understanding' },
-        communication: { score: Math.min(100, finalScore + 4), feedback: 'Clear articulation' },
-        behavioral: { score: Math.min(100, finalScore + 2), feedback: 'Professional structured responses' },
-      },
+      strengths,
+      improvement_areas: improvementAreas,
+      dimensions,
     };
 
     const finalResult = {

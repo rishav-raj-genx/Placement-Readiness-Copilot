@@ -218,18 +218,18 @@ export function useInterviewRecorder({
           });
         if (uploadError) throw new Error(`Recording upload failed: ${uploadError.message}`);
 
-        const { data: publicUrlData } = client.storage
+        const { data: signedData, error: signedError } = await client.storage
           .from(INTERVIEW_RECORDING_BUCKET)
-          .getPublicUrl(objectPath);
-        const publicUrl = publicUrlData.publicUrl;
-        if (!publicUrl) {
+          .createSignedUrl(objectPath, 60 * 60 * 24 * 7);
+        const signedUrl = signedData?.signedUrl;
+        if (signedError || !signedUrl) {
           await client.storage.from(INTERVIEW_RECORDING_BUCKET).remove([objectPath]);
-          throw new Error('Supabase did not return a recording URL.');
+          throw new Error(signedError?.message || 'Supabase did not return a signed recording URL.');
         }
 
         const { data: updatedSession, error: updateError } = await client
           .from('interview_sessions')
-          .update({ audio_url: publicUrl })
+          .update({ audio_url: signedUrl })
           .eq('id', interviewId)
           .eq('user_id', userId)
           .select('id')
@@ -240,16 +240,16 @@ export function useInterviewRecorder({
           throw new Error(updateError?.message ?? 'The interview session was not found.');
         }
 
-        uploadedUrlRef.current = publicUrl;
+        uploadedUrlRef.current = signedUrl;
         chunksRef.current = [];
         recordingBlobRef.current = null;
         if (mountedRef.current) {
-          setAudioUrl(publicUrl);
+          setAudioUrl(signedUrl);
           setChunks([]);
           setStatus('uploaded');
         }
-        callbacksRef.current.onUploadComplete?.(publicUrl);
-        return publicUrl;
+        callbacksRef.current.onUploadComplete?.(signedUrl);
+        return signedUrl;
       } catch (caught) {
         reportError(caught);
         throw caught;

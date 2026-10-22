@@ -1477,7 +1477,43 @@ ${executableCode}
   };
 }
 
+async function verifyStudentVivaCompleted(userId: string): Promise<boolean> {
+  const admin = createSupabaseServiceClient();
+  const { data: sessions, error } = await admin
+    .from('interview_sessions')
+    .select('id, config, status, result')
+    .or(`user_id.eq.${userId},student_id.eq.${userId}`)
+    .eq('status', 'completed')
+    .limit(20);
+
+  if (error || !Array.isArray(sessions) || sessions.length === 0) {
+    return false;
+  }
+
+  // Ensure there is at least one completed session that is NOT a Round 2 coding assessment
+  const vivaSession = sessions.find((s) => {
+    const cfg = typeof s.config === 'object' && s.config !== null ? (s.config as Record<string, unknown>) : {};
+    return cfg.type !== 'coding' && cfg.round !== 2;
+  });
+
+  return Boolean(vivaSession);
+}
+
 export async function GET(): Promise<NextResponse> {
+  const supabase = createServerSessionClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+
+  const hasCompletedViva = await verifyStudentVivaCompleted(authData.user.id);
+  if (!hasCompletedViva) {
+    return NextResponse.json(
+      { error: 'Forbidden: Round 1 Viva must be completed before accessing coding interview.' },
+      { status: 403 }
+    );
+  }
+
   const interviewBaseUrl = getOptionalInterviewBaseUrl();
   try {
     const data = await serviceRequest(`${interviewBaseUrl}/api/interview/coding-problems`, {
@@ -1495,6 +1531,14 @@ export async function POST(req: Request): Promise<NextResponse> {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+
+  const hasCompletedViva = await verifyStudentVivaCompleted(authData.user.id);
+  if (!hasCompletedViva) {
+    return NextResponse.json(
+      { error: 'Forbidden: Round 1 Viva must be completed before accessing coding interview.' },
+      { status: 403 }
+    );
   }
 
   const rawBody: unknown = await req.json().catch(() => null);

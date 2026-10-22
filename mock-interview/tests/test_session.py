@@ -98,7 +98,7 @@ def test_problem_2_full_configuration_and_question_bank():
     greeting = session.greeting()
     assert "20 minutes" in greeting
     assert session.target_duration_minutes == 20
-    assert session.max_duration_minutes == 22
+    assert session.max_duration_minutes == 20
 
     questions = []
     while session.has_more_questions:

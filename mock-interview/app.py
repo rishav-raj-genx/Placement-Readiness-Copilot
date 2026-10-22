@@ -320,6 +320,13 @@ def create_app(
                 else:
                     raise ValueError("event must be start, answer, audio_answer, or finish")
         except WebSocketDisconnect:
+            if session is not None and interview_id and session.transcript:
+                with contextlib.suppress(Exception):
+                    await asyncio.to_thread(
+                        session_persistence.save_transcript,
+                        interview_id,
+                        session.transcript,
+                    )
             return
         except (AuthenticationError, TypeError, ValueError, RuntimeError, OSError) as exc:
             with contextlib.suppress(Exception):

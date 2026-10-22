@@ -45,7 +45,7 @@ class SessionConfig(BaseModel):
 
     @property
     def effective_max_minutes(self) -> int:
-        return self.max_duration_minutes if self.max_duration_minutes is not None else self.target_duration_minutes + 2
+        return self.max_duration_minutes if self.max_duration_minutes is not None else self.target_duration_minutes
 
     @property
     def total_question_target(self) -> int:
