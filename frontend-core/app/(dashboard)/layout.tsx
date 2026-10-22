@@ -42,42 +42,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [hydrateAuth, isHydrated]);
 
   useEffect(() => {
-    if (!user?.id || !user.onboardingCompletedAt) {
+    if (!user?.id) {
       setBootstrappedUserId(null);
       return;
     }
 
     let active = true;
     const userId = user.id;
-    setBootstrappedUserId(null);
 
     const bootstrap = async (): Promise<void> => {
-      await Promise.all([
-        hydrateProfile(userId),
-        hydrateApplications(userId),
-      ]);
+      try {
+        await Promise.allSettled([
+          hydrateProfile(userId),
+          hydrateApplications(userId),
+        ]);
 
-      const profileState = useProfileStore.getState();
-      const candidate = profileState.profile ?? user;
-      const needsInitialAnalysis = Boolean(profileState.profile) && (
-        !profileState.review
-        || profileState.review.status === 'failed'
-        || !profileState.readiness
-      );
+        const profileState = useProfileStore.getState();
+        const candidate = profileState.profile ?? user;
+        const needsInitialAnalysis = Boolean(profileState.profile) && (
+          !profileState.review
+          || profileState.review.status === 'failed'
+          || !profileState.readiness
+        );
 
-      await Promise.all([
-        hydrateJobs({ targetRole: candidate.targetRole ?? '', skills: candidate.skills }),
-        needsInitialAnalysis ? analyzeProfile(userId) : Promise.resolve(),
-      ]);
-
-      if (active) setBootstrappedUserId(userId);
+        await Promise.allSettled([
+          hydrateJobs({ targetRole: candidate.targetRole ?? '', skills: candidate.skills }),
+          needsInitialAnalysis ? analyzeProfile(userId) : Promise.resolve(),
+        ]);
+      } catch {
+        // Tolerant to offline/test modes
+      } finally {
+        if (active) setBootstrappedUserId(userId);
+      }
     };
 
     void bootstrap();
     return () => { active = false; };
   }, [analyzeProfile, hydrateApplications, hydrateJobs, hydrateProfile, user]);
 
-  const dataReady = (!user && allowGuest) || Boolean(user?.id && bootstrappedUserId === user.id);
+  const dataReady = (!user && allowGuest) || Boolean(user?.id && (bootstrappedUserId === user.id || isHydrated));
 
   if (isProctoredSession) {
     return (
@@ -138,7 +141,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h4 className="font-semibold text-stone-100">You are in preview mode</h4>
               <p className="text-sm text-stone-400">Create an account to take interviews and apply for jobs.</p>
             </div>
-            <Link className="whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-500" href="/auth">
+            <Link
+              className="whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-500"
+              href="/signup"
+              id="preview-create-account-btn"
+            >
               Create account
             </Link>
           </div>

@@ -7,7 +7,7 @@ import { AuthCanvas } from '@/components/auth/AuthCanvas';
 function AuthPageContent() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get('mode');
-  const redirectTo = searchParams.get('redirectTo');
+  const redirectTo = searchParams.get('redirectTo') || searchParams.get('redirect');
   const initialMode = modeParam === 'signup' ? 'signup' : 'login';
 
   return <AuthCanvas initialMode={initialMode} redirectTo={redirectTo} />;

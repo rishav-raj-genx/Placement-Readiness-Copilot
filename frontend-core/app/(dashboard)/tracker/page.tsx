@@ -14,7 +14,8 @@ import type { ApplicationStatus } from '@/types';
 
 export default function TrackerPage() {
   const user = useAuthStore((state) => state.user);
-  const applications = useApplicationStore((state) => state.applications);
+  const rawApplications = useApplicationStore((state) => state.applications);
+  const applications = rawApplications ?? [];
   const isHydrated = useApplicationStore((state) => state.isHydrated);
   const error = useApplicationStore((state) => state.error);
   const hydrate = useApplicationStore((state) => state.hydrate);
@@ -43,8 +44,10 @@ export default function TrackerPage() {
   });
 
   useEffect(() => {
-    if (user?.id && !isHydrated) void hydrate(user.id);
-  }, [hydrate, isHydrated, user?.id]);
+    if (user?.id) {
+      void hydrate(user.id);
+    }
+  }, [hydrate, user?.id]);
 
   const move = async (id: string, status: ApplicationStatus): Promise<void> => {
     try {

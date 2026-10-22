@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { DASHBOARD_NAV_CONFIG } from '@/lib/dashboard-navigation';
+import { isGuestPreviewPathname } from '@/lib/auth-routing';
 
 const NAV_ICON_MAP: Record<string, LucideIcon> = {
   Home,
@@ -46,15 +47,19 @@ interface DashboardNavigationProps {
 export function DashboardNavigation({ collapsed = false, onNavigate }: DashboardNavigationProps) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
+  const user = useAuthStore((state) => state.user);
 
   return (
     <nav aria-label="Dashboard navigation" className="flex flex-col gap-4">
       {DASHBOARD_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
         const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
+        const targetHref = !user && !isGuestPreviewPathname(href)
+          ? `/auth?redirectTo=${encodeURIComponent(href)}`
+          : href;
         return (
           <Link
             key={href}
-            href={href}
+            href={targetHref}
             onClick={onNavigate}
             title={collapsed ? label : undefined}
             aria-current={active ? 'page' : undefined}
@@ -119,7 +124,7 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
     .slice(0, 2)
     .toUpperCase() || 'G';
   const score = user ? readiness?.totalScore ?? 0 : 0;
-  const profileHref = user ? '/dashboard/profile' : '/auth?mode=signup';
+  const profileHref = user ? '/dashboard/profile' : '/signup';
 
   const handleSignOut = async () => {
     resetProfile();
@@ -206,6 +211,14 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
                   style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
                 />
               </div>
+              {user && !readiness && (
+                <Link
+                  href="/dashboard/profile"
+                  className="mt-2 block truncate text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Upload profile to score &rarr;
+                </Link>
+              )}
             </>
           )}
         </div>

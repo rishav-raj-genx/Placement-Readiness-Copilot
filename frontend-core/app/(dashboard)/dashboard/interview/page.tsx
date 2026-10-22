@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Check, Cloud, Code2, Cpu, Loader2, Lock, MessageSquare, Mic2, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -68,8 +69,11 @@ export default function ConfigureInterviewPage() {
   const livekitConfiguration = getLiveKitClientConfiguration();
 
   useEffect(() => {
-    void checkRound1Completed(user?.id).then((done) => setIsRound1Done(done));
-  }, [user?.id]);
+    if (user?.id) {
+      void checkRound1Completed(user.id).then((done) => setIsRound1Done(done));
+      void hydrateProfile(user.id);
+    }
+  }, [hydrateProfile, user?.id]);
 
   // Initialize once from profile evidence without clobbering user keystrokes
   useEffect(() => {
@@ -482,35 +486,45 @@ export default function ConfigureInterviewPage() {
           <p className="text-xs text-stone-500">
             Profile skills, target role, and past evidence are automatically applied.
           </p>
-          <Button
-            onClick={() => void begin()}
-            disabled={isCreating || isLocked}
-            className={
-              isLocked
-                ? 'rounded-lg border border-stone-700 bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-400 cursor-not-allowed'
-                : 'rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]'
-            }
-          >
-            {isLocked ? (
-              <>
-                <Lock className="mr-2 h-4 w-4 text-orange-400" />
-                Out of Credits (Locked)
-              </>
-            ) : isCreating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            {!isLocked && roundType === 'round2' ? (
-              <>
-                <Code2 className="mr-2 h-4 w-4" />
-                Launch coding IDE (Round 2)
-              </>
-            ) : !isLocked ? (
-              <>
-                Begin technical viva (Round 1)
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            ) : null}
-          </Button>
+          {!user ? (
+            <Link
+              href="/signup?redirect=/dashboard/interview"
+              className="inline-flex items-center rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21]"
+            >
+              Sign up to unlock interview studio
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          ) : (
+            <Button
+              onClick={() => void begin()}
+              disabled={isCreating || isLocked}
+              className={
+                isLocked
+                  ? 'rounded-lg border border-stone-700 bg-stone-800/80 px-4 py-2 text-xs font-semibold text-stone-400 cursor-not-allowed'
+                  : 'rounded-lg bg-[#D93829] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B]'
+              }
+            >
+              {isLocked ? (
+                <>
+                  <Lock className="mr-2 h-4 w-4 text-orange-400" />
+                  Out of Credits (Locked)
+                </>
+              ) : isCreating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {!isLocked && roundType === 'round2' ? (
+                <>
+                  <Code2 className="mr-2 h-4 w-4" />
+                  Launch coding IDE (Round 2)
+                </>
+              ) : !isLocked ? (
+                <>
+                  Begin technical viva (Round 1)
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              ) : null}
+            </Button>
+          )}
         </div>
       </section>
     </div>

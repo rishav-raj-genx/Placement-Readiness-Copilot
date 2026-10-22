@@ -30,6 +30,8 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { useApplicationStore } from '@/stores/application-store';
+import { IntroSequence } from '@/components/IntroSequence';
+import { isTourCompleted } from '@/lib/tour-storage';
 import type { ReadinessScore } from '@/types';
 
 const GUEST_MOCK_READINESS: ReadinessScore = {
@@ -71,16 +73,30 @@ export default function DashboardHomePage() {
   const error = useProfileStore((state) => state.error);
   const analyze = useProfileStore((state) => state.analyze);
 
+  const hydrateProfile = useProfileStore((state) => state.hydrate);
+
   const applications = useApplicationStore((state) => state.applications);
   const isHydrated = useApplicationStore((state) => state.isHydrated);
   const hydrateApplications = useApplicationStore((state) => state.hydrate);
   const [isRound1Done, setIsRound1Done] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
 
   useEffect(() => {
-    if (user?.id && !isHydrated) {
+    if (user?.id) {
+      void hydrateProfile(user.id);
       void hydrateApplications(user.id);
     }
-  }, [hydrateApplications, isHydrated, user?.id]);
+  }, [hydrateApplications, hydrateProfile, user?.id]);
+
+  useEffect(() => {
+    const completed = isTourCompleted({
+      userId: user?.id,
+      onboardingCompletedAt: user?.onboardingCompletedAt,
+    });
+    if (!completed) {
+      setShowIntro(true);
+    }
+  }, [user?.id, user?.onboardingCompletedAt]);
 
   useEffect(() => {
     void checkRound1Completed(user?.id).then((done) => setIsRound1Done(done));
@@ -139,6 +155,12 @@ export default function DashboardHomePage() {
     <div className="relative min-h-screen">
       <LogoFillBackground />
       <div className="relative z-10 space-y-10 pb-24">
+        {showIntro && (
+          <IntroSequence
+            open={showIntro}
+            onClose={() => setShowIntro(false)}
+          />
+        )}
         <section className="relative overflow-hidden rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40 sm:p-9">
           <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_auto]">
             <div className="max-w-2xl">
@@ -161,7 +183,17 @@ export default function DashboardHomePage() {
 
             <div className="flex flex-col items-center rounded-xl border border-stone-800 bg-stone-950 p-5 sm:p-7">
               <ReadinessRing score={score} level={tier} />
-              <p className="mt-1 text-center text-xs text-stone-500">{formatUpdatedAt(visibleReadiness?.updatedAt ?? (user ? review?.updatedAt : undefined))}</p>
+              {user && !readiness && !review?.updatedAt ? (
+                <Link
+                  href="/dashboard/profile"
+                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors text-center"
+                >
+                  <span>Upload your Profile to generate your first score</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : (
+                <p className="mt-1 text-center text-xs text-stone-500">{formatUpdatedAt(visibleReadiness?.updatedAt ?? (user ? review?.updatedAt : undefined))}</p>
+              )}
             </div>
           </div>
         </section>

@@ -133,8 +133,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (profileError) throw profileError;
 
-      const profile = await fetchProfile(data.user.id);
+      let profile = await fetchProfile(data.user.id);
       if (!profile) throw new Error('Failed to load profile after signup');
+
+      if (!profile.onboardingCompletedAt) {
+        const now = new Date().toISOString();
+        try {
+          await supabase.from('profiles').update({ onboarding_completed_at: now }).eq('id', data.user.id);
+        } catch {
+          // non-blocking
+        }
+        profile = { ...profile, onboardingCompletedAt: now };
+      }
 
       set({ user: profile, isLoading: false });
       return 'authenticated';

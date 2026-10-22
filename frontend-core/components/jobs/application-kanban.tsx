@@ -59,7 +59,7 @@ export function ApplicationKanban({
           <Column
             key={column.id}
             column={column}
-            applications={applications.filter((application) => {
+            applications={(applications ?? []).filter((application) => {
               // Normalize legacy 'interviewing' to 'interview' for column filtering
               const appStatus =
                 application.status === 'interviewing' ? 'interview' : application.status;
@@ -86,6 +86,7 @@ function Column({
   onNewApplication?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const safeApps = applications ?? [];
 
   return (
     <section
@@ -102,7 +103,7 @@ function Column({
             {column.label}
           </h2>
           <span className="rounded border border-stone-700 bg-stone-800 px-2 py-0.5 font-mono text-xs text-stone-300">
-            {applications.length}
+            {safeApps.length}
           </span>
         </div>
         {onNewApplication && (
@@ -119,10 +120,10 @@ function Column({
       </div>
 
       <div className="space-y-2.5">
-        {applications.map((application) => (
+        {safeApps.map((application) => (
           <ApplicationCard key={application.id} application={application} onMove={onMove} />
         ))}
-        {applications.length === 0 && (
+        {safeApps.length === 0 && (
           <div className="rounded-lg border border-dashed border-stone-800/60 p-4 text-center text-[11px] text-stone-500">
             Drop cards here
           </div>

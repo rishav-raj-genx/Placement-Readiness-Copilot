@@ -37,17 +37,17 @@ function JobsWorkspace() {
   } = useApplicationStore();
 
   const matchProfile = useMemo(() => ({
+    id: user?.id,
     targetRole: user?.targetRole ?? '',
     skills: user?.skills ?? [],
-  }), [user?.skills, user?.targetRole]);
+  }), [user?.id, user?.skills, user?.targetRole]);
 
   useEffect(() => {
-    if (!isHydrated && user?.id) void hydrate(matchProfile);
-  }, [hydrate, isHydrated, matchProfile, user?.id]);
-
-  useEffect(() => {
-    if (user?.id && !applicationsHydrated) void hydrateApplications(user.id);
-  }, [applicationsHydrated, hydrateApplications, user?.id]);
+    if (user?.id) {
+      void hydrate(matchProfile);
+      void hydrateApplications(user.id);
+    }
+  }, [hydrate, hydrateApplications, matchProfile, user?.id]);
 
   const discover = useCallback(async () => {
     setDiscovering(true);

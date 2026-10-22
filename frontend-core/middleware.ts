@@ -73,12 +73,30 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return response;
   }
 
-  // Allow public access to dashboard home and jobs
-  if (!userId && (pathname.startsWith('/admin') || pathname === '/dashboard/interview' || pathname.startsWith('/dashboard/interview'))) {
+  // Intercept protected modules for guests and explicitly route to auth
+  const isProtectedGuestRoute =
+    !userId &&
+    (pathname.startsWith('/admin') ||
+      pathname === '/dashboard/interview' ||
+      pathname.startsWith('/dashboard/interview/') ||
+      pathname === '/dashboard/job-matches' ||
+      pathname.startsWith('/dashboard/job-matches/') ||
+      pathname === '/dashboard/applications' ||
+      pathname.startsWith('/dashboard/applications/') ||
+      pathname === '/dashboard/tracker' ||
+      pathname.startsWith('/dashboard/tracker/') ||
+      pathname === '/dashboard/action-plan' ||
+      pathname.startsWith('/dashboard/action-plan/') ||
+      pathname === '/dashboard/interviews' ||
+      pathname.startsWith('/dashboard/interviews/'));
+
+  if (isProtectedGuestRoute) {
     const redirectUrl = new URL('/auth', request.url);
     redirectUrl.searchParams.set('redirectTo', pathname);
+    redirectUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(redirectUrl);
   }
+
   // Do NOT redirect if pathname is exactly '/dashboard' or '/dashboard/jobs'
   if (!userId && (pathname === '/dashboard' || pathname === '/dashboard/jobs' || isGuestPreviewPathname(pathname))) {
     return response;

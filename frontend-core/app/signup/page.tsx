@@ -2,14 +2,22 @@ import { redirect } from 'next/navigation';
 import { safeInternalPath } from '@/lib/auth-routing';
 
 interface SignUpPageProps {
-  searchParams: {
+  searchParams: Promise<{
     redirectTo?: string;
+    redirect?: string;
+  }> | {
+    redirectTo?: string;
+    redirect?: string;
   };
 }
 
-export default function SignUpPage({ searchParams }: SignUpPageProps): never {
-  const redirectTo = safeInternalPath(searchParams.redirectTo);
+export default async function SignUpPage({ searchParams }: SignUpPageProps): Promise<never> {
+  const resolvedParams = await Promise.resolve(searchParams);
+  const target = safeInternalPath(resolvedParams.redirect || resolvedParams.redirectTo);
   const query = new URLSearchParams({ mode: 'signup' });
-  if (redirectTo) query.set('redirectTo', redirectTo);
+  if (target) {
+    query.set('redirectTo', target);
+    query.set('redirect', target);
+  }
   redirect(`/auth?${query.toString()}`);
 }

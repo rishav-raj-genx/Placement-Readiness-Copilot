@@ -1,0 +1,23 @@
+import { redirect } from 'next/navigation';
+import { safeInternalPath } from '@/lib/auth-routing';
+
+interface LoginPageProps {
+  searchParams: Promise<{
+    redirectTo?: string;
+    redirect?: string;
+  }> | {
+    redirectTo?: string;
+    redirect?: string;
+  };
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps): Promise<never> {
+  const resolvedParams = await Promise.resolve(searchParams);
+  const target = safeInternalPath(resolvedParams.redirect || resolvedParams.redirectTo);
+  const query = new URLSearchParams({ mode: 'login' });
+  if (target) {
+    query.set('redirectTo', target);
+    query.set('redirect', target);
+  }
+  redirect(`/auth?${query.toString()}`);
+}
