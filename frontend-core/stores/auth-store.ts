@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { UserProfile } from '@/types';
+import type { UserProfile, UserRole } from '@/types';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
 import {
   normalizeUserProfile,
@@ -82,12 +82,14 @@ async function resolveOrCreateProfile(authUser: {
   const fallbackEmail = authUser.email ?? 'candidate@prepcopilot.local';
 
   try {
+    const initialRole: UserRole = authUser.user_metadata?.role === 'admin' ? 'admin' : 'student';
+
     await supabase.from('profiles').upsert(
       {
         id: authUser.id,
         email: fallbackEmail,
         display_name: fallbackDisplayName,
-        role: 'student',
+        role: initialRole,
         created_at: authUser.created_at ?? new Date().toISOString(),
       },
       { onConflict: 'id', ignoreDuplicates: true }
@@ -97,12 +99,14 @@ async function resolveOrCreateProfile(authUser: {
     // non-blocking
   }
 
+  const resolvedRole: UserRole = authUser.user_metadata?.role === 'admin' ? 'admin' : 'student';
+
   return (
     profile ?? {
       id: authUser.id,
       email: fallbackEmail,
       displayName: fallbackDisplayName,
-      role: 'student',
+      role: resolvedRole,
       createdAt: authUser.created_at ?? new Date().toISOString(),
       targetLocations: [],
       skills: [],
