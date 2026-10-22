@@ -73,6 +73,30 @@ def test_review_linkedin_pdf_without_resume(monkeypatch: MonkeyPatch) -> None:
     assert isinstance(payload["specific_fixes"], list)
 
 
+def test_forced_profile_refresh_isolates_invalid_linkedin_pdf(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    response = client.post(
+        "/analyze-profile",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
+        data={
+            "github_username": "",
+            "leetcode_url": "",
+            "force_refresh": "true",
+        },
+        files={
+            "resume": ("resume.pdf", create_two_page_resume(), "application/pdf"),
+            "linkedin_pdf": ("linkedin.txt", b"not-a-pdf", "text/plain"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resume_review"]["score"] >= 0
+    assert payload["linkedin_review"] is None
+    assert payload["linkedin_error"] == "Upload a PDF or DOCX file with a supported content type."
+
+
 def test_auth_fails_closed_when_secret_missing(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.delenv("INTERNAL_SERVICE_KEY", raising=False)
     monkeypatch.delenv("PROFILE_REVIEW_SERVICE_TOKEN", raising=False)
@@ -146,4 +170,26 @@ def test_review_resume_docx(monkeypatch: MonkeyPatch) -> None:
     assert payload["is_one_page"] is True
     assert payload["uses_action_verbs"] is True
     assert payload["has_quantifiable_metrics"] is True
+
+
+def test_forced_refresh_isolates_corrupted_resume_and_service_failures(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    response = client.post(
+        "/analyze-profile",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
+        data={
+            "github_username": "nonexistent_github_user_404_abc",
+            "leetcode_url": "https://leetcode.com/nonexistent_leetcode_user_404_abc",
+            "force_refresh": "true",
+        },
+        files={
+            "resume": ("corrupted.pdf", b"corrupted-pdf-bytes", "application/pdf"),
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resume_review"]["score"] >= 0
+    assert payload["resume_error"] is not None
+    assert payload["total_readiness_score"] >= 0
 

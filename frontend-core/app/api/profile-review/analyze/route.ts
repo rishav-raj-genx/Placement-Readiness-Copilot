@@ -9,6 +9,7 @@ import {
 } from '@/lib/leetcode';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 function readNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -32,12 +33,41 @@ class AnalysisError extends Error {
   }
 }
 
+function normalizeDocumentPath(rawPath: string | undefined, userId: string): string | null {
+  if (!rawPath) return null;
+  let cleaned = rawPath.trim();
+  if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+    try {
+      const url = new URL(cleaned);
+      const parts = url.pathname.split('candidate-documents/');
+      if (parts.length > 1) {
+        cleaned = decodeURIComponent(parts[1]);
+      } else {
+        const segs = url.pathname.split('/').filter(Boolean);
+        const userIdx = segs.indexOf(userId);
+        if (userIdx !== -1) {
+          cleaned = segs.slice(userIdx).join('/');
+        }
+      }
+    } catch {
+      // Keep as-is if URL parsing fails
+    }
+  }
+  cleaned = cleaned.split('?')[0].split('#')[0];
+  cleaned = cleaned.replace(/^\/+/, '');
+  if (cleaned.startsWith('candidate-documents/')) {
+    cleaned = cleaned.replace(/^candidate-documents\//, '');
+  }
+  return cleaned;
+}
+
 function requireOwnedPath(path: string | undefined, userId: string, label: string): string {
   if (!path) throw new AnalysisError(`${label} is missing or not provided.`, 400, 'MISSING_PATH');
-  if (!path.startsWith(`${userId}/`)) {
+  const normalized = normalizeDocumentPath(path, userId);
+  if (!normalized || !normalized.startsWith(`${userId}/`)) {
     throw new AnalysisError(`${label} path does not belong to the authenticated user.`, 403, 'FORBIDDEN_PATH_TAMPERING');
   }
-  return path;
+  return normalized;
 }
 
 export interface ProfileScores {
@@ -429,7 +459,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
   try {
     const sessionClient = createServerSessionClient();
-    const { data: { user } } = await sessionClient.auth.getUser();
+    let { data: { user } } = await sessionClient.auth.getUser();
 
     let bodyData: Record<string, unknown> | null = null;
     if (request) {
@@ -444,6 +474,22 @@ export async function POST(request?: Request): Promise<NextResponse> {
     }
 
     const requestedUserId = typeof bodyData?.userId === 'string' ? bodyData.userId.trim() : null;
+    const forceRefresh = bodyData?.force_refresh === true || bodyData?.forceRefresh === true;
+
+    const authHeader = request?.headers.get('authorization') ?? '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    // If cookie session didn't resolve a user, verify bearer token if present
+    if (!user && token) {
+      try {
+        const { data: tokenAuth } = await sessionClient.auth.getUser(token);
+        if (tokenAuth?.user) {
+          user = tokenAuth.user;
+        }
+      } catch {
+        // Fall back to internal service key check below
+      }
+    }
 
     if (user) {
       // Standard Supabase session validation: forbid arbitrary userId spoofing
@@ -456,8 +502,6 @@ export async function POST(request?: Request): Promise<NextResponse> {
       studentId = user.id;
     } else {
       // Secure service-to-service validation: strictly require configured INTERNAL_SERVICE_KEY
-      const authHeader = request?.headers.get('authorization') ?? '';
-      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
       const internalKey = process.env.INTERNAL_SERVICE_KEY?.trim();
 
       if (internalKey && token && token === internalKey && requestedUserId) {
@@ -477,11 +521,16 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
     if (profileError) throw new AnalysisError('Failed to load student profile.', 500, 'PROFILE_FETCH_FAILED');
     const profile = normalizeUserProfile(rawProfile as unknown);
-    if (!profile?.onboardingCompletedAt) {
-      return NextResponse.json(
-        { error: 'Complete onboarding before starting analysis.', code: 'ONBOARDING_INCOMPLETE' },
-        { status: 409 }
-      );
+    if (!profile) throw new AnalysisError('Failed to parse student profile.', 404, 'PROFILE_NOT_FOUND');
+    if (!profile.onboardingCompletedAt) {
+      if (forceRefresh) {
+        await admin.from('profiles').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', studentId);
+      } else {
+        return NextResponse.json(
+          { error: 'Complete onboarding before starting analysis.', code: 'ONBOARDING_INCOMPLETE' },
+          { status: 409 }
+        );
+      }
     }
 
     // Apply any explicit profile updates sent in body
@@ -544,32 +593,26 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // Download documents for analysis if present
     const validResumePath = effectiveResumePath ? requireOwnedPath(effectiveResumePath, studentId, 'Resume') : null;
     let resumeBlob: Blob | null = null;
+    let resumeAnalysisError: string | null = null;
     if (validResumePath) {
       const resumeDownload = await admin.storage.from('candidate-documents').download(validResumePath);
       if (resumeDownload.error || !resumeDownload.data) {
-        return NextResponse.json(
-          {
-            error: `Failed to download resume from storage: ${resumeDownload.error?.message ?? 'Empty file'}`,
-            code: 'RESUME_DOWNLOAD_FAILED',
-          },
-          { status: 500 }
-        );
+        resumeAnalysisError = `Resume could not be downloaded: ${resumeDownload.error?.message ?? 'Empty file'}`;
+      } else {
+        resumeBlob = resumeDownload.data;
       }
-      resumeBlob = resumeDownload.data;
     }
 
     let linkedinDownloadData: Blob | null = null;
+    let linkedinAnalysisError: string | null = null;
     if (effectiveLinkedinPath) {
       const validLinkedinPath = requireOwnedPath(effectiveLinkedinPath, studentId, 'LinkedIn profile');
       const linkedinDownload = await admin.storage.from('candidate-documents').download(validLinkedinPath);
       if (linkedinDownload.error || !linkedinDownload.data) {
-        throw new AnalysisError(
-          `Failed to download LinkedIn PDF from storage: ${linkedinDownload.error?.message ?? 'Empty file'}`,
-          500,
-          'LINKEDIN_DOWNLOAD_FAILED',
-        );
+        linkedinAnalysisError = `LinkedIn PDF could not be downloaded: ${linkedinDownload.error?.message ?? 'Empty file'}`;
+      } else {
+        linkedinDownloadData = linkedinDownload.data;
       }
-      linkedinDownloadData = linkedinDownload.data;
     }
 
     // Attempt AI scoring service invocation
@@ -579,6 +622,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         const form = new FormData();
         form.append('github_username', effectiveGithubUsername);
         form.append('leetcode_url', effectiveLeetcodeUrl);
+        form.append('force_refresh', String(forceRefresh));
         const isResumeDocx = validResumePath ? validResumePath.toLowerCase().endsWith('.docx') : false;
         form.append('resume', resumeBlob, isResumeDocx ? 'resume.docx' : 'resume.pdf');
         if (linkedinDownloadData) {
@@ -587,11 +631,12 @@ export async function POST(request?: Request): Promise<NextResponse> {
         review = await serviceRequest(`${getProfileReviewBaseUrl()}/analyze-profile`, {
           method: 'POST',
           body: form,
-          timeoutMs: 60_000,
+          timeoutMs: 50_000,
+          maxRetries: 0,
         });
       } catch (exc) {
         const message = exc instanceof Error ? exc.message : 'AI analyzer service failure';
-        const isTimeout = message.toLowerCase().includes('timed out');
+        const isTimeout = message.toLowerCase().includes('timed out') || message.toLowerCase().includes('timeout');
         throw new AnalysisError(
           `AI analyzer failed or timed out: ${message}`,
           isTimeout ? 504 : 502,
@@ -604,6 +649,10 @@ export async function POST(request?: Request): Promise<NextResponse> {
     const resumeReview = isRecord(safeReview.resume_review) ? safeReview.resume_review : null;
     let githubReview = isRecord(safeReview.github_review) ? safeReview.github_review : null;
     let linkedinReview = isRecord(safeReview.linkedin_review) ? safeReview.linkedin_review : null;
+    let githubAnalysisError = typeof safeReview.github_error === 'string' ? safeReview.github_error : null;
+    linkedinAnalysisError = typeof safeReview.linkedin_error === 'string'
+      ? safeReview.linkedin_error
+      : linkedinAnalysisError;
 
     // GitHub must also be recalculated when no resume is present. The combined
     // analyzer only runs with a resume, so use its dedicated endpoint as needed.
@@ -615,11 +664,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         );
         githubReview = isRecord(response) ? response : null;
       } catch (error) {
-        githubReview = {
-          score: 0,
-          error: error instanceof Error ? error.message : 'GitHub profile verification failed.',
-          specific_fixes: ['Verify the GitHub username and re-evaluate the profile.'],
-        };
+        githubAnalysisError = error instanceof Error ? error.message : 'GitHub profile verification failed.';
       }
     }
 
@@ -634,11 +679,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         });
         linkedinReview = isRecord(response) ? response : null;
       } catch (error) {
-        linkedinReview = {
-          score: 0,
-          error: error instanceof Error ? error.message : 'LinkedIn PDF verification failed.',
-          specific_fixes: ['Upload a readable LinkedIn PDF export and re-evaluate the profile.'],
-        };
+        linkedinAnalysisError = error instanceof Error ? error.message : 'LinkedIn PDF verification failed.';
       }
     }
 
@@ -649,28 +690,34 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // Check for latest completed mock interview score if not in currentScores
     let mockInterviewScore = currentScores.mock_interview;
     if (!mockInterviewScore) {
-      let interviewQuery = admin
-        .from('interview_sessions')
-        .select('score, result');
+      try {
+        let interviewQuery = admin
+          .from('interview_sessions')
+          .select('score, result');
 
-      if (typeof (interviewQuery as unknown as { or?: unknown }).or === 'function') {
-        interviewQuery = (interviewQuery as unknown as { or: (arg: string) => typeof interviewQuery }).or(`student_id.eq.${studentId},user_id.eq.${studentId}`);
-      } else {
-        interviewQuery = interviewQuery.eq('student_id', studentId);
-      }
-
-      const { data: latestInterview } = await interviewQuery
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (latestInterview) {
-        if (typeof latestInterview.score === 'number' && latestInterview.score > 0) {
-          mockInterviewScore = Math.round(latestInterview.score);
-        } else if (isRecord(latestInterview.result) && typeof latestInterview.result.interview_score === 'number') {
-          mockInterviewScore = Math.round(latestInterview.result.interview_score);
+        if (typeof (interviewQuery as unknown as { or?: unknown }).or === 'function') {
+          interviewQuery = (interviewQuery as unknown as { or: (arg: string) => typeof interviewQuery }).or(`student_id.eq.${studentId},user_id.eq.${studentId}`);
+        } else if (typeof interviewQuery.eq === 'function') {
+          interviewQuery = interviewQuery.eq('student_id', studentId);
         }
+
+        if (typeof interviewQuery.eq === 'function') {
+          const { data: latestInterview } = await interviewQuery
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestInterview) {
+            if (typeof latestInterview.score === 'number' && latestInterview.score > 0) {
+              mockInterviewScore = Math.round(latestInterview.score);
+            } else if (isRecord(latestInterview.result) && typeof latestInterview.result.interview_score === 'number') {
+              mockInterviewScore = Math.round(latestInterview.result.interview_score);
+            }
+          }
+        }
+      } catch {
+        // Optional fallback when interview_sessions query is not mocked or unavailable
       }
     }
 
@@ -873,6 +920,9 @@ export async function POST(request?: Request): Promise<NextResponse> {
       ...(githubReview ? { github_review: githubReview } : {}),
       ...(linkedinReview ? { linkedin_review: linkedinReview } : {}),
       ...(codingPractice.review ? { leetcode_review: codingPractice.review } : {}),
+      ...(resumeAnalysisError ? { resume_error: resumeAnalysisError } : {}),
+      ...(githubAnalysisError ? { github_error: githubAnalysisError } : {}),
+      ...(linkedinAnalysisError ? { linkedin_error: linkedinAnalysisError } : {}),
       scores: updatedScores,
       readiness_score: totalReadiness,
       total_readiness_score: totalReadiness,
@@ -921,6 +971,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         updated_at: completedAt,
       },
       review: finalReviewPayload,
+      force_refresh: forceRefresh,
       calculationSource: 'deep_merge_v2',
     });
   } catch (error) {

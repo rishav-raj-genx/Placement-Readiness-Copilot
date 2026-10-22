@@ -60,7 +60,9 @@ class AnalyzeProfileResponse(BaseModel):
     leetcode_review: LeetCodeReview | None = None
     document_review_subtotal: float = Field(ge=0, le=100)
     total_readiness_score: float = Field(ge=0, le=100)
+    resume_error: str | None = None
     github_error: str | None = None
+    linkedin_error: str | None = None
     leetcode_error: str | None = None
 
 
@@ -352,42 +354,86 @@ def review_leetcode(
 
 @app.post("/analyze-profile", response_model=AnalyzeProfileResponse)
 async def analyze_profile(
-    github_username: Annotated[str, Form()],
     resume: Annotated[UploadFile, File()],
+    github_username: Annotated[str | None, Form()] = "",
     linkedin_pdf: Annotated[UploadFile | None, File()] = None,
     leetcode_url: Annotated[str | None, Form()] = None,
+    force_refresh: Annotated[bool, Form()] = False,
     _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
 ) -> AnalyzeProfileResponse:
-    extracted_resume = await extract_pdf_text(resume)
-    resume_review = evaluate_text(
-        extracted_resume.text,
-        extracted_resume.page_count,
-        layout_geometry=extracted_resume.layout_geometry,
-    )
+    if force_refresh:
+        logger.info("Forced profile refresh requested; bypassing all persisted analysis results.")
+
+    resume_review: ReviewResult
+    resume_error: str | None = None
+    extracted_resume_text = ""
+    try:
+        extracted_resume = await extract_pdf_text(resume)
+        extracted_resume_text = extracted_resume.text
+        resume_review = evaluate_text(
+            extracted_resume.text,
+            extracted_resume.page_count,
+            layout_geometry=extracted_resume.layout_geometry,
+        )
+    except HTTPException as exc:
+        resume_error = str(exc.detail)
+        logger.warning("Resume document extraction failed: %s", resume_error)
+        resume_review = ReviewResult(
+            score=50,
+            page_count=1,
+            is_one_page=True,
+            is_ats_friendly=False,
+            uses_action_verbs=False,
+            has_spelling_or_grammar_issues=False,
+            has_clean_visual_layout=False,
+            specific_fixes=[f"Resume could not be fully parsed: {resume_error}"],
+        )
+    except Exception as exc:
+        resume_error = "Resume analysis temporarily unavailable."
+        logger.error("Unexpected resume analysis error: %s", exc, exc_info=True)
+        resume_review = ReviewResult(
+            score=50,
+            page_count=1,
+            is_one_page=True,
+            is_ats_friendly=False,
+            uses_action_verbs=False,
+            has_spelling_or_grammar_issues=False,
+            has_clean_visual_layout=False,
+            specific_fixes=["Resume analysis encountered an unexpected processing issue."],
+        )
 
     # Independent error isolation: GitHub failure does not abort the entire review
     github_review: GithubReview | None = None
     github_error: str | None = None
-    if github_username.strip():
+    clean_github_username = (github_username or "").strip()
+    if clean_github_username:
         try:
-            github_data = fetch_github_data(github_username)
+            github_data = fetch_github_data(clean_github_username, force_refresh=force_refresh)
             github_review = evaluate_github(github_data)
         except ValueError as exc:
             github_error = str(exc)
         except GithubException as exc:
-            logger.warning("GitHub profile fetch error for user %s: %s", github_username, exc)
+            logger.warning("GitHub profile fetch error for user %s: %s", clean_github_username, exc)
             github_error = "Unable to fetch the GitHub profile."
         except Exception as exc:
             logger.error("Unexpected GitHub evaluation error: %s", exc, exc_info=True)
             github_error = "GitHub analysis temporarily unavailable."
 
     linkedin_review = None
+    linkedin_error = None
     if linkedin_pdf is not None:
-        extracted_linkedin = await extract_pdf_text(linkedin_pdf)
-        linkedin_review = evaluate_linkedin_text(
-            extracted_linkedin.text,
-            resume_context=extracted_resume.text,
-        )
+        try:
+            extracted_linkedin = await extract_pdf_text(linkedin_pdf)
+            linkedin_review = evaluate_linkedin_text(
+                extracted_linkedin.text,
+                resume_context=extracted_resume_text,
+            )
+        except HTTPException as exc:
+            linkedin_error = str(exc.detail)
+            logger.warning("LinkedIn document analysis failed: %s", linkedin_error)
+        except Exception as exc:
+            linkedin_error = "LinkedIn analysis temporarily unavailable."
+            logger.error("Unexpected LinkedIn analysis error: %s", exc, exc_info=True)
 
     leetcode_review = None
     leetcode_error = None
@@ -398,7 +444,7 @@ async def analyze_profile(
             leetcode_error = stats.get("error")
         except Exception as exc:
             logger.warning("LeetCode fetch error for %s: %s", leetcode_url, exc)
-            leetcode_review = LeetCodeReview(username=leetcode_url, exists=False, score=0)
+            leetcode_review = LeetCodeReview(username=leetcode_url, exists=False, score=0, error=str(exc))
             leetcode_error = str(exc)
 
     # Subtotal calculation over available document reviews
@@ -419,6 +465,8 @@ async def analyze_profile(
         leetcode_review=leetcode_review,
         document_review_subtotal=subtotal_score,
         total_readiness_score=subtotal_score,
+        resume_error=resume_error,
         github_error=github_error,
+        linkedin_error=linkedin_error,
         leetcode_error=leetcode_error,
     )

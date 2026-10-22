@@ -12,6 +12,7 @@ interface ProjectCheckBody {
 }
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const KNOWN_TECH_PATTERNS = [
   'react', 'next.js', 'nextjs', 'tailwind', 'tailwindcss', 'typescript', 'javascript',

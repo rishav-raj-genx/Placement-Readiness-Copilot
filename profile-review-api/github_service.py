@@ -400,20 +400,25 @@ def _inspect_repository(
     }
 
 
-def fetch_github_data(username: str) -> dict[str, object]:
+def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, object]:
     normalized_username = username.strip().lower()
     if not normalized_username:
         raise ValueError("GitHub username is required.")
 
     now = time.time()
     cached = _PROFILE_CACHE.get(normalized_username)
-    if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
+    if not force_refresh and cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
         return cached[1]
 
     token = os.getenv("GITHUB_TOKEN", "").strip()
     github = Github(auth=Auth.Token(token)) if token else Github()
     try:
-        user = github.get_user(normalized_username)
+        try:
+            user = github.get_user(normalized_username)
+        except (RateLimitExceededException, GithubException) as exc:
+            if cached:
+                return cached[1]
+            raise
         repositories: list[dict[str, object]] = []
         rate_limited = False
         repo_limit = _repository_limit()

@@ -224,14 +224,27 @@ export default function ActionPlanPage() {
   };
 
   const handleReanalyze = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      toast.error('Please sign in to re-evaluate your profile.');
+      return;
+    }
     toast.info('Re-evaluating profile against FAANG screening standards...');
-    const ok = await analyze(user.id);
-    if (ok) {
-      toast.success('Screening criteria re-evaluated!');
-      await fetchDetailedData();
-    } else {
-      toast.error('Profile re-evaluation failed. Check the analysis service and try again.');
+    try {
+      const ok = await analyze(user.id);
+      if (ok) {
+        const latestReview = useProfileStore.getState().review?.result;
+        if (latestReview) {
+          setDbReviewData(latestReview as unknown as RawReviewResult);
+        }
+        toast.success('Screening criteria re-evaluated!');
+        await fetchDetailedData();
+      } else {
+        const errorMsg = useProfileStore.getState().error;
+        toast.error(errorMsg || 'Profile re-evaluation failed. Check the analysis service and try again.');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Profile re-evaluation failed. Check the analysis service and try again.';
+      toast.error(message);
     }
   };
 
