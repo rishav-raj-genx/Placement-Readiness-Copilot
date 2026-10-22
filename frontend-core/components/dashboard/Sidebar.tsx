@@ -53,7 +53,8 @@ export function DashboardNavigation({ collapsed = false, onNavigate }: Dashboard
     <nav aria-label="Dashboard navigation" className="flex flex-col gap-4">
       {DASHBOARD_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
         const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
-        const targetHref = !user && !isGuestPreviewPathname(href)
+        const isGuestAllowed = href === '/dashboard';
+        const targetHref = !user && !isGuestAllowed
           ? `/auth?redirectTo=${encodeURIComponent(href)}`
           : href;
         return (

@@ -46,6 +46,8 @@ export default function TrackerPage() {
   useEffect(() => {
     if (user?.id) {
       void hydrate(user.id);
+    } else {
+      void hydrate(undefined);
     }
   }, [hydrate, user?.id]);
 

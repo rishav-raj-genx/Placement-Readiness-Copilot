@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { HireableLogo } from '@/components/brand/hireable-logo';
@@ -20,6 +20,7 @@ import { isGuestPreviewPathname } from '@/lib/auth-routing';
 import { ProctoredGuard } from '@/components/interview/proctored-guard';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const isProctoredSession = Boolean(
     pathname?.startsWith('/dashboard/interview/session/') ||
@@ -141,13 +142,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h4 className="font-semibold text-stone-100">You are in preview mode</h4>
               <p className="text-sm text-stone-400">Create an account to take interviews and apply for jobs.</p>
             </div>
-            <Link
+            <button
+              type="button"
+              onClick={() => router.push('/signup')}
               className="whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-500"
-              href="/signup"
               id="preview-create-account-btn"
             >
               Create account
-            </Link>
+            </button>
           </div>
         )}
       </div>

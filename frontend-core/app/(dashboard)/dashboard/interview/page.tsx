@@ -167,7 +167,11 @@ export default function ConfigureInterviewPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Interview studio"
-        description="Choose your interview track. Practice theoretical system design viva or live coding with IDE."
+        description={
+          user
+            ? "Two-Round AI Evaluation Unlocked. Practice theoretical system design viva or live coding with IDE."
+            : "Preview Mode: Sign in to unlock the two-round technical interview assessment system."
+        }
       />
 
       {/* Round Selection Cards */}
@@ -191,7 +195,15 @@ export default function ConfigureInterviewPage() {
                 <h3 className="text-sm font-bold text-stone-100">Technical viva</h3>
               </div>
             </div>
-            {roundType === 'round1' && <Check className="h-4 w-4 text-[#D93829]" />}
+            {user ? (
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                Unlocked · Ready
+              </span>
+            ) : (
+              <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-400">
+                Sign In to Unlock
+              </span>
+            )}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-stone-400">
             15–20 min voice technical viva covering fundamentals, system architecture, trade-offs, and HR.
@@ -201,6 +213,10 @@ export default function ConfigureInterviewPage() {
         <button
           type="button"
           onClick={() => {
+            if (!user) {
+              router.push('/signup?redirect=/dashboard/interview');
+              return;
+            }
             if (!isRound1Done) {
               toast.info('Round 2 is locked. Please complete Round 1 Technical Viva first!');
               return;
@@ -210,33 +226,39 @@ export default function ConfigureInterviewPage() {
           className={`flex flex-col rounded-2xl border p-5 text-left transition-colors ${
             roundType === 'round2'
               ? 'border-[#D93829] bg-[#28201E]'
-              : !isRound1Done
+              : !user || !isRound1Done
               ? 'border-stone-800 bg-[#28201E]/40 opacity-75 cursor-not-allowed'
               : 'border-stone-800 bg-[#28201E]/60 hover:border-stone-700'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className={`grid h-8 w-8 place-items-center rounded-lg border border-stone-800 ${isRound1Done ? 'bg-stone-900 text-stone-200' : 'bg-orange-500/10 text-orange-400'}`}>
-                {isRound1Done ? <Code2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              <span className={`grid h-8 w-8 place-items-center rounded-lg border border-stone-800 ${user && isRound1Done ? 'bg-stone-900 text-stone-200' : 'bg-orange-500/10 text-orange-400'}`}>
+                {user && isRound1Done ? <Code2 className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               </span>
               <div>
-                <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider ${isRound1Done ? 'text-stone-500' : 'text-orange-400'}`}>
-                  {isRound1Done ? 'Round 2' : 'Round 2 (Locked)'}
+                <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider ${user && isRound1Done ? 'text-stone-500' : 'text-orange-400'}`}>
+                  {user && isRound1Done ? 'Round 2' : 'Round 2 (Locked)'}
                 </span>
                 <h3 className="text-sm font-bold text-stone-100">DSA + web dev IDE</h3>
               </div>
             </div>
-            {isRound1Done && roundType === 'round2' ? (
-              <Check className="h-4 w-4 text-[#D93829]" />
-            ) : !isRound1Done ? (
+            {!user ? (
+              <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-400">
+                Sign In to Unlock
+              </span>
+            ) : isRound1Done ? (
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                Unlocked · Ready
+              </span>
+            ) : (
               <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-400">
                 Finish Round 1 First
               </span>
-            ) : null}
+            )}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-stone-400">
-            {isRound1Done
+            {user && isRound1Done
               ? 'Interactive in-browser code editor testing algorithm efficiency (O(N) vs O(N²)) and architecture.'
               : 'Unlocks after completing Round 1 Technical Viva. Live IDE with benchmark evaluation and test cases.'}
           </p>

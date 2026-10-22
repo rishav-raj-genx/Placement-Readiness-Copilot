@@ -46,6 +46,9 @@ function JobsWorkspace() {
     if (user?.id) {
       void hydrate(matchProfile);
       void hydrateApplications(user.id);
+    } else {
+      void hydrate(undefined);
+      void hydrateApplications(undefined);
     }
   }, [hydrate, hydrateApplications, matchProfile, user?.id]);
 

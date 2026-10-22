@@ -185,16 +185,18 @@ export default function DashboardHomePage() {
 
             <div className="flex flex-col items-center rounded-xl border border-stone-800 bg-stone-950 p-5 sm:p-7">
               <ReadinessRing score={score} level={tier} />
-              {user && !readiness && !review?.updatedAt ? (
+              {user && (!readiness || !readiness.updatedAt || score === 0 || !review?.updatedAt) ? (
                 <Link
                   href="/dashboard/profile"
-                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors text-center"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-600/40 bg-red-600/10 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors text-center"
                 >
                   <span>Upload your Profile to generate your first score</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
+              ) : !user ? (
+                <p className="mt-1 text-center text-xs text-stone-500">Preview mode · Score calculated on evidence</p>
               ) : (
-                <p className="mt-1 text-center text-xs text-stone-500">{formatUpdatedAt(visibleReadiness?.updatedAt ?? (user ? review?.updatedAt : undefined))}</p>
+                <p className="mt-1 text-center text-xs text-stone-500">{formatUpdatedAt(visibleReadiness?.updatedAt ?? review?.updatedAt)}</p>
               )}
             </div>
           </div>

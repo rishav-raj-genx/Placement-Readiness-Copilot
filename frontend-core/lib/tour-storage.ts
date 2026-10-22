@@ -27,15 +27,13 @@ export interface TourStatusOptions {
 export function isTourCompleted(options?: TourStatusOptions): boolean {
   if (typeof window === 'undefined') return false;
 
-  // 1. Database profile record check (if authenticated user with onboarding_completed_at)
-  if (options?.onboardingCompletedAt) {
-    return true;
-  }
-
   const cleanId = options?.userId?.trim();
 
-  // 2. For authenticated users, strictly check per-user cookie or per-user storage
+  // 1. For authenticated users, check profile onboarding status or per-user cookie/storage
   if (cleanId) {
+    if (options?.onboardingCompletedAt) {
+      return true;
+    }
     const userCookie = getCookie(`hireable_tour_${cleanId}`);
     if (userCookie === 'completed' || userCookie === 'true') {
       return true;
@@ -43,7 +41,7 @@ export function isTourCompleted(options?: TourStatusOptions): boolean {
     return loadFromStorage<boolean>(`hireable_tour_${cleanId}`, false);
   }
 
-  // 3. For guest / unauthenticated users, check guest cookie or legacy storage
+  // 2. For guest / unauthenticated users, strictly check guest cookie or storage
   const guestCookie = getCookie('hireable_tour_guest');
   if (guestCookie === 'completed' || guestCookie === 'true') {
     return true;

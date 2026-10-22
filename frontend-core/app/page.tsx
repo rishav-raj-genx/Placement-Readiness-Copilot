@@ -24,6 +24,7 @@ export default function Home() {
   useEffect(() => {
     if (!mounted) return;
 
+    // Gracefully handle unauthenticated first-time visitors
     const completed = isTourCompleted({
       userId: user?.id,
       onboardingCompletedAt: user?.onboardingCompletedAt,
@@ -42,7 +43,15 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#1a1310]">
-      {showIntro && <IntroSequence />}
+      {showIntro && (
+        <IntroSequence
+          open={showIntro}
+          onClose={() => {
+            setShowIntro(false);
+            router.replace('/dashboard');
+          }}
+        />
+      )}
     </main>
   );
 }
