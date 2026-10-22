@@ -1,23 +1,21 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import React, { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { AuthCanvas } from '@/components/auth/AuthCanvas';
 import { safeInternalPath } from '@/lib/auth-routing';
 
-interface LoginPageProps {
-  searchParams: Promise<{
-    redirectTo?: string;
-    redirect?: string;
-  }> | {
-    redirectTo?: string;
-    redirect?: string;
-  };
+function LoginPageContent() {
+  const searchParams = useSearchParams();
+  const redirectTo = safeInternalPath(searchParams.get('redirectTo') || searchParams.get('redirect'));
+
+  return <AuthCanvas initialMode="login" redirectTo={redirectTo} />;
 }
 
-export default async function LoginPage({ searchParams }: LoginPageProps): Promise<never> {
-  const resolvedParams = await Promise.resolve(searchParams);
-  const target = safeInternalPath(resolvedParams.redirect || resolvedParams.redirectTo);
-  const query = new URLSearchParams({ mode: 'login' });
-  if (target) {
-    query.set('redirectTo', target);
-    query.set('redirect', target);
-  }
-  redirect(`/auth?${query.toString()}`);
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#1a1310]" />}>
+      <LoginPageContent />
+    </Suspense>
+  );
 }

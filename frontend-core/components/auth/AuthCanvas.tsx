@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { HireableLogo } from '@/components/brand/hireable-logo';
+import { useAuthStore } from '@/stores/auth-store';
 import { LoginForm } from './LoginForm';
 import { SignUpWizard } from './SignUpWizard';
 
@@ -15,6 +16,12 @@ interface AuthCanvasProps {
 
 export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProps) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
+  const user = useAuthStore((state) => state.user);
+  const signOut = useAuthStore((state) => state.signOut);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[#1a1310] text-stone-200">
@@ -73,21 +80,76 @@ export function AuthCanvas({ initialMode = 'login', redirectTo }: AuthCanvasProp
         </section>
 
         {/* Right Panel: Active Interaction Zone */}
-        <section className="flex w-full flex-1 items-center justify-center p-6 sm:p-10 lg:w-1/2 lg:p-12">
-          <AnimatePresence mode="wait">
-            {mode === 'login' ? (
-              <LoginForm
-                key="login"
-                onToggleSignUp={() => setMode('signup')}
-                redirectTo={redirectTo}
-              />
-            ) : (
-              <SignUpWizard
-                key="signup"
-                onToggleLogin={() => setMode('login')}
-              />
-            )}
-          </AnimatePresence>
+        <section className="flex w-full flex-1 flex-col items-center justify-center p-6 sm:p-10 lg:w-1/2 lg:p-12">
+          {/* If user is already authenticated, show friendly session banner */}
+          {user && (
+            <div className="mb-4 w-full max-w-md rounded-xl border border-orange-500/30 bg-orange-950/30 p-3.5 text-xs text-stone-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold text-orange-400">Signed in as:</span>{' '}
+                  <span className="font-mono text-stone-100">{user.displayName || user.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/dashboard"
+                    className="rounded-lg bg-orange-500 px-2.5 py-1 text-[11px] font-semibold text-stone-950 hover:bg-orange-400"
+                  >
+                    Go to Dashboard &rarr;
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void signOut()}
+                    className="rounded-lg border border-stone-700 bg-stone-900 px-2 py-1 text-[11px] text-stone-400 hover:text-stone-200"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quick Segmented Mode Switcher */}
+          <div className="mb-5 flex w-full max-w-xs rounded-xl border border-stone-800 bg-stone-900 p-1">
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                mode === 'login'
+                  ? 'bg-[#D93829] text-white shadow-sm'
+                  : 'text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('signup')}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                mode === 'signup'
+                  ? 'bg-[#D93829] text-white shadow-sm'
+                  : 'text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+
+          <div className="w-full max-w-md">
+            <AnimatePresence mode="wait">
+              {mode === 'login' ? (
+                <LoginForm
+                  key="login"
+                  onToggleSignUp={() => setMode('signup')}
+                  redirectTo={redirectTo}
+                />
+              ) : (
+                <SignUpWizard
+                  key="signup"
+                  onToggleLogin={() => setMode('login')}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </section>
       </main>
     </div>

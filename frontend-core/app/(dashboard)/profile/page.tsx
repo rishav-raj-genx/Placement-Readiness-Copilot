@@ -425,7 +425,11 @@ export default function ProfilePage() {
   // Full Profile Form Save (Basic goals + document drops)
   const handleSave = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast.info('Please sign in or create an account to save your profile.');
+      router.push('/auth?mode=login');
+      return;
+    }
 
     let profileSaved = false;
     setIsSaving(true);
@@ -618,6 +622,31 @@ export default function ProfilePage() {
           Manage your verified evidence, re-upload documents, configure coding profiles, and control your placement data.
         </p>
       </div>
+
+      {!user && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-orange-500/30 bg-orange-950/30 p-4 text-xs text-stone-300">
+          <div>
+            <p className="font-semibold text-orange-400">Preview Mode — You are not signed in</p>
+            <p className="mt-0.5 text-stone-400">Sign in to your account or register to save your profile changes and unlock full placement features.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push('/auth?mode=login')}
+              className="rounded-lg border border-stone-700 bg-stone-900 px-3 py-1.5 font-medium text-stone-200 hover:border-stone-600 hover:text-white"
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/auth?mode=signup')}
+              className="rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-500"
+            >
+              Create Account
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Current Readiness Scores Panel */}
       <section aria-labelledby="profile-readiness-heading" className="rounded-2xl border border-stone-800 bg-stone-900 p-6 shadow-md shadow-black/40 sm:p-8">

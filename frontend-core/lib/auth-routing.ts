@@ -1,8 +1,8 @@
 import type { UserRole } from '@/types';
 
-const STUDENT_PATHS = ['/dashboard', '/interview', '/interviews', '/applications', '/jobs', '/tracker', '/profile', '/resources'];
+const STUDENT_PATHS = ['/dashboard', '/dashboard/profile', '/interview', '/interviews', '/applications', '/jobs', '/tracker', '/profile', '/resources'];
 const ADMIN_PATHS = ['/admin', '/admin-dashboard', '/admin-jobs', '/admin-interviews'];
-const GUEST_PREVIEW_PATHS = ['/dashboard', '/dashboard/jobs'];
+const GUEST_PREVIEW_PATHS = ['/dashboard', '/dashboard/jobs', '/dashboard/profile', '/profile'];
 
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
@@ -84,7 +84,7 @@ export function resolveAccessRedirect({
   }
 
   if (role === 'admin') {
-    return isStudentPath || isOnboardingPath || isAuthPath ? '/admin-dashboard' : null;
+    return isStudentPath || isOnboardingPath ? '/admin-dashboard' : null;
   }
 
   if (isAdminPath) return '/dashboard';
@@ -93,12 +93,12 @@ export function resolveAccessRedirect({
   const isResumeSignup = pathname === '/auth' && query.get('mode') === 'signup' && query.get('resume') === '1';
 
   if (!onboardingCompleted) {
-    if (isResumeSignup) return null;
-    return isStudentPath || isOnboardingPath || isAuthPath
+    if (isResumeSignup || isAuthPath) return null;
+    return isStudentPath || isOnboardingPath
       ? '/auth?mode=signup&resume=1'
       : null;
   }
 
-  if (isAdminPath || isOnboardingPath || isAuthPath) return '/dashboard';
+  if (isAdminPath || isOnboardingPath) return '/dashboard';
   return null;
 }

@@ -52,10 +52,12 @@ function isRole(value: unknown): value is UserRole {
 export function normalizeUserProfile(value: unknown): UserProfile | null {
   if (!isRecord(value)) return null;
   const id = readString(value.id);
-  const email = readString(value.email);
-  const displayName = readString(value.display_name);
-  const createdAt = readString(value.created_at);
-  if (!id || !email || !displayName || !createdAt || !isRole(value.role)) return null;
+  if (!id) return null;
+
+  const email = readString(value.email) || 'candidate@prepcopilot.local';
+  const displayName = readString(value.display_name) || (readString(value.email) ? readString(value.email).split('@')[0] : 'Candidate');
+  const createdAt = readString(value.created_at) || new Date().toISOString();
+  const role: UserRole = isRole(value.role) ? value.role : 'student';
 
   const projects = Array.isArray(value.projects)
     ? value.projects.map(normalizeProject).filter((project): project is CandidateProject => project !== null)
@@ -65,7 +67,7 @@ export function normalizeUserProfile(value: unknown): UserProfile | null {
     id,
     email,
     displayName,
-    role: value.role,
+    role,
     createdAt,
     targetRole: readString(value.target_role) || undefined,
     targetLocations: readStringArray(value.target_locations),

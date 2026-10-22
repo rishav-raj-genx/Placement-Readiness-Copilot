@@ -137,19 +137,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {!user && allowGuest && (
-          <div className="fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-4 rounded-2xl border border-stone-800 bg-stone-950 px-6 py-4 shadow-md shadow-black/40">
+          <div className="fixed bottom-4 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-800 bg-stone-950 px-6 py-4 shadow-md shadow-black/40">
             <div>
               <h4 className="font-semibold text-stone-100">You are in preview mode</h4>
-              <p className="text-sm text-stone-400">Create an account to take interviews and apply for jobs.</p>
+              <p className="text-sm text-stone-400">Sign in or create an account to take interviews and save your evidence.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => router.push('/signup')}
-              className="whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-500"
-              id="preview-create-account-btn"
-            >
-              Create account
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/auth?mode=login"
+                className="whitespace-nowrap rounded-lg border border-stone-700 bg-stone-900 px-3.5 py-2 text-xs font-medium text-stone-200 transition-colors hover:border-stone-600 hover:text-white"
+                id="preview-signin-btn"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/auth?mode=signup"
+                className="whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"
+                id="preview-create-account-btn"
+              >
+                Create account
+              </Link>
+            </div>
           </div>
         )}
       </div>

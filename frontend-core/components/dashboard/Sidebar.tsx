@@ -125,7 +125,8 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
     .slice(0, 2)
     .toUpperCase() || 'G';
   const score = user ? readiness?.totalScore ?? 0 : 0;
-  const profileHref = user ? '/dashboard/profile' : '/signup';
+  const profileHref = '/dashboard/profile';
+  const authActionHref = user ? '/dashboard/profile' : '/auth?mode=login';
 
   const handleSignOut = async () => {
     resetProfile();
@@ -257,9 +258,9 @@ export function DashboardSidebar({ collapsed, onToggle }: DashboardSidebarProps)
           {!collapsed && (
             <div className="flex items-center gap-1">
               <Link
-                href={profileHref}
-                aria-label="Settings"
-                title={user ? 'Profile Settings' : 'Create account'}
+                href={authActionHref}
+                aria-label={user ? 'Settings' : 'Sign In'}
+                title={user ? 'Profile Settings' : 'Sign in to your account'}
                 className="grid h-8 w-8 place-items-center rounded-xl text-stone-500 transition hover:bg-stone-800 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
               >
                 {user ? <Settings className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}

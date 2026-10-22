@@ -69,7 +69,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     profile = { role: 'student', onboardingCompleted: false };
   }
 
-  if (!userId && (pathname === '/auth' || pathname.startsWith('/auth/'))) {
+  const isExplicitAuthRoute =
+    pathname === '/auth' ||
+    pathname.startsWith('/auth/') ||
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/signin';
+
+  if (isExplicitAuthRoute) {
     return response;
   }
 

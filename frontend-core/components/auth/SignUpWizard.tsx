@@ -298,6 +298,8 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         await supabase.from('profiles').upsert({
           id: data.user.id,
           role: 'student',
+          email: values.email,
+          created_at: data.user.created_at ?? new Date().toISOString(),
           display_name: values.fullName,
           target_role: targetRole || 'Software Engineer',
           github_username: github ? normalizeGithubUsername(github) : null,
@@ -612,7 +614,9 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
         const profileUpsertData: Record<string, unknown> = {
           id: userId,
           role: 'student',
-          display_name: displayName || 'Candidate',
+          email: identity?.email || accountForm.getValues('email') || 'candidate@prepcopilot.local',
+          created_at: new Date().toISOString(),
+          display_name: displayName || accountForm.getValues('fullName') || 'Candidate',
           target_role: targetRole || 'Software Engineer',
           github_username: github ? normalizeGithubUsername(github) : null,
           leetcode_url: leetcodeUrl.trim() || null,
@@ -751,6 +755,23 @@ export function SignUpWizard({ onToggleLogin }: SignUpWizardProps) {
           isComplete={Boolean(leetcodeUrl)}
         />
       </div>
+
+      {/* Account Status Banner if already registered */}
+      {Boolean(identity || accountCreated) && (
+        <div className="flex items-center justify-between border-b border-stone-800 bg-stone-900/60 px-5 py-3 text-xs text-stone-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <span>Account registered: <strong className="text-white">{identity?.email || displayName || 'Candidate'}</strong></span>
+          </div>
+          <button
+            type="button"
+            onClick={handleBypassToDashboard}
+            className="rounded-lg bg-[#D93829] px-3 py-1 font-semibold text-white hover:bg-[#c03023] transition-colors"
+          >
+            Open Dashboard &rarr;
+          </button>
+        </div>
+      )}
 
       {/* Account Setup Card if user is not yet signed up */}
       {!identity && !accountCreated && (

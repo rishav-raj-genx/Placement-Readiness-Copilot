@@ -30,6 +30,62 @@ async function fetchProfile(userId: string): Promise<UserProfile | null> {
   return normalizeUserProfile(data as unknown);
 }
 
+async function resolveOrCreateProfile(authUser: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+  created_at?: string;
+}): Promise<UserProfile> {
+  let profile: UserProfile | null = null;
+  try {
+    profile = await fetchProfile(authUser.id);
+  } catch {
+    profile = null;
+  }
+
+  if (profile) return profile;
+
+  const fallbackDisplayName =
+    (authUser.user_metadata?.display_name as string | undefined) ||
+    (authUser.user_metadata?.full_name as string | undefined) ||
+    (authUser.user_metadata?.name as string | undefined) ||
+    authUser.email?.split('@')[0] ||
+    'Candidate';
+  const fallbackEmail = authUser.email ?? 'candidate@prepcopilot.local';
+
+  try {
+    await supabase.from('profiles').upsert(
+      {
+        id: authUser.id,
+        email: fallbackEmail,
+        display_name: fallbackDisplayName,
+        role: 'student',
+        created_at: authUser.created_at ?? new Date().toISOString(),
+      },
+      { onConflict: 'id', ignoreDuplicates: true }
+    );
+    profile = await fetchProfile(authUser.id);
+  } catch {
+    // non-blocking
+  }
+
+  return (
+    profile ?? {
+      id: authUser.id,
+      email: fallbackEmail,
+      displayName: fallbackDisplayName,
+      role: 'student',
+      createdAt: authUser.created_at ?? new Date().toISOString(),
+      targetLocations: [],
+      skills: [],
+      projects: [],
+      interviewCredits: 3,
+      isPremium: false,
+      onboardingCompletedAt: new Date().toISOString(),
+    }
+  );
+}
+
 let authListenerRegistered = false;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -51,30 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      let profile = await fetchProfile(data.user.id);
-      if (!profile) {
-        const displayName = (data.user.user_metadata?.display_name as string | undefined) || email.split('@')[0];
-        const { error: upsertError } = await supabase.from('profiles').upsert({
-          id: data.user.id,
-          email: data.user.email ?? email,
-          display_name: displayName,
-          role: 'student',
-        }, { onConflict: 'id', ignoreDuplicates: true });
-        if (upsertError) throw upsertError;
-        profile = await fetchProfile(data.user.id);
-      }
-      if (!profile) {
-        profile = {
-          id: data.user.id,
-          email: data.user.email ?? email,
-          displayName: (data.user.user_metadata?.display_name as string | undefined) || email.split('@')[0],
-          role: 'student',
-          createdAt: data.user.created_at ?? new Date().toISOString(),
-          targetLocations: [],
-          skills: [],
-          projects: [],
-        };
-      }
+      let profile = await resolveOrCreateProfile(data.user);
 
       if (!profile.onboardingCompletedAt) {
         const now = new Date().toISOString();
@@ -176,7 +209,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: null, isHydrated: true });
         return;
       }
-      const profile = await fetchProfile(authUser.id);
+      const profile = await resolveOrCreateProfile(authUser);
       set({ user: profile, isHydrated: true });
     }).catch((error: unknown) => {
       const message = getAuthErrorMessage(error, 'session_restore');
@@ -199,10 +232,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
           }
           try {
-            const profile = await fetchProfile(session.user.id);
-            if (profile) {
-              set({ user: profile, error: null });
-            }
+            const profile = await resolveOrCreateProfile(session.user);
+            set({ user: profile, error: null });
           } catch (error: unknown) {
             set({ error: getAuthErrorMessage(error, 'session_restore') });
           }
