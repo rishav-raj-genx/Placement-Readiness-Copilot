@@ -36,3 +36,5 @@ def test_app_exposes_health_and_interview_websocket():
     data = resp.json()
     assert data["status"] == "ok"
     assert data["target_duration_minutes"] == 15
+    assert data["max_duration_minutes"] == 20
+    assert data["supported_duration_minutes"] == [15, 20]

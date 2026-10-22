@@ -58,6 +58,21 @@ def test_review_resume_flags_two_page_pdf(monkeypatch: MonkeyPatch) -> None:
     print(json.dumps(payload, indent=2))
 
 
+def test_review_linkedin_pdf_without_resume(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "static")
+    monkeypatch.setenv("INTERNAL_SERVICE_KEY", "test-secret-key-1234")
+    response = client.post(
+        "/review/linkedin",
+        headers={"Authorization": "Bearer test-secret-key-1234"},
+        files={"file": ("linkedin.pdf", create_two_page_resume(), "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload["score"], int)
+    assert isinstance(payload["specific_fixes"], list)
+
+
 def test_auth_fails_closed_when_secret_missing(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.delenv("INTERNAL_SERVICE_KEY", raising=False)
     monkeypatch.delenv("PROFILE_REVIEW_SERVICE_TOKEN", raising=False)

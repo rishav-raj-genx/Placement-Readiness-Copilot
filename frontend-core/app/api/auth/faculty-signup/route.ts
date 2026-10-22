@@ -12,7 +12,7 @@ interface FacultySignUpBody {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const BLOCKED_DOMAINS = [
+const BLOCKED_DOMAINS = [
   'gmail.com',
   'yahoo.com',
   'hotmail.com',

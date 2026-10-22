@@ -301,6 +301,15 @@ async def review_resume(
     return evaluate_text(extracted.text, extracted.page_count, layout_geometry=extracted.layout_geometry)
 
 
+@app.post("/review/linkedin", response_model=LinkedInReviewResult)
+async def review_linkedin(
+    file: Annotated[UploadFile, File()],
+    _auth: Annotated[str, Depends(verify_service_token)] = "authorized",
+) -> LinkedInReviewResult:
+    extracted = await extract_pdf_text(file)
+    return evaluate_linkedin_text(extracted.text)
+
+
 @app.post("/review/github", response_model=GithubReview)
 @app.get("/review/github/{username}", response_model=GithubReview)
 def review_github(

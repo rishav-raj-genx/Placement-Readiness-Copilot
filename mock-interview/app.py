@@ -87,6 +87,7 @@ def create_app(
             "supabase_configured": bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
             "target_duration_minutes": InterviewSession.TARGET_DURATION_MINUTES,
             "max_duration_minutes": InterviewSession.MAX_DURATION_MINUTES,
+            "supported_duration_minutes": [15, 20],
             "rounds_supported": ["theoretical_technical", "dsa_webdev_ide"],
         }
 

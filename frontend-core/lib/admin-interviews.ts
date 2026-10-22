@@ -121,13 +121,22 @@ function titleCase(value: string): string {
 }
 
 function normalizeTranscript(value: unknown): VivaTranscriptTurn[] {
-  if (!Array.isArray(value)) return [];
-  const turns = value.flatMap((item, index): VivaTranscriptTurn[] => {
+  const parsed = typeof value === 'string'
+    ? (() => {
+        try {
+          return JSON.parse(value) as unknown;
+        } catch {
+          return [];
+        }
+      })()
+    : value;
+  if (!Array.isArray(parsed)) return [];
+  const turns = parsed.flatMap((item, index): VivaTranscriptTurn[] => {
     if (!isRecord(item)) return [];
-    const speakerValue = readString(item.speaker);
+    const speakerValue = readString(item.speaker ?? item.role);
     const speaker = speakerValue === 'student' ? 'student' : speakerValue === 'ai' || speakerValue === 'interviewer' ? 'ai' : null;
-    const text = readString(item.text);
-    const timestampSeconds = readNumber(item.timestamp_sec ?? item.timestamp);
+    const text = readString(item.text ?? item.content ?? item.message);
+    const timestampSeconds = readNumber(item.timestamp_sec ?? item.timestampSeconds ?? item.timestamp);
     if (!speaker || !text) return [];
     return [{
       id: readString(item.id) || `turn-${index}`,
@@ -269,9 +278,8 @@ export function normalizeFacultyVivas(
     const overriddenAt = readString(item.admin_scored_at) || legacyOverriddenAt;
     const adminFeedback = readString(item.admin_feedback) || readString(item.score_override_reason);
     const rubric = normalizeRubric(vivaScoresRecord);
-    const transcriptValue = Array.isArray(item.transcript) && item.transcript.length > 0
-      ? item.transcript
-      : resultRecord.transcript;
+    const sessionTranscript = normalizeTranscript(item.transcript);
+    const resultTranscript = normalizeTranscript(resultRecord.transcript);
 
     return [{
       id,
@@ -289,7 +297,7 @@ export function normalizeFacultyVivas(
       needsReview: aiConfidence !== null && aiConfidence < LOW_CONFIDENCE_THRESHOLD,
       completedAt: readString(item.completed_at) || readString(item.created_at),
       summary: readString(vivaScoresRecord.summary) || readString(resultRecord.summary),
-      transcript: normalizeTranscript(transcriptValue),
+      transcript: sessionTranscript.length > 0 ? sessionTranscript : resultTranscript,
       codeHistory: readString(item.code_history) || readString(resultRecord.code_history) || null,
       audioUrl: readHttpUrl(item.audio_url) ?? readHttpUrl(resultRecord.audio_url),
       rubric: rubric.length > 0 ? rubric : normalizeRubric(resultRecord),

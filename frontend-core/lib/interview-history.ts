@@ -30,13 +30,20 @@ export function isInterviewSessionCompleted(session: {
   result?: unknown;
 }): boolean {
   const status = typeof session.status === 'string' ? session.status.trim().toLowerCase() : '';
-  if (['completed', 'complete', 'finished'].includes(status)) return true;
-  if (typeof session.completed_at === 'string' && session.completed_at.trim()) return true;
+  if (['abandoned', 'cancelled', 'canceled', 'failed'].includes(status)) return false;
 
   const result = parseInterviewRecord(session.result);
   const resultStatus = typeof result.session_status === 'string'
     ? result.session_status.trim().toLowerCase()
     : '';
+  if (
+    ['abandoned', 'cancelled', 'canceled', 'failed'].includes(resultStatus)
+    || result.is_abandoned === true
+  ) {
+    return false;
+  }
+  if (['completed', 'complete', 'finished'].includes(status)) return true;
+  if (typeof session.completed_at === 'string' && session.completed_at.trim()) return true;
   return ['completed', 'complete', 'finished'].includes(resultStatus)
     || typeof result.interview_score === 'number'
     || typeof result.finalScore === 'number';

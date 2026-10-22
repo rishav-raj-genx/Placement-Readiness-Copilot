@@ -229,7 +229,9 @@ export default function ActionPlanPage() {
     const ok = await analyze(user.id);
     if (ok) {
       toast.success('Screening criteria re-evaluated!');
-      void fetchDetailedData();
+      await fetchDetailedData();
+    } else {
+      toast.error('Profile re-evaluation failed. Check the analysis service and try again.');
     }
   };
 

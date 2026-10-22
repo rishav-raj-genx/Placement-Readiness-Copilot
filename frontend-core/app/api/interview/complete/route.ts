@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // Verify session belongs to authenticated user or user is admin
     const { data: existingSession, error: fetchError } = await adminClient
       .from('interview_sessions')
-      .select('id, user_id, student_id, target_role, config, code_history, transcript, interview_score, viva_scores, result')
+      .select('id, user_id, student_id, target_role, config, code_history, transcript, interview_score, viva_scores, result, status, completed_at')
       .eq('id', interviewId)
       .maybeSingle();
 
@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
     // worker-persisted transcript, without allowing an empty browser payload to erase it.
     const submittedTranscript = normalizePersistedTranscript(body.transcript);
     const existingTranscript = normalizePersistedTranscript(existingSession.transcript);
-    const normalizedTranscript = submittedTranscript.length > 0
-      ? submittedTranscript
-      : existingTranscript;
+    const normalizedTranscript = existingTranscript.length > 0
+      ? existingTranscript
+      : submittedTranscript;
 
     // Code snapshot from Round 2
     const codeHistory = body.codeHistory?.trim() || body.code_history?.trim() || existingSession.code_history || null;
@@ -100,12 +100,24 @@ export async function POST(request: NextRequest) {
     const rawServerScore =
       existingSession.interview_score ??
       sessionVivaScores.interview_score ??
-      sessionResult.interview_score;
+      sessionResult.interview_score ??
+      sessionResult.finalScore;
 
-    const serverScore =
-      typeof rawServerScore === 'number' && Number.isFinite(rawServerScore)
-        ? Math.max(0, Math.min(100, rawServerScore))
-        : 72;
+    if (typeof rawServerScore !== 'number' || !Number.isFinite(rawServerScore)) {
+      return NextResponse.json(
+        { error: 'The server evaluation is not ready. Wait for final scoring before completing the interview.' },
+        { status: 409 },
+      );
+    }
+    const serverScore = Math.max(0, Math.min(100, rawServerScore));
+    const resultSessionStatus = typeof sessionResult.session_status === 'string'
+      ? sessionResult.session_status.trim().toLowerCase()
+      : '';
+    const isAbandoned = existingSession.status === 'abandoned'
+      || resultSessionStatus === 'abandoned'
+      || sessionResult.is_abandoned === true
+      || sessionResult.is_provisional === true;
+    const finalStatus = isAbandoned ? 'abandoned' : 'completed';
 
     const targetRole = existingSession.target_role || 'Software Engineer';
     const finalScore = serverScore;
@@ -140,6 +152,7 @@ export async function POST(request: NextRequest) {
       };
 
     const vivaScores = {
+      ...sessionVivaScores,
       interview_score: finalScore,
       summary,
       strengths,
@@ -148,6 +161,7 @@ export async function POST(request: NextRequest) {
     };
 
     const finalResult = {
+      ...sessionResult,
       contract_version: '2.0.0',
       interview_score: finalScore,
       summary,
@@ -156,13 +170,16 @@ export async function POST(request: NextRequest) {
       transcript: normalizedTranscript,
       dimensions: vivaScores.dimensions,
       code_history: codeHistory,
+      is_abandoned: isAbandoned,
+      session_status: finalStatus,
     };
 
-    // Deep state saving: strictly update status to 'completed'
+    // Persist the server-authored evaluation and canonical transcript without
+    // allowing a browser request to promote an abandoned session to completed.
     const { error: updateError } = await adminClient
       .from('interview_sessions')
       .update({
-        status: 'completed',
+        status: finalStatus,
         interview_score: finalScore,
         transcript: normalizedTranscript,
         code_history: codeHistory,
@@ -175,6 +192,15 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('[Session Complete] Database update failed:', updateError);
       return NextResponse.json({ error: 'Failed to update interview session.' }, { status: 500 });
+    }
+
+    if (finalStatus !== 'completed') {
+      return NextResponse.json({
+        success: true,
+        interviewId,
+        status: finalStatus,
+        finalScore,
+      });
     }
 
     // PHASE 3: MASTER SCORE RECALCULATION
@@ -339,7 +365,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       interviewId,
-      status: 'completed',
+      status: finalStatus,
       finalScore,
       vivaScore,
       ideScore,

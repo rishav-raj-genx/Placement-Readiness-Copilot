@@ -48,8 +48,11 @@ class InterviewFinalizer:
         with self._lock:
             if self._result is None:
                 student_turns = [turn for turn in self.transcript if turn.speaker == "student"]
-                if not student_turns:
-                    raise ValueError("an interview needs at least one candidate answer")
+                if not self.transcript:
+                    self.record(
+                        "assistant",
+                        "The interview ended before any responses were recorded.",
+                    )
 
                 if self.result_store is not None and not self._transcript_persisted:
                     if not self.interview_id:

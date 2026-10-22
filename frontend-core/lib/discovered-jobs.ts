@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DiscoveredJob } from '@/types';
 
 export const DISCOVERED_JOB_COLUMNS = [
@@ -172,7 +173,8 @@ export function filterDiscoveredJobsForTargetRole(
       job.job_type,
       ...job.required_skills,
     ].join(' '));
-    return terms.some((term) => searchable.includes(term));
+    const paddedSearchable = ` ${searchable} `;
+    return terms.some((term) => paddedSearchable.includes(` ${term} `));
   });
 }
 
@@ -209,7 +211,7 @@ export function personalizeAndRankDiscoveredJobs(
 }
 
 export async function fetchDiscoveredJobs(
-  supabase: { from: (table: string) => any },
+  supabase: SupabaseClient,
   user: { id: string }
 ) {
   const { data: jobs, error } = await supabase

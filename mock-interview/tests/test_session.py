@@ -74,6 +74,22 @@ def test_session_rejects_empty_answers():
         raise AssertionError("empty answer was accepted")
 
 
+def test_session_finalizes_as_abandoned_without_candidate_answers():
+    session = InterviewSession(
+        InterviewContext(projects=["Order API"]),
+        FakeLLM(),
+    )
+    session.greeting()
+    session.next_question()
+
+    result = session.finish()
+
+    assert result.session_status == "abandoned"
+    assert result.is_abandoned is True
+    assert result.is_provisional is True
+    assert result.transcript
+
+
 def test_problem_2_full_configuration_and_question_bank():
     from scoring.schemas import SessionConfig
 

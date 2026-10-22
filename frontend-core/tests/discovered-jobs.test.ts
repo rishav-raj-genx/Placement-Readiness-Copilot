@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  filterDiscoveredJobsForTargetRole,
   normalizeDiscoveredJob,
   normalizeDiscoveredJobs,
   personalizeAndRankDiscoveredJobs,
@@ -93,5 +94,37 @@ describe('discovered job normalization', () => {
     expect(ranked[0].id).toBe('msot-global-1');
     expect(ranked[0].is_msot_post).toBe(true);
     expect(ranked[1].id).toBe('student-job-1');
+  });
+
+  it('keeps official MSOT posts while filtering external jobs by target role', () => {
+    const frontendJob = normalizeDiscoveredJob(validJob);
+    const dataJob = normalizeDiscoveredJob({
+      ...validJob,
+      id: 'external-data-1',
+      title: 'Data Analyst',
+      description: 'Build dashboards and reporting pipelines.',
+      required_skills: ['SQL', 'Power BI'],
+    });
+    const officialJob = normalizeDiscoveredJob({
+      ...validJob,
+      id: 'msot-general-1',
+      title: 'MSOT Graduate Hiring',
+      description: 'Open campus opportunity.',
+      required_skills: [],
+      is_msot_post: true,
+    });
+
+    expect(frontendJob).not.toBeNull();
+    expect(dataJob).not.toBeNull();
+    expect(officialJob).not.toBeNull();
+    if (!frontendJob || !dataJob || !officialJob) return;
+
+    const filtered = filterDiscoveredJobsForTargetRole(
+      [dataJob, frontendJob, officialJob],
+      'Frontend Engineer',
+    );
+    const ranked = personalizeAndRankDiscoveredJobs(filtered, ['TypeScript']);
+
+    expect(ranked.map((job) => job.id)).toEqual(['msot-general-1', 'greenhouse-123']);
   });
 });

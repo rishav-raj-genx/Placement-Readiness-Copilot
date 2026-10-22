@@ -48,7 +48,7 @@ class InterviewSession:
     """A bounded, resume-grounded interview session with configurable duration and question plan."""
 
     TARGET_DURATION_MINUTES: int = 15
-    MAX_DURATION_MINUTES: int = 18
+    MAX_DURATION_MINUTES: int = 20
 
     def __init__(
         self,
@@ -156,9 +156,6 @@ class InterviewSession:
             if self.state == SessionState.COMPLETED and hasattr(self, "_cached_result"):
                 return self._cached_result
             raise ValueError(f"cannot finish session in state '{self.state.value}'")
-
-        if not any(turn.speaker == "student" for turn in self.transcript):
-            raise ValueError("an interview needs at least one candidate answer")
 
         self.state = SessionState.SCORING
         try:

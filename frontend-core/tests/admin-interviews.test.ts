@@ -70,6 +70,20 @@ describe('faculty viva normalization', () => {
     expect(review.override?.facultyName).toBe('Dr Mehta');
   });
 
+  it('normalizes a stringified transcript for faculty review', () => {
+    const [review] = normalizeFacultyVivas([{
+      ...completedSession,
+      transcript: JSON.stringify([
+        { turn_id: 1, role: 'interviewer', content: 'Describe your architecture.', timestamp_sec: 0 },
+        { turn_id: 2, role: 'student', content: 'I used an event-driven design.', timestamp_sec: 14 },
+      ]),
+    }], []);
+
+    expect(review.transcript).toHaveLength(2);
+    expect(review.transcript[0]).toMatchObject({ speaker: 'ai', text: 'Describe your architecture.' });
+    expect(review.transcript[1]).toMatchObject({ speaker: 'student', timestampSeconds: 14 });
+  });
+
   it('prefers authoritative evidence and explicit faculty override fields', () => {
     const [review] = normalizeFacultyVivas([{
       ...completedSession,

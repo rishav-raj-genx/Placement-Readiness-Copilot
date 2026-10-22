@@ -6,6 +6,7 @@ import vm from 'vm';
 import ts from 'typescript';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
 import { createSupabaseServiceClient } from '@/lib/supabase-service-server';
+import { isInterviewSessionCompleted } from '@/lib/interview-history';
 import {
   FALLBACK_CODING_PROBLEMS,
   type CodingProblemSpec,
@@ -1204,7 +1205,7 @@ async function verifyStudentVivaCompleted(userId: string): Promise<boolean> {
   // Ensure there is at least one completed session that is NOT a Round 2 coding assessment
   const vivaSession = sessions.find((s) => {
     const cfg = typeof s.config === 'object' && s.config !== null ? (s.config as Record<string, unknown>) : {};
-    return cfg.type !== 'coding' && cfg.round !== 2;
+    return isInterviewSessionCompleted(s) && cfg.type !== 'coding' && cfg.round !== 2;
   });
 
   return Boolean(vivaSession);

@@ -44,8 +44,9 @@ import {
   Tooltip,
 } from 'recharts';
 import { format } from 'date-fns';
-import type { LiveKitResultsPayload, LiveKitTranscriptEntry } from '@/types';
+import type { LiveKitResultsPayload } from '@/types';
 import { normalizeInterviewResult } from '@/lib/interview-result-adapter';
+import { normalizeInterviewTranscript } from '@/lib/interview-history';
 import { InterviewAuditPlayer } from '@/components/interview/interview-audit-player';
 
 export default function ResultsPage({ params }: { params: { id: string } }) {
@@ -68,30 +69,33 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     if (!isLiveKitId) return;
 
     // 1. Check current livekit store
-    const stored = liveKitStore.currentInterview;
+    const stored = liveKitStore.currentInterview?.interviewId === id
+      ? liveKitStore.currentInterview
+      : null;
+    let hasCachedResults = false;
     if (stored && stored.results) {
       setLiveKitResults(stored.results);
-      return;
+      hasCachedResults = true;
     }
 
     // 2. Check session / local storage directly
-    if (typeof window !== 'undefined') {
+    if (!hasCachedResults && typeof window !== 'undefined') {
       const fromSession = sessionStorage.getItem(`interview_result_${id}`);
       if (fromSession) {
         try {
           const parsed = JSON.parse(fromSession) as LiveKitResultsPayload;
           setLiveKitResults(normalizeInterviewResult(parsed));
-          return;
+          hasCachedResults = true;
         } catch {
           // ignore parse error
         }
       }
-      const fromLocal = localStorage.getItem(`interview_result_${id}`);
+      const fromLocal = !hasCachedResults ? localStorage.getItem(`interview_result_${id}`) : null;
       if (fromLocal) {
         try {
           const parsed = JSON.parse(fromLocal) as LiveKitResultsPayload;
           setLiveKitResults(normalizeInterviewResult(parsed));
-          return;
+          hasCachedResults = true;
         } catch {
           // ignore parse error
         }
@@ -99,7 +103,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     }
 
     // 3. Query the database with short retry
-    setLiveKitLoading(true);
+    setLiveKitLoading(!hasCachedResults);
 
     let attempts = 0;
     const maxAttempts = 3;
@@ -122,8 +126,15 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           }
           if (data.result) {
             const normalized = normalizeInterviewResult(data.result);
-            if ((!normalized.transcript || normalized.transcript.length === 0) && Array.isArray(data.transcript)) {
-              normalized.transcript = data.transcript as LiveKitTranscriptEntry[];
+            if (!normalized.transcript || normalized.transcript.length === 0) {
+              const persistedTranscript = normalizeInterviewTranscript(data.transcript);
+              normalized.transcript = persistedTranscript.map((turn) => ({
+                id: turn.id,
+                speaker: turn.speaker,
+                text: turn.text,
+                timestamp: turn.timestampSeconds ?? 0,
+                final: true,
+              }));
             }
             setLiveKitResults(normalized);
             setLiveKitLoading(false);
@@ -144,7 +155,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         const gotIt = await fetchResult();
         if (gotIt || attempts >= maxAttempts) {
           if (intervalId) clearInterval(intervalId);
-          if (!gotIt) {
+          if (!gotIt && !hasCachedResults) {
             // Immediate guaranteed fallback synthesis so the user is never stuck
             const role = stored?.targetRole || 'Software Engineer';
             const synthesized = compileInterviewResults(role, stored?.transcripts || []);

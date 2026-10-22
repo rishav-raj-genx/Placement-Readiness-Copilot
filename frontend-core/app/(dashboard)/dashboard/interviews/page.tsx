@@ -164,9 +164,8 @@ function toHistoryEntry(session: LiveKitHistoryEntry): HistoryEntry {
   const vivaScores = parseInterviewRecord(session.viva_scores);
   const { vivaScore, ideScore, overallScore } = resolveRoundScores(session);
   const completed = isInterviewSessionCompleted(session);
-  const transcriptSource = Array.isArray(session.transcript) && session.transcript.length > 0
-    ? session.transcript
-    : result.transcript;
+  const sessionTranscript = normalizeInterviewTranscript(session.transcript);
+  const resultTranscript = normalizeInterviewTranscript(result.transcript);
 
   return {
     id: session.id,
@@ -188,7 +187,7 @@ function toHistoryEntry(session: LiveKitHistoryEntry): HistoryEntry {
     improvementAreas: readStringArray(vivaScores.improvement_areas).length > 0
       ? readStringArray(vivaScores.improvement_areas)
       : readStringArray(result.improvement_areas ?? result.weak_areas),
-    transcript: normalizeInterviewTranscript(transcriptSource),
+    transcript: sessionTranscript.length > 0 ? sessionTranscript : resultTranscript,
     codeHistory: readString(session.code_history) ?? readString(result.code_history),
   };
 }

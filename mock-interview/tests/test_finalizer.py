@@ -49,6 +49,18 @@ def test_livekit_finalizer_scores_once_and_keeps_full_transcript() -> None:
     assert [turn.speaker for turn in first_result.transcript] == ["ai", "student"]
 
 
+def test_livekit_finalizer_closes_as_abandoned_without_candidate_answers() -> None:
+    finalizer = InterviewFinalizer(InterviewContext(), CountingLLM())
+    finalizer.record("assistant", "The configured interview time has ended.")
+
+    result = finalizer.finish()
+
+    assert result.session_status == "abandoned"
+    assert result.is_abandoned is True
+    assert result.is_provisional is True
+    assert result.transcript[0].speaker == "ai"
+
+
 def test_persistence_retry_does_not_repeat_scoring_call() -> None:
     llm = CountingLLM()
     store = RetryStore()

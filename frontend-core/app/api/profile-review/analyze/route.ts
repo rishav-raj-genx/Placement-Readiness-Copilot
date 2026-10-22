@@ -107,11 +107,10 @@ async function computeProjectsScore(
     liveUrl?: string;
   }> | undefined,
   studentId: string,
-  admin: ReturnType<typeof createAdminClient>,
-  currentProjectsScore: number
+  admin: ReturnType<typeof createAdminClient>
 ): Promise<number> {
   if (!projects || projects.length === 0) {
-    return currentProjectsScore > 0 ? currentProjectsScore : 0;
+    return 0;
   }
 
   let score = 0;
@@ -212,7 +211,7 @@ async function computeCodingPracticeScore(
         }
       }
 
-      if (!review || (review.exists && review.total_solved === 0 && review.score === 0)) {
+      if (!review || !review.exists || (review.total_solved === 0 && review.score === 0)) {
         try {
           const gqlRes = await fetch('https://leetcode.com/graphql', {
             method: 'POST',
@@ -561,15 +560,16 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
     let linkedinDownloadData: Blob | null = null;
     if (effectiveLinkedinPath) {
-      try {
-        const validLinkedinPath = requireOwnedPath(effectiveLinkedinPath, studentId, 'LinkedIn profile');
-        const linkedinDownload = await admin.storage.from('candidate-documents').download(validLinkedinPath);
-        if (!linkedinDownload.error && linkedinDownload.data) {
-          linkedinDownloadData = linkedinDownload.data;
-        }
-      } catch {
-        /* Optional document download failure handled gracefully */
+      const validLinkedinPath = requireOwnedPath(effectiveLinkedinPath, studentId, 'LinkedIn profile');
+      const linkedinDownload = await admin.storage.from('candidate-documents').download(validLinkedinPath);
+      if (linkedinDownload.error || !linkedinDownload.data) {
+        throw new AnalysisError(
+          `Failed to download LinkedIn PDF from storage: ${linkedinDownload.error?.message ?? 'Empty file'}`,
+          500,
+          'LINKEDIN_DOWNLOAD_FAILED',
+        );
       }
+      linkedinDownloadData = linkedinDownload.data;
     }
 
     // Attempt AI scoring service invocation
@@ -592,21 +592,55 @@ export async function POST(request?: Request): Promise<NextResponse> {
       } catch (exc) {
         const message = exc instanceof Error ? exc.message : 'AI analyzer service failure';
         const isTimeout = message.toLowerCase().includes('timed out');
-        return NextResponse.json(
-          {
-            error: `AI analyzer failed or timed out: ${message}`,
-            code: isTimeout ? 'AI_ANALYZER_TIMEOUT' : 'AI_ANALYZER_FAILED',
-            details: message,
-          },
-          { status: isTimeout ? 504 : 502 }
+        throw new AnalysisError(
+          `AI analyzer failed or timed out: ${message}`,
+          isTimeout ? 504 : 502,
+          isTimeout ? 'AI_ANALYZER_TIMEOUT' : 'AI_ANALYZER_FAILED',
         );
       }
     }
 
     const safeReview = isRecord(review) ? review : {};
     const resumeReview = isRecord(safeReview.resume_review) ? safeReview.resume_review : null;
-    const githubReview = isRecord(safeReview.github_review) ? safeReview.github_review : null;
-    const linkedinReview = isRecord(safeReview.linkedin_review) ? safeReview.linkedin_review : null;
+    let githubReview = isRecord(safeReview.github_review) ? safeReview.github_review : null;
+    let linkedinReview = isRecord(safeReview.linkedin_review) ? safeReview.linkedin_review : null;
+
+    // GitHub must also be recalculated when no resume is present. The combined
+    // analyzer only runs with a resume, so use its dedicated endpoint as needed.
+    if (effectiveGithubUsername && !githubReview) {
+      try {
+        const response = await serviceRequest(
+          `${getProfileReviewBaseUrl()}/review/github/${encodeURIComponent(effectiveGithubUsername)}`,
+          { timeoutMs: 15_000, maxRetries: 1 },
+        );
+        githubReview = isRecord(response) ? response : null;
+      } catch (error) {
+        githubReview = {
+          score: 0,
+          error: error instanceof Error ? error.message : 'GitHub profile verification failed.',
+          specific_fixes: ['Verify the GitHub username and re-evaluate the profile.'],
+        };
+      }
+    }
+
+    if (linkedinDownloadData && !linkedinReview) {
+      try {
+        const linkedinForm = new FormData();
+        linkedinForm.append('file', linkedinDownloadData, 'linkedin.pdf');
+        const response = await serviceRequest(`${getProfileReviewBaseUrl()}/review/linkedin`, {
+          method: 'POST',
+          body: linkedinForm,
+          timeoutMs: 30_000,
+        });
+        linkedinReview = isRecord(response) ? response : null;
+      } catch (error) {
+        linkedinReview = {
+          score: 0,
+          error: error instanceof Error ? error.message : 'LinkedIn PDF verification failed.',
+          specific_fixes: ['Upload a readable LinkedIn PDF export and re-evaluate the profile.'],
+        };
+      }
+    }
 
     const newResumeScore = resumeReview ? readNumber(resumeReview.score) : null;
     const newGithubScore = githubReview ? readNumber(githubReview.score) : null;
@@ -645,7 +679,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
     const updatedScores: ProfileScores = {
       resume: (typeof newResumeScore === 'number')
         ? newResumeScore
-        : (currentScores.resume > 0 ? currentScores.resume : 0),
+        : (effectiveResumePath ? currentScores.resume : 0),
 
       projects: currentScores.projects > 0 ? currentScores.projects : 0,
 
@@ -653,11 +687,11 @@ export async function POST(request?: Request): Promise<NextResponse> {
 
       github: (typeof newGithubScore === 'number')
         ? newGithubScore
-        : (currentScores.github > 0 ? currentScores.github : 0),
+        : (effectiveGithubUsername ? currentScores.github : 0),
 
       linkedin: (typeof newLinkedinScore === 'number')
         ? newLinkedinScore
-        : (currentScores.linkedin > 0 ? currentScores.linkedin : 0),
+        : (effectiveLinkedinPath ? currentScores.linkedin : 0),
 
       leetcode: currentScores.leetcode > 0 ? currentScores.leetcode : (currentScores.coding_practice > 0 ? currentScores.coding_practice : 0),
 
@@ -673,8 +707,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
     const projectsScore = await computeProjectsScore(
       profile.projects,
       studentId,
-      admin,
-      currentScores.projects
+      admin
     );
     updatedScores.projects = projectsScore;
 
@@ -837,6 +870,8 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // Database Commit 2: candidate_profile_reviews table
     const finalReviewPayload = {
       ...(isRecord(review) ? review : {}),
+      ...(githubReview ? { github_review: githubReview } : {}),
+      ...(linkedinReview ? { linkedin_review: linkedinReview } : {}),
       ...(codingPractice.review ? { leetcode_review: codingPractice.review } : {}),
       scores: updatedScores,
       readiness_score: totalReadiness,

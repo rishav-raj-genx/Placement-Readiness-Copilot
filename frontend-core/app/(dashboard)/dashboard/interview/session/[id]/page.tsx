@@ -52,6 +52,16 @@ import { CountdownTimer } from '@/components/interview/countdown-timer';
 import { TranscriptDrawer } from '@/components/interview/transcript-drawer';
 import { TextInterviewChat } from '@/components/interview/text-interview-chat';
 
+function readCompletionStatus(value: unknown): string {
+  if (typeof value !== 'object' || value === null || !('status' in value)) return '';
+  return typeof value.status === 'string' ? value.status.trim().toLowerCase() : '';
+}
+
+function readCompletionError(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || !('error' in value)) return null;
+  return typeof value.error === 'string' && value.error.trim() ? value.error.trim() : null;
+}
+
 export default function InterviewSessionPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
@@ -115,6 +125,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       : liveKitStore.currentInterview?.transcripts || [];
 
     let persisted = false;
+    let vivaCompleted = false;
     try {
       const response = await fetch('/api/interview/complete', {
         method: 'POST',
@@ -127,14 +138,12 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           status: 'completed',
         }),
       });
+      const completionPayload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        const payload: unknown = await response.json().catch(() => null);
-        const message = typeof payload === 'object' && payload !== null && 'error' in payload
-          ? String(payload.error)
-          : 'Interview completion could not be persisted.';
-        throw new Error(message);
+        throw new Error(readCompletionError(completionPayload) ?? 'Interview completion could not be persisted.');
       }
       persisted = true;
+      vivaCompleted = readCompletionStatus(completionPayload) === 'completed';
     } catch (saveErr) {
       toast.error(saveErr instanceof Error ? saveErr.message : 'Interview completion could not be persisted.');
     }
@@ -144,15 +153,17 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
       localStorage.setItem(`interview_result_${id}`, JSON.stringify(p));
     }
     liveKitStore.setResults(p);
-    if (persisted) {
+    if (persisted && vivaCompleted) {
       markRound1Completed(user?.id);
     }
-    if (persisted && user?.id) {
+    if (persisted && vivaCompleted && user?.id) {
       void useProfileStore.getState().analyze(user.id);
     }
-    toast.success(persisted
-      ? 'Interview completed. Round 2 is now unlocked.'
-      : 'Interview ended. Results are available, but Round 2 remains locked until persistence succeeds.');
+    if (persisted && vivaCompleted) {
+      toast.success('Interview completed. Round 2 is now unlocked.');
+    } else {
+      toast.warning('Interview ended. Results are available, but Round 2 remains locked until a completed Viva is persisted.');
+    }
     router.push(`/dashboard/interview/results/${id}`);
   }, [finalizeRecording, id, liveKitStore, router, user?.id]);
 
@@ -367,6 +378,7 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
           userId={user?.id}
           onFinish={async (resultsPayload) => {
             let persisted = false;
+            let vivaCompleted = false;
             try {
               const response = await fetch('/api/interview/complete', {
                 method: 'POST',
@@ -379,14 +391,12 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
                   status: 'completed',
                 }),
               });
+              const completionPayload: unknown = await response.json().catch(() => null);
               if (!response.ok) {
-                const payload: unknown = await response.json().catch(() => null);
-                const message = typeof payload === 'object' && payload !== null && 'error' in payload
-                  ? String(payload.error)
-                  : 'Interview completion could not be persisted.';
-                throw new Error(message);
+                throw new Error(readCompletionError(completionPayload) ?? 'Interview completion could not be persisted.');
               }
               persisted = true;
+              vivaCompleted = readCompletionStatus(completionPayload) === 'completed';
             } catch (saveErr) {
               toast.error(saveErr instanceof Error ? saveErr.message : 'Interview completion could not be persisted.');
             }
@@ -395,16 +405,18 @@ export default function InterviewSessionPage({ params }: { params: { id: string 
               sessionStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
               localStorage.setItem(`interview_result_${id}`, JSON.stringify(resultsPayload));
             }
-            if (persisted) markRound1Completed(user?.id);
+            if (persisted && vivaCompleted) markRound1Completed(user?.id);
             liveKitStore.setResults(resultsPayload);
 
-            if (persisted && user?.id) {
+            if (persisted && vivaCompleted && user?.id) {
               void useProfileStore.getState().analyze(user.id);
             }
 
-            toast.success(persisted
-              ? 'Interview completed. Round 2 is now unlocked.'
-              : 'Interview ended. Results are available, but Round 2 remains locked until persistence succeeds.');
+            if (persisted && vivaCompleted) {
+              toast.success('Interview completed. Round 2 is now unlocked.');
+            } else {
+              toast.warning('Interview ended. Results are available, but Round 2 remains locked until a completed Viva is persisted.');
+            }
             router.push(`/dashboard/interview/results/${id}`);
           }}
           onAbandon={() => {

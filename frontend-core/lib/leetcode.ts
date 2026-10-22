@@ -137,8 +137,12 @@ export function normalizeLeetCodeStats(value: unknown, fallbackUsername = ''): L
   );
   const username = readString(value.username, matchedUser?.username, fallbackUsername);
   const explicitExists = typeof value.exists === 'boolean' ? value.exists : null;
-  const exists = explicitExists ?? Boolean(matchedUser || username || totalSolved > 0);
+  const hasMatchedUserField = 'matchedUser' in rootData;
+  const exists = explicitExists ?? (hasMatchedUserField
+    ? matchedUser !== null
+    : Boolean(username || totalSolved > 0));
   const explicitScore = readNumber(value.score);
+  const calculatedScore = calculateLeetCodeScore(totalSolved, mediumSolved, hardSolved, contestRating);
 
   if (!exists && !username && totalSolved === 0 && !('exists' in value) && !('matchedUser' in rootData)) {
     return null;
@@ -153,8 +157,8 @@ export function normalizeLeetCodeStats(value: unknown, fallbackUsername = ''): L
     hard_solved: hardSolved,
     contest_rating: contestRating,
     global_ranking: globalRanking === null ? null : Math.round(globalRanking),
-    score: explicitScore === null
-      ? calculateLeetCodeScore(totalSolved, mediumSolved, hardSolved, contestRating)
+    score: explicitScore === null || (explicitScore === 0 && totalSolved > 0)
+      ? calculatedScore
       : Math.min(100, Math.max(0, Math.round(explicitScore))),
     error: typeof value.error === 'string' && value.error.trim() ? value.error.trim() : null,
   };
