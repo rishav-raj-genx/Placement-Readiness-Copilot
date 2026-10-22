@@ -77,6 +77,7 @@ class LinkCheckRequest(BaseModel):
 
 
 class JobSearchRequest(BaseModel):
+    student_id: Optional[str] = Field(None, max_length=128)
     skills: List[str] = Field(..., min_length=1, max_length=50)
     target_role: Optional[str] = Field("Software Engineer Intern", max_length=128)
     boolean_query: Optional[str] = Field(None, max_length=500)
@@ -164,6 +165,11 @@ def discover_jobs(
             max_results=req.max_results or 20,
             force_refresh=req.force_refresh or False,
         )
+        if req.student_id:
+            for job in jobs:
+                if isinstance(job, dict):
+                    job["student_id"] = req.student_id
+            db_client.save_discovered_jobs(jobs)
         freshness = job_aggregator.get_source_freshness()
         return {
             "count": len(jobs),

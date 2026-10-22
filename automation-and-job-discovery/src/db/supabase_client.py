@@ -231,6 +231,7 @@ class SupabaseHandler:
         # Filter strictly to schema columns
         allowed_columns = {
             "id",
+            "student_id",
             "title",
             "company",
             "location",

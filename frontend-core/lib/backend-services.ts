@@ -52,8 +52,11 @@ export function getOptionalAutomationBaseUrl(): string | null {
   return rawValue ? normalizeServiceBase(rawValue, 'automation') : null;
 }
 
-interface ServiceRequestOptions extends RequestInit {
+export interface ServiceRequestOptions extends RequestInit {
   timeoutMs?: number;
+  maxRetries?: number;
+  initialBackoffMs?: number;
+  maxBackoffMs?: number;
 }
 
 function getInternalServiceToken(): string {
@@ -68,25 +71,90 @@ function getInternalServiceToken(): string {
 }
 
 export async function serviceRequest(url: string, options: ServiceRequestOptions = {}): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
-  const headers = new Headers(options.headers);
-  if (!headers.has('Authorization')) {
-    const serviceToken = getInternalServiceToken();
-    headers.set('Authorization', `Bearer ${serviceToken}`);
-  }
-  try {
-    const response = await fetch(url, { ...options, headers, signal: controller.signal, cache: 'no-store' });
-    const payload: unknown = await response.json().catch(() => null);
-    if (!response.ok) {
-      const detail = typeof payload === 'object' && payload !== null && 'detail' in payload ? String(payload.detail) : `${response.status} ${response.statusText}`;
-      throw new Error(`Service request failed: ${detail}`);
+  const maxRetries = options.maxRetries ?? 3;
+  const initialBackoffMs = options.initialBackoffMs ?? 500;
+  const maxBackoffMs = options.maxBackoffMs ?? 10_000;
+  let attempt = 0;
+
+  while (true) {
+    attempt++;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+    const headers = new Headers(options.headers);
+    if (!headers.has('Authorization')) {
+      const serviceToken = getInternalServiceToken();
+      if (serviceToken) {
+        headers.set('Authorization', `Bearer ${serviceToken}`);
+      }
     }
-    return payload;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw new Error('Service request timed out.');
-    throw error;
-  } finally {
-    clearTimeout(timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      clearTimeout(timeout);
+
+      const payload: unknown = await response.json().catch(() => null);
+
+      if (response.ok) {
+        return payload;
+      }
+
+      const detail =
+        typeof payload === 'object' && payload !== null && 'detail' in payload
+          ? String((payload as Record<string, unknown>).detail)
+          : `${response.status} ${response.statusText}`;
+
+      // 4xx errors (excluding 429 Too Many Requests) fail immediately without retrying
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        throw new Error(`Service request failed: ${detail}`);
+      }
+
+      if (attempt > maxRetries) {
+        throw new Error(`Service request failed after ${attempt} attempts: ${detail}`);
+      }
+
+      // Extract Retry-After header or calculate exponential backoff with random jitter
+      let backoffMs: number;
+      const retryAfter = response.headers.get('Retry-After');
+      if (retryAfter) {
+        const parsedSeconds = parseFloat(retryAfter);
+        if (!Number.isNaN(parsedSeconds) && parsedSeconds > 0) {
+          backoffMs = parsedSeconds * 1000;
+        } else {
+          const dateMs = new Date(retryAfter).getTime();
+          backoffMs = !Number.isNaN(dateMs) && dateMs > Date.now() ? dateMs - Date.now() : initialBackoffMs;
+        }
+      } else {
+        const exponential = initialBackoffMs * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * (exponential * 0.3);
+        backoffMs = Math.min(maxBackoffMs, exponential + jitter);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    } catch (error) {
+      clearTimeout(timeout);
+
+      // Re-throw immediately if this is an explicit non-retriable 4xx failure
+      if (error instanceof Error && error.message.startsWith('Service request failed:')) {
+        throw error;
+      }
+
+      if (attempt > maxRetries) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('Service request timed out.');
+        }
+        throw error;
+      }
+
+      const exponential = initialBackoffMs * Math.pow(2, attempt - 1);
+      const jitter = Math.random() * (exponential * 0.3);
+      const backoffMs = Math.min(maxBackoffMs, exponential + jitter);
+
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
   }
 }
