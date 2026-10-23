@@ -63,6 +63,8 @@ function sanitizeProfilePayload(body: Record<string, unknown>): Record<string, u
     payload.resume_pdf_path = body.resumePdfPath.trim() || null;
   } else if (typeof body.resume_pdf_path === 'string') {
     payload.resume_pdf_path = body.resume_pdf_path.trim() || null;
+  } else if (typeof body.resume_path === 'string') {
+    payload.resume_pdf_path = body.resume_path.trim() || null;
   }
 
   if (typeof body.linkedinPath === 'string') {
@@ -71,6 +73,8 @@ function sanitizeProfilePayload(body: Record<string, unknown>): Record<string, u
     payload.linkedin_pdf_path = body.linkedinPdfPath.trim() || null;
   } else if (typeof body.linkedin_pdf_path === 'string') {
     payload.linkedin_pdf_path = body.linkedin_pdf_path.trim() || null;
+  } else if (typeof body.linkedin_path === 'string') {
+    payload.linkedin_pdf_path = body.linkedin_path.trim() || null;
   }
 
   if (Array.isArray(body.projects)) {

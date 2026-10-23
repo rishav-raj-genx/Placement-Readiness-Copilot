@@ -451,10 +451,28 @@ def _get_user_with_retry(github: Github, username: str):
     return github.get_user(username)
 
 
+def extract_github_username(url_or_username: str) -> str:
+    """Extract clean GitHub username from URL or raw username string."""
+    if not url_or_username or not url_or_username.strip():
+        return ""
+    cleaned = url_or_username.strip()
+    cleaned = cleaned.split("?")[0].split("#")[0].rstrip("/")
+    match = re.search(r"github\.com/([a-zA-Z0-9_\-]+)", cleaned, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    raw = cleaned.replace("@", "").strip()
+    if "/" in raw:
+        raw = raw.split("/")[-1].strip()
+    if re.match(r"^[a-zA-Z0-9_\-]+$", raw):
+        return raw
+    return raw
+
+
 def fetch_github_data(username: str, force_refresh: bool = False) -> dict[str, object]:
-    normalized_username = username.strip().lower()
+    clean_username = extract_github_username(username)
+    normalized_username = clean_username.strip().lower()
     if not normalized_username:
-        raise ValueError("GitHub username is required.")
+        return _base_github_error_profile(username or "unknown", "GitHub profile not found or invalid username.")
 
     now = time.time()
     cached = _PROFILE_CACHE.get(normalized_username)

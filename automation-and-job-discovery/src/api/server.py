@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from src import config
 from src.db.supabase_client import db_client
 from src.job_discovery.aggregator import JobAggregator
+from src.job_discovery.boolean_parser import BooleanSearchParser
 from src.link_checker.checker import LiveLinkChecker
 from src.readiness_score.calculator import PlacementReadinessCalculator
 from src.readiness_score.models import ReadinessReport, StudentProfileEvaluation

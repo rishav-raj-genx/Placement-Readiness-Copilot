@@ -20,8 +20,8 @@ from ai_reviewer import (
     extract_docx_text,
     get_backend_status,
 )
-from github_service import fetch_github_data
-from leetcode_service import fetch_leetcode_stats
+from github_service import extract_github_username, fetch_github_data
+from leetcode_service import extract_leetcode_username, fetch_leetcode_stats
 
 logger = logging.getLogger("profile_review_api")
 logging.basicConfig(level=logging.INFO)
@@ -462,7 +462,7 @@ async def _evaluate_github_pillar(
     force_refresh: bool,
 ) -> tuple[GithubReview | None, str | None]:
     """Evaluates GitHub pillar concurrently with graceful degradation."""
-    clean_username = (github_username or "").strip()
+    clean_username = extract_github_username(github_username)
     if not clean_username:
         return None, None
 
@@ -512,8 +512,20 @@ async def _evaluate_leetcode_pillar(
     if not clean_url:
         return None, None
 
+    clean_username = extract_leetcode_username(clean_url)
+    if not clean_username:
+        return (
+            LeetCodeReview(
+                username=clean_url,
+                exists=False,
+                score=0,
+                error="Link invalid or service unreachable",
+            ),
+            "Link invalid or service unreachable",
+        )
+
     try:
-        stats = await asyncio.to_thread(fetch_leetcode_stats, clean_url)
+        stats = await asyncio.to_thread(fetch_leetcode_stats, clean_username)
         review = LeetCodeReview(**stats)
         error = None
         if not stats.get("exists") or stats.get("error"):
@@ -573,8 +585,8 @@ async def analyze_profile(
         logger.info("Forced profile refresh requested; bypassing all persisted analysis results.")
 
     try:
-        clean_github = (github_username or "").strip()
-        clean_leetcode = (leetcode_url or "").strip()
+        clean_github = extract_github_username(github_username)
+        clean_leetcode = extract_leetcode_username(leetcode_url) or (leetcode_url or "").strip()
 
         # If resume is provided, parse text quickly so LinkedIn can use it for cross-check context
         resume_context = ""
@@ -621,13 +633,30 @@ async def analyze_profile(
                         "Resume document is empty or unreadable.",
                         "",
                     )
-                review = await asyncio.to_thread(
-                    evaluate_text,
-                    pre_extracted_resume.text,
-                    pre_extracted_resume.page_count,
-                    layout_geometry=pre_extracted_resume.layout_geometry,
-                )
-                return review, None, pre_extracted_resume.text
+                try:
+                    review = await asyncio.to_thread(
+                        evaluate_text,
+                        pre_extracted_resume.text,
+                        pre_extracted_resume.page_count,
+                        layout_geometry=pre_extracted_resume.layout_geometry,
+                    )
+                    return review, None, pre_extracted_resume.text
+                except Exception as exc:
+                    logger.warning("Resume evaluation encountered an issue: %s", exc)
+                    return (
+                        ReviewResult(
+                            score=0,
+                            page_count=pre_extracted_resume.page_count,
+                            is_one_page=pre_extracted_resume.page_count == 1,
+                            is_ats_friendly=False,
+                            uses_action_verbs=False,
+                            has_spelling_or_grammar_issues=False,
+                            has_clean_visual_layout=False,
+                            specific_fixes=[f"Resume evaluation encountered an issue: {exc}"],
+                        ),
+                        str(exc),
+                        pre_extracted_resume.text,
+                    )
             return await _evaluate_resume_pillar(resume)
 
         # Run independent pillars in parallel

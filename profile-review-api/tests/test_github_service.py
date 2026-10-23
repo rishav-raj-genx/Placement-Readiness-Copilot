@@ -120,18 +120,44 @@ def test_fetch_github_data_handles_404_resiliently(monkeypatch) -> None:
     assert "not found" in str(result["reason"]).lower()
 
 
-def test_fetch_github_data_handles_connection_error_resiliently(monkeypatch) -> None:
+def test_extract_github_username() -> None:
+    from github_service import extract_github_username
+
+    assert extract_github_username("https://github.com/rishav-raj-genx") == "rishav-raj-genx"
+    assert extract_github_username("https://github.com/rishav-raj-genx/") == "rishav-raj-genx"
+    assert extract_github_username("https://github.com/rishav-raj-genx?tab=repositories") == "rishav-raj-genx"
+    assert extract_github_username("https://github.com/rishav-raj-genx#intro") == "rishav-raj-genx"
+    assert extract_github_username("http://github.com/rishav-raj-genx") == "rishav-raj-genx"
+    assert extract_github_username("@rishav-raj-genx") == "rishav-raj-genx"
+    assert extract_github_username("rishav-raj-genx") == "rishav-raj-genx"
+    assert extract_github_username("") == ""
+
+
+def test_fetch_github_data_sanitizes_full_url(monkeypatch) -> None:
     from github import Github
     from github_service import fetch_github_data
 
+    called_username = []
+
     def mock_get_user(self, username: str):
-        raise ConnectionError("Connection refused by peer")
+        called_username.append(username)
+        mock_user = SimpleNamespace(
+            login="rishav-raj-genx",
+            name="Rishav",
+            bio="Software Engineer",
+            public_repos=5,
+            followers=10,
+            following=5,
+            get_repos=lambda: [],
+        )
+        return mock_user
 
     monkeypatch.setattr(Github, "get_user", mock_get_user)
 
-    result = fetch_github_data("network_error_user", force_refresh=True)
-    assert result["score"] == 0
-    assert result["username"] == "network_error_user"
-    assert "connection error" in str(result["reason"]).lower()
+    result = fetch_github_data("https://github.com/rishav-raj-genx", force_refresh=True)
+    assert called_username == ["rishav-raj-genx"]
+    assert result["username"] == "rishav-raj-genx"
+    assert result["public_repos"] == 5
+
 
 

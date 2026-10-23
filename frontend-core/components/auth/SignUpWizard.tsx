@@ -258,13 +258,16 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
           const path = `${userId}/resume.${ext}`;
 
           for (const bucket of ['resumes', 'candidate-documents']) {
-            const { error: uploadError } = await supabase.storage
-              .from(bucket)
-              .upload(path, resumeFile, { upsert: true, contentType });
+            try {
+              const { error: uploadError } = await supabase.storage
+                .from(bucket)
+                .upload(path, resumeFile, { upsert: true, contentType });
 
-            if (!uploadError) {
-              uploadedResumePath = path;
-              break;
+              if (!uploadError) {
+                uploadedResumePath = path;
+              }
+            } catch {
+              // Try next bucket
             }
           }
         } catch {
@@ -276,14 +279,17 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
       if (linkedinFile) {
         try {
           const path = `${userId}/linkedin.pdf`;
-          for (const bucket of ['candidate-documents', 'resumes']) {
-            const { error: uploadError } = await supabase.storage
-              .from(bucket)
-              .upload(path, linkedinFile, { upsert: true, contentType: 'application/pdf' });
+          for (const bucket of ['resumes', 'candidate-documents']) {
+            try {
+              const { error: uploadError } = await supabase.storage
+                .from(bucket)
+                .upload(path, linkedinFile, { upsert: true, contentType: 'application/pdf' });
 
-            if (!uploadError) {
-              uploadedLinkedinPath = path;
-              break;
+              if (!uploadError) {
+                uploadedLinkedinPath = path;
+              }
+            } catch {
+              // Try next bucket
             }
           }
         } catch {
@@ -303,6 +309,7 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
         linkedin_url: linkedinUrl.trim() || null,
         resume_path: uploadedResumePath,
         resume_pdf_path: uploadedResumePath,
+        linkedin_path: uploadedLinkedinPath,
         linkedin_pdf_path: uploadedLinkedinPath,
         onboarding_completed_at: new Date().toISOString(),
         created_at: data.user.created_at ?? new Date().toISOString(),
@@ -318,12 +325,16 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
         if (
           profileError.code === 'PGRST204' ||
           errStr.includes('resume_path') ||
+          errStr.includes('linkedin_path') ||
           errStr.includes('leetcode_url') ||
           errStr.includes('linkedin_url') ||
           errStr.includes('column')
         ) {
           if (errStr.includes('resume_path') && !errStr.includes('resume_pdf_path')) {
             delete profileData.resume_path;
+          }
+          if (errStr.includes('linkedin_path') && !errStr.includes('linkedin_pdf_path')) {
+            delete profileData.linkedin_path;
           }
           if (errStr.includes('leetcode_url')) {
             delete profileData.leetcode_url;

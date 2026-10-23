@@ -174,3 +174,9 @@ def test_cold_start_fallback_skills_when_skills_empty(monkeypatch):
     )
     assert len(jobs) > 0
 
+    from src.api.server import JobSearchRequest, discover_jobs
+    req = JobSearchRequest(skills=[], target_role="Software Engineer Intern")
+    res = discover_jobs(req, _auth=True)
+    assert res["count"] > 0
+    assert len(res["jobs"]) > 0
+
