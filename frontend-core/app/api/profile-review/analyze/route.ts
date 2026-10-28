@@ -1091,13 +1091,21 @@ export async function POST(request?: Request): Promise<NextResponse> {
       throw new AnalysisError('Failed to persist completed profile review.', 500, 'DATABASE_ERROR');
     }
 
-    // Database Commit 3: keep the canonical profile score snapshot in sync.
-    const { error: profileScoreSaveError } = await admin.from('profiles').update({
+    // Database Commit 3: keep the canonical profile score snapshot in sync (non-fatal)
+    try {
+      const { error: profileScoreSaveError } = await admin.from('profiles').update({
         scores: updatedScores,
         updated_at: completedAt,
       }).eq('id', studentId);
-    if (profileScoreSaveError) {
-      throw new AnalysisError('Failed to persist profile scores.', 500, 'PROFILE_SCORE_SAVE_FAILED');
+
+      if (profileScoreSaveError) {
+        console.warn('Failed to sync scores column to profiles table, retrying with updated_at only:', profileScoreSaveError.message);
+        await admin.from('profiles').update({
+          updated_at: completedAt,
+        }).eq('id', studentId);
+      }
+    } catch (profileSaveErr) {
+      console.warn('Non-blocking: could not sync scores snapshot to profiles table:', profileSaveErr);
     }
 
     // Frontend Sync: Return complete, recalculated object
