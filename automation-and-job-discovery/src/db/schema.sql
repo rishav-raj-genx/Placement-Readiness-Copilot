@@ -74,23 +74,42 @@ CREATE TABLE IF NOT EXISTS project_live_checks (
 CREATE INDEX IF NOT EXISTS idx_live_checks_student ON project_live_checks(student_id);
 CREATE INDEX IF NOT EXISTS idx_live_checks_url ON project_live_checks(project_url);
 
--- 3. Discovered Jobs Table (Module 5 - Greenhouse, Lever & RSS)
+-- 3. Discovered Jobs Table (Module 5 - JSearch API + Supabase cache)
 CREATE TABLE IF NOT EXISTS discovered_jobs (
     id TEXT PRIMARY KEY,
+    student_id TEXT,                          -- scopes jobs per student for cache lookup
     title TEXT NOT NULL,
     company TEXT NOT NULL,
     location TEXT,
     url TEXT NOT NULL UNIQUE,
     source TEXT NOT NULL,
+    description TEXT,
+    required_skills JSONB DEFAULT '[]'::jsonb,
     matched_skills JSONB DEFAULT '[]'::jsonb,
     relevance_score NUMERIC(5, 2) DEFAULT 0.0,
     match_reason TEXT,
     is_remote BOOLEAN DEFAULT false,
     job_type TEXT DEFAULT 'internship/entry-level',
+    employment_type TEXT DEFAULT 'full_time',
+    publication_status TEXT DEFAULT 'published',
+    boolean_matched BOOLEAN DEFAULT false,
+    is_msot_post BOOLEAN DEFAULT false,       -- true = admin-posted job, false = JSearch discovered
     posted_at TIMESTAMPTZ DEFAULT NOW(),
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Patch: add new columns safely to any existing discovered_jobs table
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS student_id TEXT;
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS required_skills JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS employment_type TEXT DEFAULT 'full_time';
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS publication_status TEXT DEFAULT 'published';
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS boolean_matched BOOLEAN DEFAULT false;
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS is_msot_post BOOLEAN DEFAULT false;
+ALTER TABLE discovered_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_jobs_student_created ON discovered_jobs(student_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_relevance ON discovered_jobs(relevance_score DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_company ON discovered_jobs(company);
 

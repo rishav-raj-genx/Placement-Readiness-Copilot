@@ -53,11 +53,15 @@ function JobsWorkspace() {
     }
   }, [hydrate, hydrateApplications, matchProfile, user?.id]);
 
-  const discover = useCallback(async () => {
+  const discover = useCallback(async (shouldForceRefresh = false) => {
     setDiscovering(true);
     setDiscoveryError(null);
     try {
-      const response = await fetch('/api/jobs/discover', { method: 'POST' });
+      const response = await fetch('/api/jobs/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force_refresh: shouldForceRefresh }),
+      });
       const payload: unknown = await response.json();
       if (!response.ok) {
         throw new Error(
@@ -81,7 +85,7 @@ function JobsWorkspace() {
   useEffect(() => {
     if (!isHydrated || autoDiscoveryRequested.current) return;
     autoDiscoveryRequested.current = true;
-    void discover();
+    void discover(false);
   }, [discover, isHydrated]);
 
   const applyAndLog = async (job: JobPosting) => {
@@ -121,7 +125,7 @@ function JobsWorkspace() {
             <Button
               variant="outline"
               disabled={discovering}
-              onClick={() => void discover()}
+              onClick={() => void discover(true)}
               className="rounded-lg border-stone-800 bg-stone-900 text-xs font-medium text-stone-200 hover:bg-stone-800"
             >
               {discovering ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}

@@ -207,7 +207,15 @@ export default function ActionPlanPage() {
   const leetcodeScore = typeof leetcode?.score === 'number'
     ? leetcode.score
     : (activeResult?.scores?.leetcode ?? readiness?.breakdown?.leetcode?.rawScore ?? readiness?.breakdown?.coding_practice?.rawScore ?? 0);
-  const leetcodeUrl = profile?.leetcodeUrl || profile?.codingProfileUrl || (leetcode?.username ? `https://leetcode.com/${leetcode.username}` : undefined);
+  const leetcodeUrl = profile?.leetcodeUrl || profile?.codingProfileUrl || (leetcode?.username ? `https://leetcode.com/u/${leetcode.username}` : undefined);
+  const canonicalLeetcodeUrl = useMemo(() => {
+    const raw = profile?.leetcodeUrl || profile?.codingProfileUrl || leetcode?.username;
+    if (!raw || !raw.trim()) return undefined;
+    const clean = raw.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+    const handle = clean.replace(/^@/, '').replace(/^(?:https?:\/\/)?(?:www\.)?leetcode\.(?:com|cn)\/(?:u\/)?/i, '');
+    return `https://leetcode.com/u/${handle}`;
+  }, [profile?.leetcodeUrl, profile?.codingProfileUrl, leetcode?.username]);
 
   const candidateProjects: ProjectProfileItem[] = useMemo(() => {
     if (profile?.projects && profile.projects.length > 0) {
@@ -1151,8 +1159,8 @@ export default function ActionPlanPage() {
                     />
                     <DiagnosticItem
                       label="Verified Profile Link"
-                      passed={Boolean(leetcodeUrl || leetcode?.username)}
-                      detail={leetcode?.username ? `@${leetcode.username} verified` : 'Connect LeetCode in Profile'}
+                      passed={Boolean(canonicalLeetcodeUrl || leetcode?.username)}
+                      detail={leetcode?.username ? `@${leetcode.username} verified` : (canonicalLeetcodeUrl ? 'Profile connected' : 'Connect LeetCode in Profile')}
                       required
                     />
                   </div>
@@ -1214,14 +1222,14 @@ export default function ActionPlanPage() {
                 </div>
 
                 {/* Footer LeetCode Profile */}
-                {leetcodeUrl && (
+                {canonicalLeetcodeUrl && (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-800/80 bg-stone-950/70 p-4">
                     <div className="text-xs text-stone-400">
                       External Coding Profile
                     </div>
                     <div className="flex items-center gap-3">
                       <a
-                        href={leetcodeUrl.startsWith('http') ? leetcodeUrl : `https://${leetcodeUrl}`}
+                        href={canonicalLeetcodeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs text-stone-300 hover:text-white"

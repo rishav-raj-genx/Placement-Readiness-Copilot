@@ -51,7 +51,7 @@ export function sanitizeUsername(value: string | null | undefined): string {
 
   // Extract from common URL patterns:
   // e.g. https://github.com/username or https://leetcode.com/username or https://leetcode.com/u/username
-  const urlMatch = str.match(/(?:github\.com|leetcode\.com(?:\/u)?)\/([a-zA-Z0-9_\-]+)/i);
+  const urlMatch = str.match(/(?:github\.com|leetcode\.(?:com|cn)(?:\/u)?)\/([a-zA-Z0-9_\-\.]+)/i);
   if (urlMatch && urlMatch[1]) {
     return urlMatch[1];
   }
@@ -62,7 +62,7 @@ export function sanitizeUsername(value: string | null | undefined): string {
       const parsed = new URL(str);
       const segments = parsed.pathname.split('/').filter(Boolean);
       const last = segments[segments.length - 1];
-      if (last && /^[a-zA-Z0-9_\-]+$/.test(last)) {
+      if (last && /^[a-zA-Z0-9_\-\.]+$/.test(last)) {
         return last;
       }
     } catch {
@@ -71,7 +71,7 @@ export function sanitizeUsername(value: string | null | undefined): string {
   }
 
   // If it's already a clean username or has prefix
-  const cleaned = str.replace(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com|leetcode\.com)\/?/i, '');
+  const cleaned = str.replace(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com|leetcode\.(?:com|cn))\/?/i, '');
   const segment = cleaned.replace(/^u\//i, '').split(/[/?#]/, 1)[0];
   return segment.replace(/^@+/, '').trim();
 }

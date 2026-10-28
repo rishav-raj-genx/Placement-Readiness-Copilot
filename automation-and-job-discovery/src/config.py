@@ -24,6 +24,7 @@ DEFAULT_VIEWPORT_HEIGHT = int(os.getenv("DEFAULT_VIEWPORT_HEIGHT", "812"))
 BROWSER_TIMEOUT_MS = int(os.getenv("BROWSER_TIMEOUT_MS", "25000"))
 
 # Job Discovery
+JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "").strip()
 MAX_JOBS_PER_SOURCE = int(os.getenv("MAX_JOBS_PER_SOURCE", "30"))
 AUTOMATION_E2E_MODE = os.getenv("AUTOMATION_E2E_MODE", "false").lower() in (
     "true",

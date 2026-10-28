@@ -202,6 +202,7 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
 
     const sanitizedGithub = github.trim() ? sanitizeUsername(github.trim()) : null;
     const sanitizedLeetcode = leetcodeUrl.trim() ? sanitizeUsername(leetcodeUrl.trim()) : null;
+    const canonicalLeetcode = sanitizedLeetcode ? `https://leetcode.com/u/${sanitizedLeetcode}` : null;
 
     if (github.trim() && !sanitizedGithub) {
       toast.error('Please enter a valid GitHub username or profile URL.');
@@ -305,7 +306,7 @@ export function SignUpWizard({ onToggleLogin = () => {}, onToggleStaff = () => {
         display_name: fullName.trim(),
         target_role: effectiveRole || 'Software Engineer',
         github_username: sanitizedGithub,
-        leetcode_url: sanitizedLeetcode,
+        leetcode_url: canonicalLeetcode,
         linkedin_url: linkedinUrl.trim() || null,
         resume_path: uploadedResumePath,
         resume_pdf_path: uploadedResumePath,

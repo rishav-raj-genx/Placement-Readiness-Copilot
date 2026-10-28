@@ -209,10 +209,10 @@ async function computeProjectsScore(
 
 function extractLeetcodeUsername(raw: string): string {
   const cleaned = raw.trim().split('?')[0].split('#')[0].replace(/\/+$/, '');
-  const match = cleaned.match(/leetcode\.com\/(?:u\/)?([a-zA-Z0-9_\-]+)/i);
+  const match = cleaned.match(/leetcode\.(?:com|cn)\/(?:u\/)?([a-zA-Z0-9_\-\.]+)/i);
   if (match) return match[1];
   const simple = cleaned.replace(/^@/, '');
-  if (/^[a-zA-Z0-9_\-]+$/.test(simple)) return simple;
+  if (/^[a-zA-Z0-9_\-\.]+$/.test(simple)) return simple;
   return '';
 }
 
@@ -226,37 +226,46 @@ async function computeCodingPracticeScore(
   let score = 0;
   let review = normalizeLeetCodeStats(existingReview, leetcodeUrl ? extractLeetcodeUsername(leetcodeUrl) : '');
 
-  // 1. Fetch live LeetCode stats via microservice or direct public GraphQL
+  // 1. Fetch live LeetCode stats via microservice or direct public GraphQL / mirror
   if (leetcodeUrl && leetcodeUrl.trim().length > 0) {
     const username = extractLeetcodeUsername(leetcodeUrl);
     if (username) {
-      if (!review) {
+      // If we don't have a verified review with solved problems, reach out to the microservice
+      if (!review || !review.exists || (review.total_solved === 0 && review.score === 0)) {
         try {
           const response = await serviceRequest(
             `${getProfileReviewBaseUrl()}/review/leetcode/${encodeURIComponent(username)}`,
             { timeoutMs: 8_000, maxRetries: 1 },
           );
-          review = normalizeLeetCodeStats(response, username);
+          const serviceReview = normalizeLeetCodeStats(response, username);
+          if (serviceReview && (serviceReview.total_solved > 0 || serviceReview.exists)) {
+            review = serviceReview;
+          }
         } catch {
           // The direct public API below is an independent fallback.
         }
       }
 
+      // If microservice was unreachable or returned 0, try direct LeetCode GraphQL
       if (!review || !review.exists || (review.total_solved === 0 && review.score === 0)) {
         try {
           const gqlRes = await fetch('https://leetcode.com/graphql', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               Referer: `https://leetcode.com/u/${encodeURIComponent(username)}/`,
+              Origin: 'https://leetcode.com',
             },
             cache: 'no-store',
             body: JSON.stringify({
               query: `query getUserProfile($username: String!) {
                 matchedUser(username: $username) {
                   username
-                  submitStats: submitStatsGlobal {
+                  submitStatsGlobal {
+                    acSubmissionNum { difficulty count }
+                  }
+                  submitStats {
                     acSubmissionNum { difficulty count }
                   }
                   profile { ranking }
@@ -268,10 +277,34 @@ async function computeCodingPracticeScore(
           });
           if (gqlRes.ok) {
             const directReview = normalizeLeetCodeStats(await gqlRes.json(), username);
-            if (directReview) review = directReview;
+            if (directReview && (directReview.total_solved > 0 || directReview.exists)) {
+              review = directReview;
+            }
           }
         } catch {
-          // Preserve the service response or prior verified score if LeetCode is unavailable.
+          // Fall through to public mirror API below
+        }
+      }
+
+      // If still 0 or blocked by Cloudflare, query resilient public mirror
+      if (!review || !review.exists || (review.total_solved === 0 && review.score === 0)) {
+        try {
+          const mirrorRes = await fetch(
+            `https://alfa-leetcode-api.onrender.com/userProfile/${encodeURIComponent(username)}`,
+            {
+              cache: 'no-store',
+              headers: { Accept: 'application/json' },
+            },
+          );
+          if (mirrorRes.ok) {
+            const mirrorData = await mirrorRes.json();
+            const mirrorReview = normalizeLeetCodeStats(mirrorData, username);
+            if (mirrorReview && mirrorReview.total_solved > 0) {
+              review = mirrorReview;
+            }
+          }
+        } catch {
+          // Preserve the prior verified score if LeetCode is unavailable.
         }
       }
     }

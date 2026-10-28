@@ -130,6 +130,7 @@ def test_aggregator_rejects_unapproved_and_linkedin_jobs(monkeypatch):
     )
     monkeypatch.setattr(aggregator.lever, "fetch_all", lambda max_per_company: [])
     monkeypatch.setattr(aggregator.rss, "fetch_all", lambda max_per_feed: [])
+    monkeypatch.setattr(aggregator.jsearch, "api_key", "")
 
     jobs = aggregator.discover_jobs(
         student_skills=["React", "TypeScript"],

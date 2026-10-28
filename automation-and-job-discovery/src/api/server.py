@@ -204,17 +204,20 @@ def discover_jobs(
             target_role = "Full-Stack Software Engineer"
 
         # If skills array is empty, strictly execute search based purely on candidate's target_role
+        # Default locations to India + Remote so JSearch always has a location context
+        effective_locations = req.locations if req.locations else ["India", "Bangalore", "Remote"]
+
         if not raw_skills:
             active_skills = get_fallback_skills_for_role(target_role)
             logger.info(
-                "Empty profile skills received. Strictly executing job search based purely on target role '%s' with fallback skills: %s",
+                "Empty profile skills received. Executing job search for role '%s' via JSearch with locations: %s",
                 target_role,
-                active_skills,
+                effective_locations,
             )
             boolean_query = req.boolean_query or BooleanSearchParser.build_query_from_profile(
                 skills=[],
                 target_role=target_role,
-                locations=req.locations or ["remote", "bangalore", "india", "worldwide"],
+                locations=effective_locations,
             )
         else:
             active_skills = raw_skills
@@ -224,15 +227,11 @@ def discover_jobs(
             student_skills=active_skills,
             target_role=target_role,
             boolean_query=boolean_query,
-            locations=req.locations,
+            locations=effective_locations,
             max_results=req.max_results or 20,
             force_refresh=req.force_refresh or False,
+            student_id=req.student_id or None,
         )
-        if req.student_id:
-            for job in jobs:
-                if isinstance(job, dict):
-                    job["student_id"] = req.student_id
-            db_client.save_discovered_jobs(jobs)
         freshness = job_aggregator.get_source_freshness()
         return {
             "count": len(jobs),

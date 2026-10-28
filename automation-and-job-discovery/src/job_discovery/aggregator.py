@@ -11,6 +11,7 @@ from src.job_discovery.boolean_parser import BooleanSearchParser
 from src.job_discovery.e2e_fixtures import build_e2e_jobs
 from src.job_discovery.greenhouse import GreenhouseFetcher
 from src.job_discovery.lever import LeverFetcher
+from src.job_discovery.jsearch_client import JSearchClient
 from src.job_discovery.rss_fetcher import RSSJobFetcher
 
 logger = logging.getLogger("job_aggregator")
@@ -21,6 +22,7 @@ ALLOWED_JOB_SOURCES = frozenset(
         "lever_ats",
         "weworkremotely_rss",
         "jobicy_rss",
+        "jsearch_api",
     }
 )
 FORBIDDEN_JOB_HOSTS = frozenset({"linkedin.com", "www.linkedin.com"})
@@ -37,6 +39,7 @@ class JobAggregator:
     FORCE_REFRESH_COOLDOWN: float = 15.0  # 15s debounce for forced refresh
 
     def __init__(self):
+        self.jsearch = JSearchClient()
         self.greenhouse = GreenhouseFetcher()
         self.lever = LeverFetcher()
         self.rss = RSSJobFetcher()
@@ -145,9 +148,16 @@ class JobAggregator:
         max_results: int = 25,
         save_to_db: bool = True,
         force_refresh: bool = False,
+        student_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Discovers, filters, scores, and ranks jobs for a student profile.
+
+        Supabase-first caching strategy:
+          1. If `student_id` is known and `force_refresh` is False, check Supabase
+             (or local SQLite) for jobs cached within the last 24 hours.
+          2. If a fresh cache exists → return it immediately (no JSearch call = quota saved).
+          3. If no cache or force_refresh=True → call JSearch, save results, return them.
         """
         has_provided_skills = bool([s.strip() for s in (student_skills or []) if s and s.strip()])
         effective_skills = [s.strip() for s in (student_skills or []) if s and s.strip()]
@@ -155,57 +165,118 @@ class JobAggregator:
             from src.api.server import get_fallback_skills_for_role
             effective_skills = get_fallback_skills_for_role(target_role)
 
-        # If boolean query is not explicitly given, automatically construct one
-        if not boolean_query:
-            query_skills = effective_skills if has_provided_skills else []
-            boolean_query = BooleanSearchParser.build_query_from_profile(
-                skills=query_skills,
-                target_role=target_role,
-                locations=locations or ["remote", "bangalore", "india", "worldwide"],
+        effective_locations = locations or ["India", "Bangalore", "Remote"]
+        logger.info(
+            "Discovering jobs for role='%s', skills=%s, locations=%s, student_id=%s",
+            target_role,
+            effective_skills[:4],
+            effective_locations,
+            student_id,
+        )
+
+        # ── SUPABASE CACHE CHECK — protect the 200 calls/month JSearch quota ──
+        if student_id and save_to_db and not force_refresh and not config.AUTOMATION_E2E_MODE:
+            cached = db_client.get_cached_jobs_for_student(
+                student_id=student_id,
+                max_age_hours=24,
+            )
+            if cached:
+                logger.info(
+                    "Serving %d jobs from cache for student '%s' — JSearch NOT called.",
+                    len(cached), student_id,
+                )
+                return cached[:max_results]
+            logger.info(
+                "Cache MISS for student '%s' — will call JSearch now.", student_id
             )
 
-        logger.info(f"Using Boolean Search Query: {boolean_query}")
+        # ── PRIMARY PATH: JSearch API ─────────────────────────────────────────
+        if self.jsearch.is_configured and not config.AUTOMATION_E2E_MODE:
+            raw_jobs = self.jsearch.discover_for_profile(
+                target_role=target_role,
+                skills=effective_skills,
+                locations=effective_locations,
+                max_results=max_results,
+            )
+            matched_jobs = self._score_jsearch_jobs(
+                raw_jobs=raw_jobs,
+                student_skills=effective_skills,
+                target_role=target_role,
+            )
 
-        # 1. Deduplicated compliant pool
-        deduped = self.get_raw_pool(force_refresh=force_refresh)
+        # ── FALLBACK PATH: legacy Greenhouse / Lever / RSS ────────────────────
+        else:
+            if not boolean_query:
+                boolean_query = BooleanSearchParser.build_query_from_profile(
+                    skills=effective_skills if has_provided_skills else [],
+                    target_role=target_role,
+                    locations=effective_locations,
+                )
+            logger.info(
+                "JSearch not configured — falling back to legacy boolean search: %s",
+                boolean_query,
+            )
+            deduped = self.get_raw_pool(force_refresh=force_refresh)
+            matched_jobs = self._legacy_boolean_filter(
+                pool=deduped,
+                boolean_query=boolean_query,
+                student_skills=effective_skills,
+                target_role=target_role,
+                has_provided_skills=has_provided_skills,
+            )
 
-        # 2. Boolean filter & scoring
-        matched_jobs: List[Dict[str, Any]] = []
-        clean_skills = effective_skills
+        # Sort by relevance score descending and cap results
+        matched_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)
+        final_jobs = matched_jobs[:max_results]
 
-        for job in deduped:
-            searchable_text = f"{job['title']} {job['company']} {job.get('location', '')} {job.get('description', '')}"
+        # Stamp student_id onto every job record before persisting
+        if student_id:
+            for job in final_jobs:
+                job.setdefault("student_id", student_id)
 
-            # Boolean logic match test: HARD filter (Issue 17: Boolean filters must be strictly respected)
-            matches_query = BooleanSearchParser.matches(boolean_query, searchable_text)
-            if not matches_query:
+        # Sync to Supabase (or SQLite fallback) so subsequent calls hit the cache
+        if save_to_db and final_jobs:
+            db_client.save_discovered_jobs(final_jobs)
+
+        return final_jobs
+
+    def _score_jsearch_jobs(
+        self,
+        raw_jobs: List[Dict[str, Any]],
+        student_skills: List[str],
+        target_role: str,
+    ) -> List[Dict[str, Any]]:
+        """Score and format JSearch API results into our discovered_jobs schema."""
+        results = []
+        for job in raw_jobs:
+            if not self._is_permitted_job(job):
                 continue
 
-            # Skill scoring & matched skill extraction
+            searchable_text = (
+                f"{job['title']} {job['company']} "
+                f"{job.get('location', '')} {job.get('description', '')}"
+            )
             matched_skills_found = []
-            for skill in clean_skills:
-                # Word boundary match for skills
+            for skill in student_skills:
                 pattern = r"(?:\b|_)" + re.escape(skill.lower()) + r"(?:\b|_)"
                 if re.search(pattern, searchable_text.lower()):
                     matched_skills_found.append(skill)
 
-            # Calculate relevance score (0 - 100)
             relevance, match_reason = self._compute_relevance(
                 job=job,
-                student_skills=clean_skills,
+                student_skills=student_skills,
                 matched_skills=matched_skills_found,
                 target_role=target_role,
-                matches_boolean=matches_query,
+                matches_boolean=True,
             )
 
             is_intern = any(
                 k in job["title"].lower() or k in job.get("description", "").lower()
                 for k in ["intern", "internship", "co-op", "trainee", "graduate"]
             )
-            emp_type = "internship" if is_intern else "full_time"
+            emp_type = job.get("employment_type", "internship" if is_intern else "full_time")
 
-            employer_required = list(job.get("required_skills") or [])
-            job_record = {
+            results.append({
                 "id": job["id"],
                 "title": job["title"],
                 "company": job["company"],
@@ -213,7 +284,68 @@ class JobAggregator:
                 "url": job["url"],
                 "source": job["source"],
                 "description": job.get("description", "") or match_reason,
-                "required_skills": employer_required,
+                "required_skills": list(job.get("required_skills") or []),
+                "matched_skills": matched_skills_found,
+                "relevance_score": max(50.0, relevance),
+                "match_reason": match_reason or f"Matched via JSearch for '{target_role}'",
+                "is_remote": job.get("is_remote", False),
+                "job_type": "internship/entry-level" if is_intern else "full_time",
+                "employment_type": emp_type,
+                "publication_status": "published",
+                "posted_at": job.get("posted_at"),
+                "boolean_matched": True,
+            })
+        return results
+
+    def _legacy_boolean_filter(
+        self,
+        pool: List[Dict[str, Any]],
+        boolean_query: str,
+        student_skills: List[str],
+        target_role: str,
+        has_provided_skills: bool,
+    ) -> List[Dict[str, Any]]:
+        """Legacy filter using Greenhouse/Lever/RSS pool with boolean matching."""
+        matched_jobs: List[Dict[str, Any]] = []
+        for job in pool:
+            searchable_text = (
+                f"{job['title']} {job['company']} "
+                f"{job.get('location', '')} {job.get('description', '')}"
+            )
+            try:
+                matches_query = BooleanSearchParser.matches(boolean_query, searchable_text)
+            except Exception:
+                matches_query = False
+            if not matches_query:
+                continue
+
+            matched_skills_found = []
+            for skill in student_skills:
+                pattern = r"(?:\b|_)" + re.escape(skill.lower()) + r"(?:\b|_)"
+                if re.search(pattern, searchable_text.lower()):
+                    matched_skills_found.append(skill)
+
+            relevance, match_reason = self._compute_relevance(
+                job=job,
+                student_skills=student_skills,
+                matched_skills=matched_skills_found,
+                target_role=target_role,
+                matches_boolean=matches_query,
+            )
+            is_intern = any(
+                k in job["title"].lower() or k in job.get("description", "").lower()
+                for k in ["intern", "internship", "co-op", "trainee", "graduate"]
+            )
+            emp_type = "internship" if is_intern else "full_time"
+            matched_jobs.append({
+                "id": job["id"],
+                "title": job["title"],
+                "company": job["company"],
+                "location": job.get("location", "Remote"),
+                "url": job["url"],
+                "source": job["source"],
+                "description": job.get("description", "") or match_reason,
+                "required_skills": list(job.get("required_skills") or []),
                 "matched_skills": matched_skills_found,
                 "relevance_score": relevance,
                 "match_reason": match_reason,
@@ -223,26 +355,28 @@ class JobAggregator:
                 "publication_status": "published",
                 "posted_at": job.get("posted_at"),
                 "boolean_matched": matches_query,
-            }
-            matched_jobs.append(job_record)
+            })
 
         if not matched_jobs and not has_provided_skills:
-            for job in deduped:
-                searchable_text = f"{job['title']} {job['company']} {job.get('location', '')} {job.get('description', '')}".lower()
+            for job in pool:
+                searchable_text = (
+                    f"{job['title']} {job['company']} "
+                    f"{job.get('location', '')} {job.get('description', '')}".lower()
+                )
                 role_words = [w.lower() for w in target_role.split() if len(w) > 2]
-                if any(w in searchable_text for w in role_words) or any(w in job['title'].lower() for w in ["software", "engineer", "developer", "intern"]):
+                if any(w in searchable_text for w in role_words):
                     relevance, match_reason = self._compute_relevance(
                         job=job,
-                        student_skills=clean_skills,
+                        student_skills=student_skills,
                         matched_skills=[],
                         target_role=target_role,
                         matches_boolean=False,
                     )
                     is_intern = any(
-                        k in job["title"].lower() or k in job.get("description", "").lower()
-                        for k in ["intern", "internship", "co-op", "trainee", "graduate"]
+                        k in job["title"].lower()
+                        for k in ["intern", "internship", "co-op", "trainee"]
                     )
-                    job_record = {
+                    matched_jobs.append({
                         "id": job["id"],
                         "title": job["title"],
                         "company": job["company"],
@@ -260,18 +394,8 @@ class JobAggregator:
                         "publication_status": "published",
                         "posted_at": job.get("posted_at"),
                         "boolean_matched": True,
-                    }
-                    matched_jobs.append(job_record)
-
-        # Sort by relevance score descending
-        matched_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)
-        final_jobs = matched_jobs[:max_results]
-
-        # Sync to Supabase
-        if save_to_db and final_jobs:
-            db_client.save_discovered_jobs(final_jobs)
-
-        return final_jobs
+                    })
+        return matched_jobs
 
     @staticmethod
     def _is_permitted_job(job: Dict[str, Any]) -> bool:

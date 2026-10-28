@@ -531,8 +531,18 @@ Provide actionable, high-standard recommendations in specific_fixes. Return only
     if not review.has_quantifiable_metrics:
         review.score = min(review.score, 60)
         cap_msg = "[Score Capped at 60/100] Bullet points lack quantifiable metrics. Quantify engineering achievements with concrete numbers and percentages."
-        if not any("quantifiable metrics" in f.lower() for f in review.specific_fixes):
+        if not any("score capped at 60/100" in f.lower() for f in review.specific_fixes):
             review.specific_fixes.insert(0, cap_msg)
+
+    # Merge deterministic grammar and spelling verification
+    deterministic_grammar = _check_grammar_and_style(text)
+    if deterministic_grammar:
+        review.has_spelling_or_grammar_issues = True
+        for issue in deterministic_grammar:
+            if issue not in review.spelling_grammar_issues:
+                review.spelling_grammar_issues.append(issue)
+            if issue not in review.specific_fixes:
+                review.specific_fixes.append(issue)
 
     return review
 

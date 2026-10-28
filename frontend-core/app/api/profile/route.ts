@@ -34,9 +34,25 @@ function sanitizeProfilePayload(body: Record<string, unknown>): Record<string, u
   }
 
   if (typeof body.leetcodeUrl === 'string') {
-    payload.leetcode_url = body.leetcodeUrl.trim() || null;
+    const raw = body.leetcodeUrl.trim();
+    if (!raw) {
+      payload.leetcode_url = null;
+    } else if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      payload.leetcode_url = raw;
+    } else {
+      const handle = sanitizeUsername(raw);
+      payload.leetcode_url = handle ? `https://leetcode.com/u/${handle}` : null;
+    }
   } else if (typeof body.leetcode_url === 'string') {
-    payload.leetcode_url = body.leetcode_url.trim() || null;
+    const raw = body.leetcode_url.trim();
+    if (!raw) {
+      payload.leetcode_url = null;
+    } else if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      payload.leetcode_url = raw;
+    } else {
+      const handle = sanitizeUsername(raw);
+      payload.leetcode_url = handle ? `https://leetcode.com/u/${handle}` : null;
+    }
   }
 
   if (typeof body.codingProfileUrl === 'string') {

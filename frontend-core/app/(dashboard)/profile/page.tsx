@@ -223,7 +223,8 @@ export default function ProfilePage() {
         setGithub(cleanVal || '');
       } else if (editingField === 'leetcode') {
         dbColumn = 'leetcode_url';
-        cleanVal = cleanVal ? sanitizeUsername(cleanVal) : null;
+        const rawHandle = cleanVal ? sanitizeUsername(cleanVal) : null;
+        cleanVal = rawHandle ? `https://leetcode.com/u/${rawHandle}` : null;
         setLeetcodeUrl(cleanVal || '');
       } else if (editingField === 'linkedinUrl') {
         dbColumn = 'linkedin_url';
@@ -511,6 +512,9 @@ export default function ProfilePage() {
 
       let updateSuccessful = false;
       try {
+        const rawHandle = leetcodeUrl ? sanitizeUsername(leetcodeUrl) : null;
+        const canonicalLeetcodeUrl = rawHandle ? `https://leetcode.com/u/${rawHandle}` : null;
+
         const patchRes = await fetch('/api/profile', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -519,7 +523,7 @@ export default function ProfilePage() {
             displayName: displayName.trim(),
             targetRole: targetRole.trim(),
             githubUsername: github ? sanitizeUsername(github) : null,
-            leetcodeUrl: leetcodeUrl ? sanitizeUsername(leetcodeUrl) : null,
+            leetcodeUrl: canonicalLeetcodeUrl,
             linkedinUrl: linkedinUrl.trim() || null,
             linkedinText: linkedinText.trim() || null,
             projects: projects.length > 0 ? projects : null,
@@ -535,6 +539,9 @@ export default function ProfilePage() {
       }
 
       if (!updateSuccessful) {
+        const rawHandle = leetcodeUrl ? sanitizeUsername(leetcodeUrl) : null;
+        const canonicalLeetcodeUrl = rawHandle ? `https://leetcode.com/u/${rawHandle}` : null;
+
         const fullPayload: Record<string, unknown> = {
           id: currentUser.id,
           email: currentUser.email,
@@ -542,7 +549,7 @@ export default function ProfilePage() {
           display_name: displayName.trim(),
           target_role: targetRole.trim(),
           github_username: github ? sanitizeUsername(github) : null,
-          leetcode_url: leetcodeUrl ? sanitizeUsername(leetcodeUrl) : null,
+          leetcode_url: canonicalLeetcodeUrl,
           linkedin_url: linkedinUrl.trim() || null,
           linkedin_text: linkedinText.trim() || null,
           projects: projects.length > 0 ? projects : null,
@@ -579,6 +586,29 @@ export default function ProfilePage() {
       }
 
       profileSaved = true;
+
+      // If the student changed their target role, invalidate stale job cache
+      // and trigger a fresh job discovery in the background (fire-and-forget).
+      const previousRole = candidate?.targetRole ?? '';
+      const roleChanged = targetRole.trim() !== previousRole.trim();
+      if (roleChanged) {
+        toast.info(`Target role updated to "${targetRole.trim()}". Refreshing job matches…`);
+        // Fire and forget — don't block the UI on this
+        void (async () => {
+          try {
+            // 1. Flush stale cached jobs for this student
+            await fetch('/api/jobs/invalidate', { method: 'POST' });
+            // 2. Trigger a fresh discovery with the new role (results saved to Supabase)
+            await fetch('/api/jobs/discover', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ force_refresh: true }),
+            });
+          } catch {
+            // Non-blocking — the student can manually refresh from the jobs page
+          }
+        })();
+      }
 
       const currentUserId = currentUser.id;
       const recalculated = await analyze(currentUserId);

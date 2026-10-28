@@ -80,6 +80,7 @@ class SupabaseHandler:
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS discovered_jobs (
             id TEXT PRIMARY KEY,
+            student_id TEXT,
             title TEXT,
             company TEXT,
             location TEXT,
@@ -115,6 +116,12 @@ class SupabaseHandler:
             cursor.execute(
                 "ALTER TABLE readiness_scores ADD COLUMN algorithm_version TEXT DEFAULT 'v1.0.0'"
             )
+        # Migrate discovered_jobs: add student_id column if it was created before this version
+        job_columns = {
+            str(row[1]) for row in cursor.execute("PRAGMA table_info(discovered_jobs)").fetchall()
+        }
+        if "student_id" not in job_columns:
+            cursor.execute("ALTER TABLE discovered_jobs ADD COLUMN student_id TEXT")
         conn.commit()
         conn.close()
 
@@ -222,6 +229,106 @@ class SupabaseHandler:
         conn.close()
 
         return {"success": True, "source": "local_sqlite", "id": record_id}
+
+    def get_cached_jobs_for_student(
+        self,
+        student_id: str,
+        max_age_hours: int = 24,
+    ) -> List[Dict[str, Any]]:
+        """
+        Reads previously discovered jobs from Supabase (or local SQLite) for a student.
+
+        Returns a non-empty list when fresh cached results exist so the caller
+        can skip calling JSearch entirely — protecting the 200 calls/month free-tier quota.
+        Returns [] when:
+          - Supabase is not reachable (falls through to SQLite, then [] if that is also empty)
+          - No rows exist for this student yet
+          - All rows are older than `max_age_hours`
+        """
+        if not self.is_live or not self.supabase:
+            return self._get_cached_jobs_sqlite(student_id, max_age_hours)
+
+        try:
+            from datetime import timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+            res = (
+                self.supabase.table("discovered_jobs")
+                .select(
+                    "id,title,company,location,url,source,description,"
+                    "required_skills,matched_skills,relevance_score,match_reason,"
+                    "is_remote,job_type,employment_type,publication_status,"
+                    "posted_at,student_id,boolean_matched"
+                )
+                .eq("student_id", student_id)
+                .gte("created_at", cutoff)
+                .order("relevance_score", desc=True)
+                .limit(50)
+                .execute()
+            )
+            rows = res.data or []
+            if rows:
+                logger.info(
+                    "Cache HIT — returning %d cached jobs for student '%s' from Supabase",
+                    len(rows), student_id,
+                )
+            return rows
+        except Exception as e:
+            logger.warning(
+                "Could not query Supabase cache for student '%s': %s — will call JSearch",
+                student_id, e,
+            )
+            # Try SQLite fallback before giving up
+            return self._get_cached_jobs_sqlite(student_id, max_age_hours)
+
+    def _get_cached_jobs_sqlite(
+        self, student_id: str, max_age_hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """SQLite fallback for get_cached_jobs_for_student (development / offline only)."""
+        try:
+            from datetime import timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+            conn = sqlite3.connect(self.local_db_path)
+            cur = conn.cursor()
+            # Gracefully handle tables that predate the student_id column
+            cols = {row[1] for row in cur.execute("PRAGMA table_info(discovered_jobs)").fetchall()}
+            if "student_id" not in cols:
+                conn.close()
+                return []
+            cur.execute(
+                """
+                SELECT id, title, company, location, url, source,
+                       matched_skills, relevance_score, match_reason,
+                       is_remote, job_type, posted_at
+                FROM discovered_jobs
+                WHERE student_id = ? AND created_at >= ?
+                ORDER BY relevance_score DESC
+                LIMIT 50
+                """,
+                (student_id, cutoff),
+            )
+            rows = cur.fetchall()
+            conn.close()
+            if not rows:
+                return []
+            logger.info(
+                "Cache HIT — returning %d cached jobs for student '%s' from SQLite",
+                len(rows), student_id,
+            )
+            return [
+                {
+                    "id": r[0], "title": r[1], "company": r[2], "location": r[3],
+                    "url": r[4], "source": r[5],
+                    "matched_skills": json.loads(r[6]) if r[6] else [],
+                    "relevance_score": r[7], "match_reason": r[8],
+                    "is_remote": bool(r[9]), "job_type": r[10],
+                    "posted_at": r[11], "student_id": student_id,
+                    "publication_status": "published",
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.warning("SQLite cache read failed for student '%s': %s", student_id, e)
+            return []
 
     def save_discovered_jobs(self, jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Pushes list of discovered jobs to Supabase or local SQLite."""
