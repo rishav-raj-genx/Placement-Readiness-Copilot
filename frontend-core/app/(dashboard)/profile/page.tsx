@@ -371,10 +371,17 @@ export default function ProfilePage() {
     }
     setIsSavingProject(true);
 
+    const title = projectForm.title.trim() || 'Untitled Project';
+    const repoUrl = projectForm.repoUrl.trim() || undefined;
     const item: ProjectItem = {
-      title: projectForm.title.trim() || 'Untitled Project',
-      repoUrl: projectForm.repoUrl.trim() || undefined,
-      githubUrl: projectForm.repoUrl.trim() || undefined,
+      id: editingProjectIndex !== null && projects[editingProjectIndex]?.id
+        ? projects[editingProjectIndex].id
+        : `proj-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: title,
+      title,
+      repoUrl,
+      repositoryUrl: repoUrl,
+      githubUrl: repoUrl,
       liveUrl: projectForm.liveUrl.trim() || undefined,
       description: projectForm.description.trim(),
     };

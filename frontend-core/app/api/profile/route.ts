@@ -28,9 +28,17 @@ function sanitizeProfilePayload(body: Record<string, unknown>): Record<string, u
   }
 
   if (typeof body.githubUsername === 'string') {
-    payload.github_username = sanitizeUsername(body.githubUsername) || null;
+    const cleanGh = sanitizeUsername(body.githubUsername) || null;
+    payload.github_username = cleanGh;
+    payload.github_handle = cleanGh;
   } else if (typeof body.github_username === 'string') {
-    payload.github_username = sanitizeUsername(body.github_username) || null;
+    const cleanGh = sanitizeUsername(body.github_username) || null;
+    payload.github_username = cleanGh;
+    payload.github_handle = cleanGh;
+  } else if (typeof body.github_handle === 'string') {
+    const cleanGh = sanitizeUsername(body.github_handle) || null;
+    payload.github_username = cleanGh;
+    payload.github_handle = cleanGh;
   }
 
   if (typeof body.leetcodeUrl === 'string') {

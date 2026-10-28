@@ -11,7 +11,8 @@ type UnknownRecord = Record<string, unknown>;
 
 export const PROFILE_SELECT_COLUMNS = [
   'id', 'email', 'display_name', 'role', 'created_at', 'target_role', 'target_locations',
-  'skills', 'github_username', 'resume_pdf_path', 'linkedin_pdf_path', 'linkedin_url',
+  'skills', 'github_username', 'github_handle', 'leetcode_url', 'coding_profile_url',
+  'resume_pdf_path', 'linkedin_pdf_path', 'linkedin_url',
   'linkedin_text', 'projects', 'onboarding_completed_at', 'updated_at',
 ].join(',');
 
@@ -37,17 +38,26 @@ function readStringArray(value: unknown): string[] {
 
 function normalizeProject(value: unknown): CandidateProject | null {
   if (!isRecord(value)) return null;
-  const id = readString(value.id);
-  const name = readString(value.name);
-  const repositoryUrl = readString(value.repositoryUrl);
+  const title = readString(value.title);
+  const name = readString(value.name) || title;
+  const repoUrl = readString(value.repoUrl) || readString(value.repositoryUrl) || readString(value.githubUrl);
+  const repositoryUrl = readString(value.repositoryUrl) || repoUrl;
   const description = readString(value.description);
-  if (!id || !name || !repositoryUrl || !description) return null;
+  const liveUrl = readString(value.liveUrl) || undefined;
+  const id = readString(value.id) || (name ? `proj-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : `proj-${Math.random().toString(36).substring(2, 9)}`);
+
+  // Require either a name/title or a description to be present
+  if (!name && !description) return null;
+
   return {
     id,
-    name,
-    repositoryUrl,
-    liveUrl: readString(value.liveUrl) || undefined,
-    description,
+    name: name || 'Project',
+    title: title || name || 'Project',
+    repositoryUrl: repositoryUrl || undefined,
+    repoUrl: repoUrl || repositoryUrl || undefined,
+    githubUrl: repoUrl || repositoryUrl || undefined,
+    liveUrl,
+    description: description || 'Portfolio project',
   };
 }
 
@@ -78,15 +88,15 @@ export function normalizeUserProfile(value: unknown): UserProfile | null {
     targetRole: readString(value.target_role) || undefined,
     targetLocations: readStringArray(value.target_locations),
     skills: readStringArray(value.skills),
-    githubUsername: readString(value.github_username) || undefined,
+    githubUsername: readString(value.github_username) || readString(value.github_handle) || undefined,
     resumePdfPath: readString(value.resume_pdf_path) || readString(value.resume_path) || undefined,
     linkedinPdfPath: readString(value.linkedin_pdf_path) || readString(value.linkedin_path) || undefined,
     linkedinUrl: readString(value.linkedin_url) || undefined,
     linkedinText: readString(value.linkedin_text) || undefined,
     linkedin_url: readString(value.linkedin_url) || null,
     linkedin_text: readString(value.linkedin_text) || null,
-    leetcodeUrl: readString(value.leetcode_url) || undefined,
-    codingProfileUrl: readString(value.coding_profile_url) || undefined,
+    leetcodeUrl: readString(value.leetcode_url) || readString(value.coding_profile_url) || undefined,
+    codingProfileUrl: readString(value.coding_profile_url) || readString(value.leetcode_url) || undefined,
     projects,
     interviewCredits: typeof value.interview_credits === 'number' ? value.interview_credits : 3,
     isPremium: value.is_premium === true,
