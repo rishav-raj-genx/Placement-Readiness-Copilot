@@ -70,10 +70,10 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
       .eq('publication_status', 'published');
 
     if (authData.user) {
-      // Crucial: Use the .or() filter to allow global admin jobs to bypass the student_id lock
-      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},is_msot_post.eq.true`);
+      // Allow personal matches, global platform jobs (student_id is null), and MSOT posts
+      jobsQuery = jobsQuery.or(`student_id.eq.${authData.user.id},student_id.is.null,is_msot_post.eq.true`);
     } else {
-      jobsQuery = jobsQuery.or('is_msot_post.eq.true');
+      jobsQuery = jobsQuery.or('student_id.is.null,is_msot_post.eq.true');
     }
 
     const { data: jobData, error: jobsError } = await jobsQuery

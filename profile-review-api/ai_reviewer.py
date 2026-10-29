@@ -802,3 +802,70 @@ Return only the LinkedInReviewResult schema.""",
             suggested_rewrites=rewrites,
             specific_fixes=fixes,
         )
+
+
+def extract_projects_from_resume_text(text: str) -> list[dict[str, object]]:
+    """
+    Parses and extracts candidate project entries directly from resume text.
+    Identifies project titles, descriptions, and repository or demo links.
+    """
+    if not text or not text.strip():
+        return []
+
+    projects: list[dict[str, object]] = []
+
+    pattern = re.compile(
+        r"(?:^|\n)\s*(?:(?:academic|personal|key|featured|technical|selected)\s+)?projects?\b[:\s]*(.*?)(?=\n\s*(?:(?:work\s+)?experience|employment|education|skills|certifications|achievements|leadership|\Z))",
+        re.DOTALL | re.IGNORECASE,
+    )
+    match = pattern.search(text)
+    section_text = match.group(1).strip() if match else text
+
+    blocks = re.split(r"\n\s*\n|\n(?=[A-Z0-9][A-Za-z0-9\s\-–—|]{3,50}(?:\s*\(|\s*\||\s*–|\s*-|\s*:))", section_text)
+
+    for block in blocks:
+        lines = [line.strip() for line in block.split("\n") if line.strip()]
+        if not lines:
+            continue
+        first_line = lines[0]
+        if re.match(r"^(?:projects?|skills|education|experience|summary|objective)$", first_line.lower()):
+            lines = lines[1:]
+            if not lines:
+                continue
+            first_line = lines[0]
+
+        title_parts = re.split(r"[|–—\-(:]", first_line)
+        title = title_parts[0].strip()
+        clean_title = re.sub(r"^[•\-\*\d\.\)]+\s*", "", title).strip()
+        if len(clean_title) < 2 or len(clean_title) > 60:
+            continue
+        if clean_title.lower() in ("project", "projects", "technical skills", "education", "experience", "languages", "tools"):
+            continue
+
+        urls = re.findall(r"https?://[^\s)\]]+|github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+", block)
+        repo_url = None
+        live_url = None
+        for u in urls:
+            clean_u = u if u.startsWith("http") else f"https://{u}"
+            if "github.com" in clean_u:
+                repo_url = clean_u
+            else:
+                live_url = clean_u
+
+        desc_lines = lines[1:] if len(lines) > 1 else lines
+        desc = " ".join(desc_lines)[:350].strip() or f"Engineering project focused on {clean_title}."
+
+        clean_id = re.sub(r"[^a-z0-9]", "-", clean_title.lower())[:24]
+        projects.append({
+            "id": f"proj-{clean_id}" if clean_id else f"proj-{len(projects)+1}",
+            "name": clean_title,
+            "title": clean_title,
+            "description": desc,
+            "repositoryUrl": repo_url,
+            "repoUrl": repo_url,
+            "liveUrl": live_url,
+        })
+        if len(projects) >= 6:
+            break
+
+    return projects

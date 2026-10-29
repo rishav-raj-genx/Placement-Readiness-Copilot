@@ -18,6 +18,7 @@ from ai_reviewer import (
     evaluate_text,
     extract_docx_data,
     extract_docx_text,
+    extract_projects_from_resume_text,
     get_backend_status,
 )
 from github_service import extract_github_username, fetch_github_data
@@ -59,6 +60,7 @@ class AnalyzeProfileResponse(BaseModel):
     github_review: GithubReview | None = None
     linkedin_review: LinkedInReviewResult | None = None
     leetcode_review: LeetCodeReview | None = None
+    extracted_projects: list[dict[str, object]] = Field(default_factory=list)
     document_review_subtotal: float = Field(ge=0, le=100)
     total_readiness_score: float = Field(ge=0, le=100)
     resume_error: str | None = None
@@ -739,11 +741,14 @@ async def analyze_profile(
 
         subtotal_score = round(sum(scores) / len(scores), 2) if scores else 0.0
 
+        extracted_projects = extract_projects_from_resume_text(resume_context)
+
         return AnalyzeProfileResponse(
             resume_review=resume_review,
             github_review=github_review,
             linkedin_review=linkedin_review,
             leetcode_review=leetcode_review,
+            extracted_projects=extracted_projects,
             document_review_subtotal=subtotal_score,
             total_readiness_score=subtotal_score,
             resume_error=resume_error,

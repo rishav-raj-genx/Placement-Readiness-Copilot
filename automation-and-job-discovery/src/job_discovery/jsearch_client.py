@@ -240,4 +240,6 @@ class JSearchClient:
             "posted_at": posted_at,
             "employment_type": emp_type,
             "job_type": "internship/entry-level" if emp_type == "internship" else "full_time",
+            "publication_status": "published",
+            "is_msot_post": False,
         }

@@ -292,6 +292,7 @@ class JobAggregator:
                 "job_type": "internship/entry-level" if is_intern else "full_time",
                 "employment_type": emp_type,
                 "publication_status": "published",
+                "is_msot_post": False,
                 "posted_at": job.get("posted_at"),
                 "boolean_matched": True,
             })

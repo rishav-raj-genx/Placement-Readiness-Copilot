@@ -138,9 +138,19 @@ async function computeProjectsScore(
     liveUrl?: string;
   }> | undefined,
   studentId: string,
-  admin: ReturnType<typeof createAdminClient>
+  admin: ReturnType<typeof createAdminClient>,
+  resumeReview?: Record<string, unknown> | null,
 ): Promise<number> {
   if (!projects || projects.length === 0) {
+    // If student uploaded a resume and projects are in the resume, derive project readiness from resume evaluation
+    if (resumeReview) {
+      const hasImpact = Boolean(resumeReview.has_project_stack_and_impact);
+      const resScore = typeof resumeReview.score === 'number' ? resumeReview.score : 70;
+      let scoreFromResume = 70;
+      if (hasImpact) scoreFromResume += 15;
+      if (resScore >= 75) scoreFromResume += 10;
+      return Math.min(95, Math.max(50, scoreFromResume));
+    }
     return 0;
   }
 
@@ -965,10 +975,43 @@ export async function POST(request?: Request): Promise<NextResponse> {
     // PHASE 2: DERIVED "PROJECTS" RECALCULATION
     // Factor in actual parsed project data and live-link check results
     // ──────────────────────────────────────────────────────────────────────────
+    let candidateProjects = Array.isArray(profile.projects) && profile.projects.length > 0
+      ? profile.projects
+      : null;
+
+    // If candidate has no manually saved projects, take projects extracted from resume
+    const extractedFromResume = Array.isArray((safeReview as Record<string, unknown>).extracted_projects) &&
+      ((safeReview as Record<string, unknown>).extracted_projects as unknown[]).length > 0
+      ? ((safeReview as Record<string, unknown>).extracted_projects as Array<Record<string, unknown>>)
+      : null;
+
+    if (!candidateProjects && extractedFromResume) {
+      candidateProjects = extractedFromResume.map((p, idx) => ({
+        id: String(p.id || `proj-resume-${idx + 1}`),
+        name: String(p.name || p.title || `Project ${idx + 1}`),
+        title: String(p.title || p.name || `Project ${idx + 1}`),
+        description: String(p.description || 'Engineering project from resume'),
+        repositoryUrl: p.repositoryUrl ? String(p.repositoryUrl) : (p.repoUrl ? String(p.repoUrl) : undefined),
+        repoUrl: p.repoUrl ? String(p.repoUrl) : (p.repositoryUrl ? String(p.repositoryUrl) : undefined),
+        liveUrl: p.liveUrl ? String(p.liveUrl) : undefined,
+      }));
+
+      // Persist extracted resume projects to profiles table
+      try {
+        await admin
+          .from('profiles')
+          .update({ projects: candidateProjects, updated_at: new Date().toISOString() })
+          .eq('id', studentId);
+      } catch (saveProjErr) {
+        console.warn('Could not persist extracted resume projects:', saveProjErr);
+      }
+    }
+
     const projectsScore = await computeProjectsScore(
-      profile.projects,
+      candidateProjects || profile.projects,
       studentId,
-      admin
+      admin,
+      resumeReview,
     );
     updatedScores.projects = projectsScore;
 
@@ -1020,7 +1063,7 @@ export async function POST(request?: Request): Promise<NextResponse> {
         weight: 0.25,
         weighted_points: Math.round(projectsScore * 0.25 * 10) / 10,
         max_points: 25,
-        present: (Array.isArray(profile.projects) && profile.projects.length > 0) || projectsScore > 0,
+        present: (Array.isArray(candidateProjects || profile.projects) && (candidateProjects || profile.projects).length > 0) || Boolean(resumeReview) || projectsScore > 0,
       },
       mock_interview: {
         raw_score: updatedScores.mock_interview,

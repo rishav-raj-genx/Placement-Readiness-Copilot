@@ -224,8 +224,12 @@ export default function ActionPlanPage() {
     if (profile?.projects && profile.projects.length > 0) {
       return profile.projects as ProjectProfileItem[];
     }
+    const reviewProjects = (activeResult as Record<string, unknown> | null)?.extracted_projects;
+    if (Array.isArray(reviewProjects) && reviewProjects.length > 0) {
+      return reviewProjects as ProjectProfileItem[];
+    }
     return [];
-  }, [profile?.projects]);
+  }, [profile?.projects, activeResult]);
 
   const handleCopyText = (text: string, key: string) => {
     void navigator.clipboard.writeText(text);

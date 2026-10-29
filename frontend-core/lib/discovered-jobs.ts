@@ -68,6 +68,22 @@ function isPublicationStatus(value: unknown): value is DiscoveredJob['publicatio
   return value === 'published' || value === 'unpublished';
 }
 
+function normalizeEmploymentType(value: unknown): DiscoveredJob['employment_type'] | null {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim().toLowerCase().replace(/[-\s]/g, '_');
+  if (clean === 'full_time' || clean === 'fulltime') return 'full_time';
+  if (clean === 'intern' || clean === 'internship') return 'internship';
+  if (clean === 'part_time' || clean === 'parttime') return 'part_time';
+  if (clean === 'contract' || clean === 'contractor') return 'contract';
+  return null;
+}
+
+function normalizePublicationStatus(value: unknown): DiscoveredJob['publication_status'] | null {
+  if (value === undefined || value === null || value === '') return 'published';
+  if (value === 'published' || value === 'unpublished') return value;
+  return null;
+}
+
 export function normalizeDiscoveredJob(value: unknown): DiscoveredJob | null {
   if (!isRecord(value)) return null;
 
@@ -76,28 +92,29 @@ export function normalizeDiscoveredJob(value: unknown): DiscoveredJob | null {
   const company = readString(value.company);
   const url = readHttpUrl(value.url);
   if (!id || !title || !company || !url) return null;
-  if (!isEmploymentType(value.employment_type) || !isPublicationStatus(value.publication_status)) {
-    return null;
-  }
+
+  const employment_type = normalizeEmploymentType(value.employment_type);
+  const publication_status = normalizePublicationStatus(value.publication_status);
+  if (!employment_type || !publication_status) return null;
 
   return {
     id,
     title,
     company,
-    location: readString(value.location),
+    location: readString(value.location) || 'Remote / Various',
     url,
-    source: readString(value.source),
+    source: readString(value.source) || 'jsearch_api',
     description: readString(value.description),
     required_skills: readStringArray(value.required_skills),
     matched_skills: readStringArray(value.matched_skills),
-    relevance_score: readNumber(value.relevance_score),
+    relevance_score: readNumber(value.relevance_score) || 60,
     match_reason: readString(value.match_reason),
     is_remote: value.is_remote === true,
-    job_type: readString(value.job_type),
-    employment_type: value.employment_type,
-    publication_status: value.publication_status,
+    job_type: readString(value.job_type) || (employment_type === 'internship' ? 'internship/entry-level' : 'full_time'),
+    employment_type,
+    publication_status,
     is_msot_post: value.is_msot_post === true,
-    posted_at: readString(value.posted_at),
+    posted_at: readString(value.posted_at) || new Date().toISOString(),
   };
 }
 

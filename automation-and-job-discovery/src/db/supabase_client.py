@@ -353,10 +353,23 @@ class SupabaseHandler:
             "job_type",
             "employment_type",
             "publication_status",
+            "is_msot_post",
+            "boolean_matched",
             "posted_at",
             "updated_at",
         }
-        cleaned_jobs = [{k: v for k, v in job.items() if k in allowed_columns} for job in jobs]
+        import uuid as _uuid
+        cleaned_jobs = []
+        for job in jobs:
+            item = {k: v for k, v in job.items() if k in allowed_columns}
+            # Ensure student_id is valid UUID string or None
+            sid = item.get("student_id")
+            if sid:
+                try:
+                    item["student_id"] = str(_uuid.UUID(str(sid)))
+                except (ValueError, TypeError):
+                    item["student_id"] = None
+            cleaned_jobs.append(item)
 
         saved_count = 0
         if self.is_live and self.supabase:
