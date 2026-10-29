@@ -8,6 +8,7 @@ import {
 } from '@/lib/discovered-jobs';
 import { createServerSessionClient } from '@/lib/supabase-session-server';
 import { createSupabaseServiceClient } from '@/lib/supabase-service-server';
+import { discoverAndCacheJobs } from '@/lib/jsearch-service';
 import { JobsFeedClient, type CandidateMatchProfile } from '@/components/jobs/JobsFeedClient';
 import type { DiscoveredJob } from '@/types';
 
@@ -91,11 +92,36 @@ async function loadJobDiscovery(): Promise<JobDiscoveryResult> {
     }
 
     const jobsValue: unknown = jobData;
-    const normalizedJobs = normalizeDiscoveredJobs(jobsValue);
-    const roleFilteredJobs = filterDiscoveredJobsForTargetRole(
+    let normalizedJobs = normalizeDiscoveredJobs(jobsValue);
+    let roleFilteredJobs = filterDiscoveredJobsForTargetRole(
       normalizedJobs,
       profile?.targetRole ?? '',
     );
+
+    // If there are no discovered non-MSOT jobs for the target role, automatically fetch via JSearch and cache in Supabase
+    const nonMsotJobs = roleFilteredJobs.filter((j) => !j.is_msot_post);
+    if (nonMsotJobs.length === 0) {
+      try {
+        const freshJobs = await discoverAndCacheJobs({
+          supabase: createSupabaseServiceClient(),
+          studentId: authData.user?.id,
+          targetRole: profile?.targetRole || 'Full-Stack Software Engineer',
+          skills: profile?.skills ?? [],
+          locations: ['India', 'Remote'],
+        });
+        if (freshJobs.length > 0) {
+          const msotPosts = normalizedJobs.filter((j) => j.is_msot_post);
+          normalizedJobs = [...msotPosts, ...freshJobs];
+          roleFilteredJobs = filterDiscoveredJobsForTargetRole(
+            normalizedJobs,
+            profile?.targetRole ?? '',
+          );
+        }
+      } catch (discErr) {
+        console.warn('Server-side job discovery failed, falling back to cached jobs:', discErr);
+      }
+    }
+
     const effectiveJobs = roleFilteredJobs.length > 0 ? roleFilteredJobs : normalizedJobs;
     return {
       profile,

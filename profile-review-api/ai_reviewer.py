@@ -846,7 +846,7 @@ def extract_projects_from_resume_text(text: str) -> list[dict[str, object]]:
         repo_url = None
         live_url = None
         for u in urls:
-            clean_u = u if u.startsWith("http") else f"https://{u}"
+            clean_u = u if u.startswith("http") else f"https://{u}"
             if "github.com" in clean_u:
                 repo_url = clean_u
             else:

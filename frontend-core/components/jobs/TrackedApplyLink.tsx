@@ -43,7 +43,12 @@ export function TrackedApplyLink({
         applicationDate: new Date().toISOString().slice(0, 10),
         jobPostingUrl: url,
       });
-      toast.success('Application added to your tracker.');
+      toast.success(`Application recorded for ${company}! Practice tailored interview questions now.`, {
+        action: {
+          label: 'Practice Interview',
+          onClick: () => router.push(`/dashboard/interview?role=${encodeURIComponent(jobTitle)}&company=${encodeURIComponent(company)}&jobId=${encodeURIComponent(jobId)}`),
+        },
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unable to record this application.';
       toast.error(message);

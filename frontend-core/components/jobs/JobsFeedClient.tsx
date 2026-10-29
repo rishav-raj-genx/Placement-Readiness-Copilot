@@ -11,6 +11,7 @@ import {
   Clock3,
   Loader2,
   MapPin,
+  Mic2,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -157,15 +158,24 @@ function JobCard({ job }: JobCardProps) {
             {job.match_reason || 'Recommended from your target role, skills, and candidate profile.'}
           </p>
         </div>
-        <TrackedApplyLink
-          jobId={job.id}
-          company={job.company}
-          jobTitle={job.title}
-          url={job.url}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#D93829] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
-        >
-          Apply now <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </TrackedApplyLink>
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
+          <TrackedApplyLink
+            jobId={job.id}
+            company={job.company}
+            jobTitle={job.title}
+            url={job.url}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#D93829] px-3.5 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#C22F21] active:bg-[#AB281B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D93829]"
+          >
+            Apply now <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </TrackedApplyLink>
+          <Link
+            href={`/dashboard/interview?role=${encodeURIComponent(job.title)}&company=${encodeURIComponent(job.company)}&skills=${encodeURIComponent(job.required_skills.join(','))}&jobId=${encodeURIComponent(job.id)}`}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-stone-700 bg-stone-800/90 px-3.5 py-2.5 text-xs font-semibold text-stone-200 transition-colors hover:bg-stone-700 hover:text-white"
+          >
+            <Mic2 className="h-3.5 w-3.5 text-[#D93829]" aria-hidden="true" />
+            Practice Interview
+          </Link>
+        </div>
       </div>
     </article>
   );
@@ -205,11 +215,21 @@ export function JobsFeedClient({ profile, initialJobs, initialError }: JobsFeedC
   }, [profile?.skills, profile?.targetRole, router]);
 
   useEffect(() => {
-    if ((jobs.length === 0 || initialJobs.length === 0) && !autoTriggeredRef.current) {
+    const hasDiscoveredJobs = jobs.some((j) => !j.is_msot_post);
+    if (!hasDiscoveredJobs && !autoTriggeredRef.current) {
       autoTriggeredRef.current = true;
       void triggerDiscover();
     }
-  }, [jobs.length, initialJobs.length, triggerDiscover]);
+  }, [jobs, triggerDiscover]);
+
+  const previousRoleRef = useRef(profile?.targetRole);
+  useEffect(() => {
+    if (previousRoleRef.current && previousRoleRef.current !== profile?.targetRole) {
+      previousRoleRef.current = profile?.targetRole;
+      autoTriggeredRef.current = false;
+      void triggerDiscover();
+    }
+  }, [profile?.targetRole, triggerDiscover]);
 
   return (
     <>

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, Cloud, Code2, Cpu, Loader2, Lock, MessageSquare, Mic2, Plus, Radio, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowRight, Building2, Check, Cloud, Code2, Cpu, Loader2, Lock, MessageSquare, Mic2, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,8 +47,14 @@ function Field({
   );
 }
 
-export default function ConfigureInterviewPage() {
+function ConfigureInterviewContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryRole = searchParams.get('role');
+  const queryCompany = searchParams.get('company');
+  const querySkills = searchParams.get('skills');
+  const queryJobId = searchParams.get('jobId');
+
   const user = useAuthStore((state) => state.user);
   const profile = useProfileStore((state) => state.profile);
   const hydrateProfile = useProfileStore((state) => state.hydrate);
@@ -61,7 +67,7 @@ export default function ConfigureInterviewPage() {
   const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [roundType, setRoundType] = useState<'round1' | 'round2' | 'both'>('round1');
   const [isRound1Done, setIsRound1Done] = useState(false);
-  const [targetRole, setTargetRole] = useState('');
+  const [targetRole, setTargetRole] = useState(queryRole || '');
   const [topics, setTopics] = useState<string[]>([]);
   const [topicInput, setTopicInput] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
@@ -70,7 +76,7 @@ export default function ConfigureInterviewPage() {
   const [provider, setProvider] = useState<'cloud_api' | 'ollama_local'>('cloud_api');
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('entry_level');
   const [companyType, setCompanyType] = useState<CompanyType>('other');
-  const [targetCompany, setTargetCompany] = useState('');
+  const [targetCompany, setTargetCompany] = useState(queryCompany || '');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isLaunchingRound2, setIsLaunchingRound2] = useState(false);
   const livekitConfiguration = getLiveKitClientConfiguration();
@@ -82,15 +88,26 @@ export default function ConfigureInterviewPage() {
     }
   }, [hydrateProfile, user?.id]);
 
-  // Initialize once from profile evidence without clobbering user keystrokes
   useEffect(() => {
-    if (profile?.targetRole) {
+    if (queryRole) {
+      setTargetRole(queryRole);
+    } else if (profile?.targetRole) {
       setTargetRole((current) => current || profile.targetRole || '');
     }
-    if (profile?.skills?.length) {
+
+    if (queryCompany) {
+      setTargetCompany(queryCompany);
+    }
+
+    if (querySkills) {
+      const parsed = querySkills.split(',').map((s) => s.trim()).filter(Boolean);
+      if (parsed.length > 0) {
+        setTopics(parsed.slice(0, 6));
+      }
+    } else if (profile?.skills?.length) {
       setTopics((current) => (current.length === 0 ? profile.skills.slice(0, 6) : current));
     }
-  }, [profile?.targetRole, profile?.skills]);
+  }, [queryRole, queryCompany, querySkills, profile?.targetRole, profile?.skills]);
 
   const addTopic = () => {
     const topic = topicInput.trim();
@@ -196,6 +213,24 @@ export default function ConfigureInterviewPage() {
             : "Preview Mode: Sign in to unlock the two-round technical interview assessment system."
         }
       />
+
+      {queryCompany && (
+        <div className="flex items-center justify-between rounded-2xl border border-[#D93829]/40 bg-[#D93829]/10 p-5">
+          <div className="flex items-center gap-3.5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#D93829]/20 text-[#D93829]">
+              <Building2 className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-stone-100">
+                Tailored interview preparation for {queryCompany}
+              </p>
+              <p className="text-xs text-stone-400">
+                Opening: <span className="font-medium text-stone-200">{queryRole || targetRole || 'Software Engineering'}</span>. Questions will test core technologies and situational problem-solving for this company.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Round Selection Cards */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -587,5 +622,19 @@ export default function ConfigureInterviewPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function ConfigureInterviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[400px] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[#D93829]" />
+        </div>
+      }
+    >
+      <ConfigureInterviewContent />
+    </Suspense>
   );
 }
